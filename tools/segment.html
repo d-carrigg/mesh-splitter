@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mesh Splitter</title>
 <style>
-  :root { --bg:#16181c; --panel:#1f2228; --line:#2e323a; --fg:#e6e8eb; --mute:#8b919c; --acc:#4da3ff; }
+  :root { color-scheme:dark; accent-color:var(--acc); --bg:#16181c; --panel:#1f2228; --line:#2e323a; --fg:#e6e8eb; --mute:#8b919c; --acc:#4da3ff; }
   * { box-sizing:border-box; }
   html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:13px/1.35 system-ui,Segoe UI,sans-serif; }
   body { display:flex; }
@@ -14,18 +14,22 @@
   #view canvas { display:block; }
   h1 { font-size:15px; margin:0 0 8px; }
   h2 { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--mute); margin:14px 0 6px; }
-  button { background:#2b3038; color:var(--fg); border:1px solid #3a404a; border-radius:5px; padding:5px 8px; font:inherit; cursor:pointer; }
+  button { background:#2b3038; color:var(--fg); border:1px solid #3a404a; border-radius:5px; padding:4px 8px; font:inherit; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px; }
+  button:has(svg:only-child) { padding:4px 6px; }
+  svg.i { width:16px; height:16px; flex:none; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
   button:hover { border-color:#56606e; }
   button.on { background:var(--acc); border-color:var(--acc); color:#06121f; font-weight:600; }
   button:disabled { opacity:.45; cursor:default; }
   .row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:4px 0; }
-  .tools button { flex:1; padding:5px 0; }
-  label.sl { display:grid; grid-template-columns:110px 1fr 44px; gap:6px; align-items:center; margin:3px 0; color:var(--mute); }
+  .bar h1, .head h2 { margin:0 auto 0 0; }
+  .head { margin-top:14px; }
+  .tools { margin:10px 0 6px; }
+  .tools button { flex:1; padding:6px 0; }
+  label.sl { display:grid; grid-template-columns:64px 1fr 40px; gap:6px; align-items:center; margin:3px 0; color:var(--mute); }
   label.sl output { color:var(--fg); text-align:right; }
   input[type=number] { width:48px; background:#14161a; color:var(--fg); border:1px solid #3a404a; border-radius:4px; padding:2px 4px; font:inherit; }
   input[type=text] { background:transparent; color:var(--fg); border:1px solid transparent; border-radius:4px; padding:2px 4px; font:inherit; width:100%; }
   input[type=text]:focus { border-color:#3a404a; background:#14161a; outline:none; }
-  #hint { color:var(--mute); font-size:12px; min-height:32px; margin-top:4px; }
   #status { position:absolute; left:10px; bottom:8px; color:var(--mute); font-size:12px; pointer-events:none; }
   #busy { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:#0008; font-size:15px; }
   #drop { position:absolute; inset:20px; border:2px dashed #4b5360; border-radius:12px; display:flex; align-items:center; justify-content:center; color:var(--mute); font-size:16px; pointer-events:none; }
@@ -34,74 +38,62 @@
   table.parts tr.active td { background:#27313d; }
   table.parts input[type=color] { width:22px; height:20px; padding:0; border:none; background:none; cursor:pointer; }
   table.parts .n { color:var(--mute); font-size:11px; text-align:right; white-space:nowrap; }
-  table.parts .eye { cursor:pointer; user-select:none; color:var(--mute); }
-  table.parts .eye.off { opacity:.35; }
+  table.parts button { background:none; border:none; padding:2px; color:var(--mute); }
+  table.parts button:hover { color:var(--fg); }
   .small { font-size:11px; color:var(--mute); }
-  kbd { background:#2b3038; border:1px solid #3a404a; border-radius:3px; padding:0 4px; font-size:11px; }
 </style>
 </head>
 <body>
 <div id="side">
-  <h1>Mesh Splitter</h1>
-  <div class="row">
-    <button id="openBtn">Open STL / 3MF…</button>
+  <div class="row bar">
+    <h1>Mesh Splitter</h1>
+    <button id="openBtn" data-icon="open" title="Open STL / 3MF"></button>
+    <button id="undoBtn" data-icon="undo" title="Undo (Ctrl+Z)"></button>
+    <button id="redoBtn" data-icon="redo" title="Redo (Ctrl+Y)"></button>
+    <button id="frameBtn" data-icon="frame" title="Frame view (Home)"></button>
     <input id="fileIn" type="file" accept=".stl,.3mf" hidden>
   </div>
-  <div id="fileInfo" class="small">No mesh loaded. Drop a file on the view.</div>
+  <div id="fileInfo" class="small">Drop or open an STL / 3MF</div>
 
-  <h2>Tool</h2>
-  <div class="row tools">
-    <button data-tool="orbit" title="O">Orbit</button>
-    <button data-tool="seed" title="S">Seed</button>
-    <button data-tool="fill" title="F">Fill</button>
-    <button data-tool="brush" title="B">Brush</button>
-    <button data-tool="pick" title="P">Pick</button>
-  </div>
-  <div id="hint"></div>
-
-  <h2>Settings</h2>
-  <label class="sl" title="Concave creases sharper than this separate parts; lower = more sensitive, 0 = pure distance">Crease step<input id="lambda" type="range" min="0" max="20" step="0.5" value="2"><output id="lambdaOut"></output></label>
-  <label class="sl" title="Neighbour-averaging passes on the concavity map; more = ignores small dents">Smoothing<input id="smooth" type="range" min="0" max="20" step="1" value="4"><output id="smoothOut"></output></label>
-  <label class="sl">Fill stop angle<input id="fillAng" type="range" min="2" max="90" step="1" value="25"><output id="fillAngOut"></output></label>
-  <label class="sl">Brush radius<input id="brushR" type="range" min="0.2" max="30" step="0.1" value="3"><output id="brushROut"></output></label>
+  <div class="row tools" id="tools"></div>
+  <label class="sl" title="Concave creases sharper than this separate parts; lower = more sensitive, 0 = pure distance">Crease<input id="lambda" type="range" min="0" max="20" step="0.5" value="2"><output id="lambdaOut"></output></label>
+  <label class="sl" title="Neighbour-averaging passes on the concavity map; more = ignores small dents">Denoise<input id="smooth" type="range" min="0" max="20" step="1" value="4"><output id="smoothOut"></output></label>
+  <label class="sl" title="Fill stops at concave creases sharper than this">Fill stop<input id="fillAng" type="range" min="2" max="90" step="1" value="25"><output id="fillAngOut"></output></label>
+  <label class="sl" title="Brush radius (mm)">Brush<input id="brushR" type="range" min="0.2" max="30" step="0.1" value="3"><output id="brushROut"></output></label>
 
   <h2>Segment</h2>
   <div class="row">
-    <button id="segBtn" title="Grow every seeded part out from its seeds; boundaries settle on concave creases">Segment from seeds</button>
+    <button id="segBtn" data-icon="segment" title="Grow every seeded part from its seeds; boundaries settle on concave creases">Segment</button>
+    <button id="smoothBtn" data-icon="smooth" title="Smooth part boundaries (3 majority-vote passes)">Smooth</button>
+    <button id="shellBtn" data-icon="shells" title="One part per disconnected shell">Shells</button>
   </div>
   <div class="row">
-    <button id="autoBtn">Auto split</button> into <input id="autoK" type="number" min="2" max="32" value="6"> parts
+    <button id="autoBtn" data-icon="auto" title="Split automatically into N parts">Auto split</button>
+    <input id="autoK" type="number" min="2" max="32" value="6" title="Number of parts">
+    <label class="small" title="Split only the active part"><input id="autoScope" type="checkbox"> active only</label>
   </div>
-  <div class="row"><label><input id="autoScope" type="checkbox"> only inside active part</label></div>
-  <div class="row"><button id="shellBtn">Split by shells</button> <span class="small">(disconnected pieces)</span></div>
 
-  <h2>Parts</h2>
+  <div class="row head">
+    <h2>Parts</h2>
+    <button id="addPart" data-icon="plus" title="New part"></button>
+    <button id="mergeBtn" data-icon="merge" title="Merge checked parts into active"></button>
+    <button id="clrSeeds" data-icon="eraser" title="Clear active part's seeds"></button>
+    <button id="clrAllSeeds" data-icon="eraser" title="Clear all seeds">All</button>
+    <button id="showAll" data-icon="eye" title="Show all parts"></button>
+    <button id="soloBtn" data-icon="solo" title="Show only active part"></button>
+  </div>
   <table class="parts"><tbody id="partsBody"></tbody></table>
-  <div class="row">
-    <button id="addPart">+ Part</button>
-    <button id="mergeBtn" title="Move the checked parts' faces into the active part">Merge ✓ → active</button>
-  </div>
-  <div class="row">
-    <button id="clrSeeds">Clear seeds (active)</button>
-    <button id="clrAllSeeds">Clear all seeds</button>
-  </div>
-  <div class="row">
-    <button id="showAll">Show all</button>
-    <button id="soloBtn">Solo active</button>
-    <button id="undoBtn">Undo</button>
-  </div>
 
   <h2>Export</h2>
   <div class="row">
-    <button id="exp3mf" title="Same mesh, each triangle painted with its part's filament (Bambu/Orca color painting)">Painted 3MF</button>
-    <button id="expStl" title="One closed STL per part, cut faces capped">Part STLs (.zip)</button>
+    <button id="exp3mf" data-icon="palette" title="Same mesh, each triangle painted with its part's filament slot (Bambu/Orca color painting)">Painted 3MF</button>
+    <button id="expStl" data-icon="package" title="One closed STL per part, cut faces capped (.zip)">Part STLs</button>
   </div>
   <div class="row">
-    <button id="saveSess">Save session</button>
-    <button id="loadSess">Load session</button>
+    <button id="saveSess" data-icon="save" title="Download session (.json)">Save</button>
+    <button id="loadSess" data-icon="load" title="Load session (.json)">Load</button>
     <input id="sessIn" type="file" accept=".json" hidden>
   </div>
-  <p class="small">F# = filament slot written to the painted 3MF. <kbd>Ctrl</kbd>+click picks a part in any tool. <kbd>Shift</kbd>+brush erases to Unassigned. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo.</p>
 </div>
 <div id="view">
   <div id="drop">Drop an STL or 3MF here</div>
@@ -124,7 +116,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { STLLoader } from "three/addons/loaders/STLLoader.js";
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
-import { unzipSync, zipSync, strFromU8, strToU8 } from "fflate";
+import { unzipSync, zipSync, zlibSync, unzlibSync, strFromU8, strToU8 } from "fflate";
 
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
 THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
@@ -135,6 +127,34 @@ const PALETTE = ["#e6194b","#3cb44b","#4363d8","#f58231","#911eb4","#42d4f4","#f
                  "#fabed4","#469990","#dcbeff","#9a6324","#fffac8","#800000","#aaffc3","#000075"];
 const UNASSIGNED_COLOR = "#9aa0a8";
 
+const ICONS = {
+  orbit: '<path d="M16.5 7.5C15.6 4.2 14 2 12 2 9.2 2 7 6.5 7 12s2.2 10 5 10c.3 0 .7-.1 1-.2"/><path d="m15.2 13.7 3.8 1.9-1.9 3.8"/><path d="M19 15.6c-1.8.9-4.3 1.4-7 1.4-5.5 0-10-2.2-10-5s4.5-5 10-5c4.8 0 8.9 1.7 9.8 4"/>',
+  seed: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  fill: '<path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/>',
+  brush: '<path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/>',
+  pick: '<path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/>',
+  open: '<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>',
+  undo: '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>',
+  redo: '<path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 15-6.7l3 2.7"/>',
+  frame: '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  merge: '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/>',
+  eraser: '<path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff: '<path d="M9.9 4.24A9 9 0 0 1 12 4c6.5 0 10 8 10 8a18 18 0 0 1-2.16 3.19"/><path d="M6.6 6.6A13.5 13.5 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M14.1 14.1a3 3 0 1 1-4.2-4.2"/><path d="m2 2 20 20"/>',
+  solo: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  segment: '<path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.17-2.87L3 3"/><path d="m15 9 6-6"/>',
+  smooth: '<path d="M2 12c2-5 4-5 6 0s4 5 6 0 4-5 6 0"/>',
+  shells: '<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/>',
+  auto: '<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4M19 14v4M10 2v2M7 8H3M21 16h-4M11 3H9"/>',
+  palette: '<circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.6-.7 1.6-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1a1.6 1.6 0 0 1 1.7-1.7h2c3 0 5.5-2.5 5.5-5.5C22 6 17.5 2 12 2z"/>',
+  package: '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+  save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/>',
+  load: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
+};
+const icon = (n) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
+
 // ---------------------------------------------------------------- state
 const S = {
   name: "", source: null,          // {type:'stl'} | {type:'3mf', files, meshes:[{file,objectId,triStart,triCount}]}
@@ -142,7 +162,7 @@ const S = {
   G: null,                         // face graph
   labels: null,                    // Int32Array part index per face
   parts: [],                       // {name,color,filament,seeds:[face],visible}
-  active: 0, tool: "seed", undo: [],
+  active: 0, tool: "seed", hist: { past: [], future: [] },
 };
 
 // ---------------------------------------------------------------- three setup
@@ -192,17 +212,18 @@ async function loadArrayBuffer(name, buf) {
   S.G = buildGraph(S.pos, S.tri);
   S.labels = new Int32Array(S.nF);
   S.parts = [{ name: "Unassigned", color: UNASSIGNED_COLOR, filament: 1, seeds: [], visible: true }];
-  S.active = 0; S.undo = [];
+  S.active = 0; S.hist = { past: [], future: [] };
   buildMesh();
   frame();
   refreshUI();
   const bb = S.G.bbox;
-  $("fileInfo").textContent = `${name}: ${S.nF.toLocaleString()} faces, ${S.G.shells} shell(s), ` +
-    `${(bb[3]-bb[0]).toFixed(1)} × ${(bb[4]-bb[1]).toFixed(1)} × ${(bb[5]-bb[2]).toFixed(1)} mm`;
+  $("fileInfo").textContent = `${name} · ${S.nF.toLocaleString()} faces · ${S.G.shells} shell${S.G.shells > 1 ? "s" : ""} · ` +
+    `${(bb[3]-bb[0]).toFixed(0)}×${(bb[4]-bb[1]).toFixed(0)}×${(bb[5]-bb[2]).toFixed(0)} mm`;
   $("drop").style.display = "none";
   $("brushR").max = (S.G.diag * 0.15).toFixed(1);
   if (+$("brushR").value > +$("brushR").max) $("brushR").value = (S.G.diag * 0.02).toFixed(1);
   syncSliders();
+  restoreAutosave();
 }
 
 // 3MF transform: 12 numbers, row-vector convention p' = p * M
@@ -631,17 +652,82 @@ function dropEmptyParts() {
 
 function partCounts() { const c = new Int32Array(S.parts.length); for (let f = 0; f < S.nF; f++) c[S.labels[f]]++; return c; }
 
-function pushUndo() {
-  S.undo.push({ labels: S.labels.slice(), parts: JSON.parse(JSON.stringify(S.parts)), active: S.active });
-  if (S.undo.length > 40) S.undo.shift();
+function snapshot() { return { labels: S.labels.slice(), parts: JSON.parse(JSON.stringify(S.parts)), active: S.active }; }
+function pushUndo(snap = snapshot()) {
+  S.hist.past.push(snap); S.hist.future = [];
+  if (S.hist.past.length > 40) S.hist.past.shift();
 }
-function undo() {
-  const u = S.undo.pop(); if (!u) return;
+function travel(from, to, msg) {
+  const u = from.pop(); if (!u) return;
+  to.push(snapshot());
   S.labels = u.labels; S.parts = u.parts; S.active = u.active;
-  afterEdit("Undone");
+  afterEdit(msg);
+}
+const undo = () => travel(S.hist.past, S.hist.future, "Undone");
+const redo = () => travel(S.hist.future, S.hist.past, "Redone");
+
+function afterEdit(msg) { updateColors(); updateVisibility(); drawSeeds(); refreshUI(); autosave(); if (msg) status(msg); }
+
+function deletePart(i) {
+  if (i <= 0) return;
+  pushUndo();
+  for (let f = 0; f < S.nF; f++) { const l = S.labels[f]; S.labels[f] = l === i ? 0 : l > i ? l - 1 : l; }
+  const [p] = S.parts.splice(i, 1);
+  S.active = S.active === i ? 0 : S.active > i ? S.active - 1 : S.active;
+  afterEdit(`Deleted ${p.name}`);
 }
 
-function afterEdit(msg) { updateColors(); updateVisibility(); drawSeeds(); refreshUI(); if (msg) status(msg); }
+// Graph edges incident to each mesh vertex (CSR), for counting label changes around a vertex.
+function vertexEdges(G) {
+  if (G.vS) return;
+  const shared = (e, out) => {
+    const a = G.ea[e], b = G.eb[e];
+    for (let i = 0; i < 3; i++) { const v = S.tri[3*a+i]; for (let j = 0; j < 3; j++) if (S.tri[3*b+j] === v) { out(v); break; } }
+  };
+  const vS = new Int32Array(S.nV + 1);
+  for (let e = 0; e < G.nE; e++) shared(e, (v) => vS[v + 1]++);
+  for (let v = 0; v < S.nV; v++) vS[v + 1] += vS[v];
+  const vE = new Int32Array(vS[S.nV]), fill = vS.slice(0, S.nV);
+  for (let e = 0; e < G.nE; e++) shared(e, (v) => { vE[fill[v]++] = e; });
+  G.vS = vS; G.vE = vE;
+}
+// True if relabelling face f to `to` adds a second arc of `to` or of f's label around one of its vertices.
+function pinches(f, to) {
+  const G = S.G, from = S.labels[f], lab = (g) => (g === f ? to : S.labels[g]);
+  for (let c = 0; c < 3; c++) {
+    const v = S.tri[3*f+c];
+    for (const L of [from, to]) {
+      let pre = 0, post = 0;
+      for (let k = G.vS[v]; k < G.vS[v + 1]; k++) {
+        const a = G.ea[G.vE[k]], b = G.eb[G.vE[k]];
+        if ((S.labels[a] === L) !== (S.labels[b] === L)) pre++;
+        if ((lab(a) === L) !== (lab(b) === L)) post++;
+      }
+      if (post > Math.max(2, pre)) return true;
+    }
+  }
+  return false;
+}
+// Majority vote: a face adopts a label that at least 2 neighbours share and that outnumbers its own.
+// Flips are applied in place and skipped when they would pinch a part at a vertex, because the
+// STL capper cannot seal a part whose boundary loops touch.
+function smoothBoundaries(passes = 3) {
+  const G = S.G, before = snapshot(), cnt = new Map();
+  vertexEdges(G);
+  let n = 0;
+  for (let it = 0; it < passes; it++) for (let f = 0; f < S.nF; f++) {
+    cnt.clear();
+    for (let k = G.adjS[f]; k < G.adjS[f + 1]; k++) { const l = S.labels[G.adjN[k]]; cnt.set(l, (cnt.get(l) || 0) + 1); }
+    const own = cnt.get(S.labels[f]) || 0;
+    for (const [l, c] of cnt) if (l !== S.labels[f] && c >= 2 && c > own) {
+      if (!pinches(f, l)) { S.labels[f] = l; n++; }
+      break;
+    }
+  }
+  if (!n) { status("Boundaries already smooth"); return; }
+  pushUndo(before);
+  afterEdit(`Smoothed ${n.toLocaleString()} boundary faces`);
+}
 
 // ---------------------------------------------------------------- mesh display
 function buildMesh() {
@@ -734,19 +820,23 @@ function hit(ev) {
   return { face: Math.floor(h.face.a / 3), point: h.point };
 }
 
-const HINTS = {
-  orbit: "Left-drag rotate, right-drag pan, wheel zoom.",
-  seed: "Click to drop a seed for the active part (make one with + Part). Seed every part, then Segment from seeds. Alt+click removes the nearest seed.",
-  fill: "Click a region: floods the clicked part until a concave crease sharper than the stop angle, into the active part (new part if same).",
-  brush: "Drag to paint the active part. Shift+drag erases to Unassigned. Right-drag still rotates.",
-  pick: "Click a face to make its part active.",
-};
+const TOOLS = [
+  { id: "orbit", key: "o", icon: "orbit", title: "Orbit (O), drag rotate, right-drag pan, wheel zoom" },
+  { id: "seed", key: "s", icon: "seed", title: "Seed (S), click adds a seed to the active part, Alt+click removes nearest" },
+  { id: "fill", key: "f", icon: "fill", title: "Fill (F), flood the clicked region up to the fill-stop crease into the active part" },
+  { id: "brush", key: "b", icon: "brush", title: "Brush (B), Shift erases, right-drag rotates" },
+  { id: "pick", key: "p", icon: "pick", title: "Pick (P), click makes that part active (Ctrl+click in any tool)" },
+];
+for (const t of TOOLS) {
+  const b = document.createElement("button");
+  b.dataset.tool = t.id; b.title = t.title; b.innerHTML = icon(t.icon);
+  b.onclick = () => setTool(t.id);
+  $("tools").appendChild(b);
+}
 function setTool(t) {
   S.tool = t;
   document.querySelectorAll("[data-tool]").forEach((b) => b.classList.toggle("on", b.dataset.tool === t));
-  $("hint").textContent = HINTS[t];
 }
-document.querySelectorAll("[data-tool]").forEach((b) => b.addEventListener("click", () => setTool(b.dataset.tool)));
 
 let down = null, painting = false;
 const canvas = renderer.domElement;
@@ -829,19 +919,23 @@ function refreshUI() {
       <td><input type="text" value="${p.name.replace(/"/g, "&quot;")}" ${i === 0 ? "readonly" : ""}></td>
       <td style="white-space:nowrap" title="Filament slot">F<input type="number" min="1" max="32" value="${p.filament}" style="width:40px"></td>
       <td class="n">${cnt[i].toLocaleString()}${p.seeds.length ? ` · ${p.seeds.length}●` : ""}</td>
-      <td class="eye ${p.visible ? "" : "off"}" title="Show/hide">👁</td>
-      <td>${i ? '<input type="checkbox" class="mck" title="Merge into active">' : ""}</td>`;
+      <td><button class="eye" title="${p.visible ? "Hide" : "Show"}">${icon(p.visible ? "eye" : "eyeOff")}</button></td>
+      <td>${i ? '<input type="checkbox" class="mck" title="Select for merge">' : ""}</td>
+      <td>${i ? `<button class="del" title="Delete part (faces go to Unassigned)">${icon("trash")}</button>` : ""}</td>`;
     const [radio, color, name, fil] = tr.querySelectorAll("input");
     radio.onchange = () => { S.active = i; refreshUI(); };
     tr.querySelector(".n").onclick = () => { S.active = i; refreshUI(); };
     color.oninput = () => { p.color = color.value; updateColors(); drawSeeds(); };
-    name.onchange = () => { p.name = name.value || p.name; };
-    fil.onchange = () => { p.filament = Math.max(1, Math.min(32, Math.round(+fil.value || 1))); fil.value = p.filament; };
+    color.onchange = autosave;
+    name.onchange = () => { p.name = name.value || p.name; autosave(); };
+    fil.onchange = () => { p.filament = Math.max(1, Math.min(32, Math.round(+fil.value || 1))); fil.value = p.filament; autosave(); };
     tr.querySelector(".eye").onclick = () => { p.visible = !p.visible; updateVisibility(); drawSeeds(); refreshUI(); };
+    if (i) tr.querySelector(".del").onclick = () => deletePart(i);
     const ck = tr.querySelector(".mck"); if (ck) ck.dataset.idx = i;
     body.appendChild(tr);
   });
-  $("undoBtn").disabled = !S.undo.length;
+  $("undoBtn").disabled = !S.hist.past.length;
+  $("redoBtn").disabled = !S.hist.future.length;
 }
 
 $("addPart").onclick = () => { if (!S.G) return; pushUndo(); S.parts.push(newPart()); S.active = S.parts.length - 1; refreshUI(); };
@@ -859,6 +953,9 @@ $("clrAllSeeds").onclick = () => { pushUndo(); S.parts.forEach((p) => (p.seeds =
 $("showAll").onclick = () => { S.parts.forEach((p) => (p.visible = true)); afterEdit(); };
 $("soloBtn").onclick = () => { S.parts.forEach((p, i) => (p.visible = i === S.active)); afterEdit(); };
 $("undoBtn").onclick = undo;
+$("redoBtn").onclick = redo;
+$("frameBtn").onclick = () => S.G && frame();
+$("smoothBtn").onclick = () => S.G && later(() => smoothBoundaries());
 $("segBtn").onclick = () => S.G && later(segmentFromSeeds);
 $("autoBtn").onclick = () => S.G && later(() => autoSplit(Math.max(2, Math.min(32, +$("autoK").value | 0))));
 $("shellBtn").onclick = () => S.G && later(splitShells);
@@ -869,9 +966,14 @@ view.addEventListener("dragover", (e) => e.preventDefault());
 view.addEventListener("drop", (e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) openFile(f); });
 window.addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT" && e.target.type !== "range") return;
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); return; }
-  const t = { o: "orbit", s: "seed", f: "fill", b: "brush", p: "pick" }[e.key.toLowerCase()];
-  if (t && !e.ctrlKey) setTool(t);
+  const k = e.key.toLowerCase();
+  if (e.ctrlKey || e.metaKey) {
+    if (k === "z" || k === "y") { e.preventDefault(); (k === "y" || e.shiftKey ? redo : undo)(); }
+    return;
+  }
+  if (e.key === "Home" && S.G) { e.preventDefault(); frame(); return; }
+  const t = TOOLS.find((t) => t.key === k);
+  if (t) setTool(t.id);
 });
 
 // ---------------------------------------------------------------- export
@@ -1020,20 +1122,35 @@ function exportSTLs() {
   status(`${Object.keys(files).length} STL(s) zipped; ${loops} cut opening(s) capped.`);
 }
 
-function saveSession() {
-  if (!S.G) return;
-  const b = new Uint8Array(S.labels.buffer.slice(0));
+// v2 zlib-compresses labels so large meshes still fit the localStorage quota; v1 files still load.
+function encodeSession() {
+  const b = zlibSync(new Uint8Array(S.labels.buffer.slice(0)));
   let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
-  download(`${S.name}.split.json`, JSON.stringify({ version: 1, file: S.name, faces: S.nF, parts: S.parts, labels: btoa(s) }), "application/json");
+  return JSON.stringify({ version: 2, file: S.name, faces: S.nF, parts: S.parts, labels: btoa(s) });
 }
-function loadSession(txt) {
+function applySession(txt) {
   const j = JSON.parse(txt);
-  if (j.faces !== S.nF) { alert(`Session is for a mesh with ${j.faces} faces; this one has ${S.nF}.`); return; }
-  pushUndo();
-  const bin = atob(j.labels), b = new Uint8Array(bin.length);
+  if (j.faces !== S.nF) throw new Error(`Session is for a mesh with ${j.faces} faces; this one has ${S.nF}.`);
+  const bin = atob(j.labels);
+  let b = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
-  S.labels = new Int32Array(b.buffer); S.parts = j.parts; S.active = 0;
+  if (j.version >= 2) b = unzlibSync(b);
+  S.labels = new Int32Array(b.slice().buffer); S.parts = j.parts; S.active = 0;
+}
+function saveSession() { if (S.G) download(`${S.name}.split.json`, encodeSession(), "application/json"); }
+function loadSession(txt) {
+  const before = snapshot();
+  try { applySession(txt); } catch (e) { alert(e.message); return; }
+  pushUndo(before);
   afterEdit("Session loaded");
+}
+const autosaveKey = () => `meshsplit:${S.name}:${S.nF}`;
+function autosave() { try { localStorage.setItem(autosaveKey(), encodeSession()); } catch {} }
+function restoreAutosave() {
+  let txt = null;
+  try { txt = localStorage.getItem(autosaveKey()); } catch {}
+  if (!txt) return;
+  try { applySession(txt); afterEdit("Restored previous session"); } catch (e) { console.warn("autosave ignored:", e.message); }
 }
 $("exp3mf").onclick = () => later(exportPainted3MF);
 $("expStl").onclick = () => later(exportSTLs);
@@ -1042,6 +1159,7 @@ $("loadSess").onclick = () => S.G ? $("sessIn").click() : alert("Open the mesh f
 $("sessIn").onchange = async () => { const f = $("sessIn").files[0]; if (f) loadSession(await f.text()); $("sessIn").value = ""; };
 
 // ---------------------------------------------------------------- boot
+document.querySelectorAll("[data-icon]").forEach((b) => b.insertAdjacentHTML("afterbegin", icon(b.dataset.icon)));
 setTool("seed"); syncSliders(); resize();
 const qp = new URLSearchParams(location.search).get("file");
 if (qp) {
@@ -1049,7 +1167,7 @@ if (qp) {
   fetch("/" + qp.replace(/^\/+/, "")).then((r) => { if (!r.ok) throw new Error(`${qp}: HTTP ${r.status}`); return r.arrayBuffer(); })
     .then((buf) => loadArrayBuffer(qp.split("/").pop(), buf)).catch((e) => alert(e.message)).finally(() => busy(false));
 }
-window.app = { S, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, undo, redo, deletePart, smoothBoundaries, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
 </script>
 </body>
 </html>
