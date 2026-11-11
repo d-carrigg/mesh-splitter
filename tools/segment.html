@@ -37,14 +37,24 @@
   input[type=color] { width:22px; height:20px; padding:0; border:none; background:none; cursor:pointer; flex:none; }
   /* floating viewport chrome */
   .float { position:absolute; background:var(--glass); border:1px solid var(--line); border-radius:8px; box-shadow:0 4px 16px #0006; }
-  #toolbar { top:10px; left:50%; transform:translateX(-50%); display:flex; gap:4px; align-items:center; padding:4px; z-index:3; }
+  #toolbar { top:10px; left:10px; display:flex; gap:4px; align-items:center; padding:4px; z-index:3; }
   #toolbar button { padding:6px 7px; border-color:transparent; background:transparent; }
   #toolbar button:hover { background:#2b3038; border-color:#3a404a; }
   #toolbar button.on { background:var(--acc); color:#06121f; }
-  #opts { top:58px; left:50%; transform:translateX(-50%); display:flex; gap:10px; align-items:center; padding:6px 10px; z-index:2; white-space:nowrap; }
+  #opts { top:58px; left:10px; max-width:calc(100% - 330px); display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:6px 10px; z-index:2; white-space:nowrap; }
   #opts:empty, #opts.hide { display:none; }
   #opts > [data-for] { display:none; gap:10px; align-items:center; }
-  #opts > [data-for].show { display:flex; }
+  #opts > [data-for].show { display:flex; flex-wrap:wrap; }
+  .menuWrap { position:relative; }
+  .menu { position:absolute; top:calc(100% + 4px); right:0; min-width:220px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 6px 20px #0008; padding:4px; z-index:10; display:flex; flex-direction:column; }
+  .menu.left { right:auto; left:0; }
+  .menu button { justify-content:flex-start; background:none; border-color:transparent; padding:6px 8px; }
+  .menu button:hover { background:#2b3038; }
+  .menu .meta { margin-left:auto; padding-left:12px; color:var(--mute); font-size:11px; }
+  #dropRecent { display:flex; flex-direction:column; gap:2px; min-width:280px; }
+  #dropRecent button { justify-content:flex-start; background:none; border-color:transparent; font-size:13px; padding:5px 8px; }
+  #dropRecent button:hover { background:#2b3038; }
+  #dropRecent .meta { margin-left:auto; padding-left:12px; color:var(--mute); font-size:11px; }
   #rightCol { position:absolute; top:10px; right:10px; bottom:34px; width:290px; display:flex; flex-direction:column; gap:8px; pointer-events:none; z-index:2; }
   #rightCol > .card { pointer-events:auto; position:static; padding:8px 10px; overflow-y:auto; min-height:0; flex:none; max-height:100%; }
   #rightCol > .card.grow { flex:0 1 auto; }
@@ -56,8 +66,9 @@
   .sub { display:flex; align-items:center; gap:6px; margin:10px 0 4px; }
   #status { position:absolute; left:10px; bottom:8px; color:var(--mute); font-size:12px; pointer-events:none; }
   #busy { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:#0008; font-size:15px; z-index:5; }
-  #drop { position:absolute; inset:20px; border:2px dashed #4b5360; border-radius:12px; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; color:var(--mute); font-size:16px; }
-  #drop button { font-size:14px; padding:8px 14px; }
+  #drop { position:absolute; inset:20px; pointer-events:none; border:2px dashed #4b5360; border-radius:12px; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; color:var(--mute); font-size:16px; }
+  #drop button, #drop #dropRecent { pointer-events:auto; }
+  #drop > button { font-size:14px; padding:8px 14px; }
   body.empty #side, body.empty #toolbar, body.empty #opts, body.empty #rightCol { display:none; }
   body.empty #view { grid-column:1 / -1; }
   body.empty #top .needMesh { opacity:.45; pointer-events:none; }
@@ -95,15 +106,19 @@
 <header id="top">
   <h1>Mesh Splitter</h1>
   <button id="openBtn" data-icon="open" title="Open STL / 3MF"></button>
+  <span class="menuWrap"><button id="recentBtn" data-icon="clock" title="Recent files"></button><div id="recentMenu" class="menu left" hidden></div></span>
   <button id="saveSess" class="needMesh" data-icon="save" title="Save session (.json)"></button>
   <button id="loadSess" class="needMesh" data-icon="load" title="Load session (.json)"></button>
   <span class="sep"></span>
   <button id="undoBtn" disabled data-icon="undo" title="Undo (Ctrl+Z)"></button>
   <button id="redoBtn" disabled data-icon="redo" title="Redo (Ctrl+Y)"></button>
   <span id="fileInfo"></span>
-  <button id="exp3mf" class="pri needMesh" data-icon="palette" title="Same mesh, each triangle painted with its part's filament slot (Bambu/Orca color painting)">Painted 3MF</button>
-  <button id="expStl" class="pri needMesh" data-icon="package" title="One closed STL per part, cut faces capped (.zip)">Part STLs</button>
-  <button id="expMerged" class="pri needMesh" data-icon="merge" title="Whole model as one STL, with moved/replaced parts in place">Merged STL</button>
+  <span class="menuWrap needMesh"><button id="expBtn" class="pri" data-icon="download">Export<svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="m6 9 6 6 6-6"/></svg></button>
+    <div id="expMenu" class="menu" hidden>
+      <button id="exp3mf" data-icon="palette" title="Same mesh, each triangle painted with its part's filament slot (Bambu/Orca color painting)">Painted 3MF</button>
+      <button id="expStl" data-icon="package" title="One closed STL per part, cut faces capped (.zip)">Part STLs (.zip)</button>
+      <button id="expMerged" data-icon="merge" title="Whole model as one STL, with moved/replaced parts in place">Merged STL</button>
+    </div></span>
   <input id="fileIn" type="file" accept=".stl,.3mf" hidden>
   <input id="sessIn" type="file" accept=".json" hidden>
 </header>
@@ -119,10 +134,10 @@
 </aside>
 
 <div id="view">
-  <div id="drop"><span>Drop an STL or 3MF here</span><button id="dropOpen" data-icon="open">Open…</button></div>
+  <div id="drop"><span>Drop an STL or 3MF here</span><button id="dropOpen" data-icon="open">Open…</button><div id="dropRecent"></div></div>
 
   <div id="toolbar" class="float">
-    <div class="grp" data-tools="orbit,pick"></div>
+    <div class="grp" data-tools="orbit"></div>
     <span class="sep"></span>
     <div class="grp" data-tools="seed">
       <button id="autoBtn" data-icon="auto" title="Auto split into N parts"></button>
@@ -139,12 +154,13 @@
     </div>
     <span class="sep"></span>
     <div class="grp">
+      <button id="colorMode" data-icon="droplet" title="Filament colors (C): parts on the same filament slot show one color"></button>
       <button id="frameBtn" data-icon="frame" title="Frame view (Home)"></button>
     </div>
   </div>
 
   <div id="autoPop" class="float" hidden>
-    <span class="small">Parts</span><input id="autoK" type="number" min="2" max="32" value="6">
+    <span class="small">Parts</span><input id="autoK" type="number" min="2" max="32" placeholder="auto" title="Leave empty to pick the number automatically">
     <label class="small" title="Split only the selected part"><input id="autoScope" type="checkbox"> selected only</label>
     <button id="autoRun" class="pri" data-icon="auto">Split</button>
   </div>
@@ -192,7 +208,7 @@
       <div class="sub">
         <h2>Replace</h2>
         <button id="repDel" data-icon="trash" title="Remove the replacement (old part comes back)"></button>
-        <button id="repBtn" data-icon="replace" title="Swap this part for another STL/3MF, lined up on the old part's joint"></button>
+        <button id="repBtn" data-icon="replace" title="Swap this part for another STL/3MF, lined up on the old part's joint">Replace…</button>
         <input id="repIn" type="file" accept=".stl,.3mf" hidden>
       </div>
       <div id="repName" class="small" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap"></div>
@@ -214,7 +230,7 @@
       <div class="row">
         <input id="aiModel" list="aiModels" title="OpenRouter model id (needs image input)" style="flex:1; width:auto">
         <datalist id="aiModels">
-          <option value="google/gemini-2.5-flash"><option value="google/gemini-2.5-pro">
+          <option value="deepseek/deepseek-v4.1-flash"><option value="google/gemini-2.5-flash"><option value="google/gemini-2.5-pro">
           <option value="anthropic/claude-sonnet-4.5"><option value="openai/gpt-5-mini">
         </datalist>
         <button id="aiBtn" class="pri" data-icon="sparkle" title="Render views + part stats, ask a vision model (OpenRouter) to name parts and flag segmentation problems">Review</button>
@@ -282,6 +298,9 @@ const ICONS = {
   replace: '<path d="M21 3v5h-5"/><path d="M3 21v-5h5"/><path d="M20.5 8A9 9 0 0 0 4.6 6.6"/><path d="M3.5 16a9 9 0 0 0 15.9 1.4"/>',
   sparkle: '<path d="M9.94 14.06 4 20M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1"/><circle cx="12" cy="12" r="2.5"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
+  droplet: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5S5 13 5 15a7 7 0 0 0 7 7z"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   scale: '<path d="M21 3h-6M21 3v6M21 3l-7 7"/><path d="M3 21h6M3 21v-6M3 21l7-7"/>',
   rotate: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
@@ -358,7 +377,8 @@ async function loadArrayBuffer(name, buf) {
   $("brushR").max = (S.G.diag * 0.15).toFixed(1);
   if (+$("brushR").value > +$("brushR").max) $("brushR").value = (S.G.diag * 0.02).toFixed(1);
   syncSliders();
-  restoreAutosave();
+  lastActive = -1;
+  if (!restoreAutosave() && S.nF >= 200) { autoSplit(0, true); S.hist = { past: [], future: [] }; refreshUI(); }
 }
 
 // 3MF transform: 12 numbers, row-vector convention p' = p * M
@@ -617,12 +637,15 @@ function segmentFromSeeds() {
 
 // Seeds by farthest-point sampling, then Lloyd-style refinement: each region's seed moves to its
 // deepest face (farthest from the region boundary), regions are re-grown, repeat.
-function autoSplit(k) {
-  const scope = $("autoScope").checked ? S.active : -1;
+// k = 0 picks the count: over-split, then merge neighbours whose shared boundary is not a crease.
+function autoSplit(k, scopeAll = false) {
+  const scope = !scopeAll && $("autoScope").checked ? S.active : -1;
   const mask = new Uint8Array(S.nF);
   let first = -1, count = 0;
   for (let f = 0; f < S.nF; f++) if (scope < 0 || S.labels[f] === scope) { mask[f] = 1; count++; if (first < 0) first = f; }
-  if (count < k) { alert("Not enough faces in scope."); return; }
+  const auto = !k;
+  if (auto) k = Math.min(32, Math.max(16, S.G.shells + 8), Math.floor(count / 50));
+  if (count < k || k < 1) { alert("Not enough faces in scope."); return; }
   const L = creaseStep();
   let seeds = [];
   // handle disconnected scope: one farthest pass per call is fine; unreached faces get seeds later
@@ -643,7 +666,9 @@ function autoSplit(k) {
   }
   lab = grow(seeds.map((s, i) => [s, i]), mask, L).lab;
   absorbTiny(lab, mask, Math.max(20, count * 0.003));
+  if (auto) mergeWeak(lab, mask, seeds);
   pushUndo();
+  if (scope < 0) { S.parts = [S.parts[0]]; S.active = 0; } // whole-model split replaces the old parts
   const base = S.parts.length, used = new Map();
   for (let f = 0; f < S.nF; f++) if (mask[f] && lab[f] >= 0) {
     if (!used.has(lab[f])) used.set(lab[f], 0);
@@ -659,6 +684,30 @@ function autoSplit(k) {
   if (scope > 0) S.parts[scope].seeds = [];
   dropEmptyParts();
   afterEdit(`Auto split into ${order.length} parts`);
+}
+
+// Merge adjacent regions whose shared boundary does not follow a concave crease: length-weighted mean
+// edge barrier (smoothed concavity, deg) below max(AUTO_CREASE, 2 crease steps), weakest boundary first.
+const AUTO_CREASE = 6;
+function mergeWeak(lab, mask, seeds) {
+  ensureBarrier();
+  const G = S.G, T = Math.max(AUTO_CREASE, 2 * creaseStep()), par = new Map();
+  const find = (a) => { while (par.get(a) !== a) { par.set(a, par.get(par.get(a))); a = par.get(a); } return a; };
+  for (let f = 0; f < S.nF; f++) if (mask[f] && lab[f] >= 0) par.set(lab[f], lab[f]);
+  for (;;) {
+    const B = new Map(); // "a,b" -> [sum bar * len, len]
+    for (let e = 0; e < G.nE; e++) {
+      const fa = G.ea[e], fb = G.eb[e]; if (!mask[fa] || !mask[fb] || lab[fa] < 0 || lab[fb] < 0) continue;
+      const a = find(lab[fa]), b = find(lab[fb]); if (a === b) continue;
+      const key = a < b ? a + "," + b : b + "," + a, w = G.geoN[e] || 1, cur = B.get(key) || [0, 0];
+      cur[0] += G.bar[e] * w; cur[1] += w; B.set(key, cur);
+    }
+    let best = null, bv = T;
+    for (const [key, [sb, sl]] of B) if (sb / sl < bv) { bv = sb / sl; best = key; }
+    if (!best) break;
+    const [a, b] = best.split(",").map(Number); par.set(b, a);
+  }
+  for (let f = 0; f < S.nF; f++) if (mask[f] && lab[f] >= 0) lab[f] = find(lab[f]);
 }
 
 // Regions smaller than minSize (pits, noise) are re-grown from their neighbours.
@@ -939,10 +988,21 @@ function applyXf() {
   render();
 }
 
-function updateColors() {
+let byFilament = false; try { byFilament = localStorage.getItem("meshsplit:byFil") === "1"; } catch {}
+// Display color of part i: its own color, or (filament view) the color of the first part on the same slot.
+function shownColor(i, plain) {
+  const p = S.parts[i];
+  let c = p.color;
+  if (byFilament && !plain) { const q = S.parts.find((q) => q.filament === p.filament); if (q) c = q.color; }
+  const col = new THREE.Color(c);
+  if (!plain && i === S.active && i > 0) col.lerp(new THREE.Color(0xffffff), 0.45); // selected part reads lighter
+  return col;
+}
+function updateColors(plain = false) {
   if (!mesh) return;
   const col = mesh.geometry.getAttribute("color").array;
-  const cs = S.parts.map((p) => new THREE.Color(p.color).convertSRGBToLinear());
+  const cs = S.parts.map((_, i) => shownColor(i, plain).convertSRGBToLinear());
+  for (const m of repMeshes.values()) if (S.parts[m.userData.part]) m.material.color.copy(shownColor(m.userData.part, plain));
   for (let f = 0; f < S.nF; f++) {
     const c = cs[S.labels[f]] || cs[0];
     for (let k = 0; k < 3; k++) { col[9*f+3*k] = c.r; col[9*f+3*k+1] = c.g; col[9*f+3*k+2] = c.b; }
@@ -1010,11 +1070,10 @@ function hit(ev) {
 }
 
 const TOOLS = [
-  { id: "orbit", key: "o", icon: "orbit", title: "Orbit (O), drag rotate, right-drag pan, wheel zoom" },
+  { id: "orbit", key: "v", icon: "pick", title: "Select (V), click a part to select it, drag rotate, right-drag pan, wheel zoom" },
   { id: "seed", key: "s", icon: "seed", title: "Seed (S), click adds a seed to the active part, Alt+click removes nearest" },
   { id: "fill", key: "f", icon: "fill", title: "Fill (F), flood the clicked region up to the fill-stop crease into the active part" },
   { id: "brush", key: "b", icon: "brush", title: "Brush (B), Shift erases, right-drag rotates" },
-  { id: "pick", key: "p", icon: "pick", title: "Pick (P), click makes that part active (Ctrl+click in any tool)" },
 ];
 document.querySelectorAll("[data-tools]").forEach((g) => [...g.dataset.tools.split(",")].reverse().forEach((id) => {
   const t = TOOLS.find((t) => t.id === id), b = document.createElement("button");
@@ -1059,8 +1118,9 @@ window.addEventListener("pointerup", (ev) => {
   const moved = Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 4; down = null;
   if (moved || ev.target !== canvas) return;
   if (pickingJoint) { pickJointAt(ev); return; }
-  const h = hit(ev); if (!h) return;
-  if (ev.ctrlKey || S.tool === "pick") { S.active = S.labels[h.face]; refreshUI(); return; }
+  const h = hit(ev);
+  if (!h) { if (S.tool === "orbit" && S.active) selectPart(0); return; }
+  if (ev.ctrlKey || S.tool === "orbit") { selectPart(S.labels[h.face]); return; }
   if (S.tool === "seed") {
     if (ev.altKey) { removeNearestSeed(h.face); return; }
     if (S.active === 0) { pushUndo(); S.parts.push(newPart()); S.active = S.parts.length - 1; }
@@ -1101,6 +1161,7 @@ function syncSliders() {
 }
 ["lambda", "smooth", "fillAng", "brushR"].forEach((id) => $(id).addEventListener("input", syncSliders));
 
+let lastActive = -1;
 const mergeSel = new Set(); // parts Shift+clicked in the list, merged into the selected part
 function selectPart(i) { S.active = i; mergeSel.clear(); refreshUI(); }
 function refreshUI() {
@@ -1126,6 +1187,7 @@ function refreshUI() {
     tr.querySelector(".eye").onclick = () => { p.visible = !p.visible; updateVisibility(); drawSeeds(); refreshUI(); };
     body.appendChild(tr);
   });
+  if (lastActive !== S.active) { lastActive = S.active; updateColors(); }
   $("mergeBtn").hidden = !mergeSel.size;
   $("mergeBtn").title = `Merge ${mergeSel.size} part(s) into ${S.parts[S.active].name}`;
   refreshXfPanel();
@@ -1171,14 +1233,56 @@ $("autoBtn").onclick = () => {
   else $("opts").style.visibility = "";
 };
 const closeAuto = () => { $("autoPop").hidden = true; $("autoBtn").classList.remove("on"); $("opts").style.visibility = ""; };
-$("autoRun").onclick = () => { closeAuto(); S.G && later(() => autoSplit(Math.max(2, Math.min(32, +$("autoK").value | 0)))); };
+$("autoRun").onclick = () => { closeAuto(); S.G && later(() => autoSplit($("autoK").value === "" ? 0 : Math.max(2, Math.min(32, +$("autoK").value | 0)))); };
 $("autoK").addEventListener("keydown", (e) => { if (e.key === "Enter") $("autoRun").click(); if (e.key === "Escape") closeAuto(); });
 // review card
 const showAi = (on) => { $("aiCard").hidden = !on; $("aiToggle").classList.toggle("on", on); };
 $("aiToggle").onclick = () => showAi($("aiCard").hidden);
 $("aiClose").onclick = () => showAi(false);
 $("fileIn").onchange = async () => { const f = $("fileIn").files[0]; if (f) openFile(f); };
-async function openFile(f) { busy(true); try { await loadArrayBuffer(f.name, await f.arrayBuffer()); } catch (e) { console.error(e); alert(e.message); } busy(false); }
+async function openBuf(name, buf, remember = true) {
+  busy(true);
+  try { await loadArrayBuffer(name, buf); if (remember) recentPut(name, buf); } catch (e) { console.error(e); alert(e.message); }
+  busy(false);
+}
+async function openFile(f) { await openBuf(f.name, await f.arrayBuffer()); }
+// recent files: bytes kept in IndexedDB (browser files have no path to reopen)
+const RECENT_MAX = 8;
+function rdb() { return new Promise((res, rej) => { const r = indexedDB.open("meshsplit", 1); r.onupgradeneeded = () => r.result.createObjectStore("recent", { keyPath: "name" }); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+const rreq = (q) => new Promise((res, rej) => { q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+async function recentAll() { try { const db = await rdb(); return (await rreq(db.transaction("recent").objectStore("recent").getAll())).sort((a, b) => b.t - a.t); } catch { return []; } }
+async function recentPut(name, buf) {
+  if (buf.byteLength > 200e6) return;
+  try {
+    const db = await rdb(), st = db.transaction("recent", "readwrite").objectStore("recent");
+    await rreq(st.put({ name, buf: buf.slice(0), size: buf.byteLength, t: Date.now() }));
+    const all = (await rreq(st.getAll())).sort((a, b) => b.t - a.t);
+    for (const r of all.slice(RECENT_MAX)) st.delete(r.name);
+  } catch (e) { console.warn("recent files:", e.message); }
+  renderRecent();
+}
+const ago = (t) => { const m = (Date.now() - t) / 6e4; return m < 60 ? `${Math.max(1, m | 0)} min` : m < 1440 ? `${(m / 60) | 0} h` : `${(m / 1440) | 0} d`; };
+async function renderRecent() {
+  const all = await recentAll();
+  for (const box of [$("recentMenu"), $("dropRecent")]) {
+    box.innerHTML = "";
+    for (const r of all) {
+      const b = document.createElement("button"); b.title = r.name;
+      b.innerHTML = `${icon("open")}<span style="overflow:hidden;text-overflow:ellipsis;max-width:320px">${esc(r.name)}</span><span class="meta">${ago(r.t)}</span>`;
+      b.onclick = () => { closeMenus(); openBuf(r.name, r.buf); };
+      box.appendChild(b);
+    }
+  }
+  $("recentBtn").disabled = !all.length;
+}
+function closeMenus() { document.querySelectorAll(".menu").forEach((m) => (m.hidden = true)); }
+function toggleMenu(id) { const m = $(id), was = m.hidden; closeMenus(); m.hidden = !was; }
+$("recentBtn").onclick = (e) => { e.stopPropagation(); toggleMenu("recentMenu"); };
+$("expBtn").onclick = (e) => { e.stopPropagation(); toggleMenu("expMenu"); };
+document.addEventListener("click", (e) => { if (!e.target.closest(".menu")) closeMenus(); });
+// filament color view
+const setColorMode = (on) => { byFilament = on; $("colorMode").classList.toggle("on", on); try { localStorage.setItem("meshsplit:byFil", on ? "1" : "0"); } catch {} updateColors(); };
+$("colorMode").onclick = () => setColorMode(!byFilament);
 view.addEventListener("dragover", (e) => e.preventDefault());
 view.addEventListener("drop", (e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) openFile(f); });
 window.addEventListener("keydown", (e) => {
@@ -1191,6 +1295,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Home" && S.G) { e.preventDefault(); frame(); return; }
   if (e.key === "Escape") { if (!$("autoPop").hidden) closeAuto(); else if (pickingJoint) { pickingJoint = false; refreshUI(); status(""); } else if (S.G && S.active) selectPart(0); return; }
   if (e.key === "Delete" && S.G && S.active > 0) { deletePart(S.active); return; }
+  if (k === "c" && S.G) { setColorMode(!byFilament); return; }
   const t = TOOLS.find((t) => t.key === k);
   if (t) setTool(t.id);
 });
@@ -1318,7 +1423,7 @@ function syncReps() {
       m.matrixAutoUpdate = false; repMeshes.set(p.rep.id, m); scene.add(m);
     }
     m.userData.part = i;
-    m.material.color.set(p.color); m.visible = p.visible;
+    m.material.color.copy(shownColor(i)); m.visible = p.visible;
     const M = repMatrix(i); if (M) { m.matrix.copy(M); m.matrixWorldNeedsUpdate = true; }
   });
   for (const [id, m] of repMeshes) if (!live.has(id)) { scene.remove(m); m.geometry.dispose(); repMeshes.delete(id); }
@@ -1520,7 +1625,7 @@ function label(cx, x, y, text, size = 15) {
 
 function captureForReview(stats) {
   const nP = S.parts.length, vis = S.parts.map((p) => p.visible);
-  S.parts.forEach((p) => (p.visible = true)); updateVisibility();
+  S.parts.forEach((p) => (p.visible = true)); updateVisibility(); updateColors(true);
   try {
     const T = 448, cols = 3, over = document.createElement("canvas"); over.width = T * cols; over.height = T * 2;
     const ox = over.getContext("2d"), perView = [];
@@ -1552,7 +1657,7 @@ function captureForReview(stats) {
       sx.font = "11px system-ui"; sx.fillStyle = "#aaa"; sx.fillText(VIEWS[bv].name, x0 + 6, y0 + t - 17);
     });
     col.array.set(keep); col.needsUpdate = true;
-    for (const m of repMeshes.values()) m.material.color.set(S.parts[m.userData.part].color);
+    updateColors();
     return {
       images: [over.toDataURL("image/jpeg", 0.85), sheet.toDataURL("image/jpeg", 0.85)],
       captions: ["Image 1: six views, every part in its own colour, labelled #id at its most visible spot.",
@@ -1623,7 +1728,7 @@ async function llmStatus() {
     $("aiState").textContent = j.configured ? `key: ${j.source}` : "no key";
     $("aiState").title = j.configured ? "" : "Put OPENROUTER_API_KEY=... in .env (repo root), set the env var, or put {\"api_key\": \"...\"} in tools/openrouter.local.json, then restart the splitter";
     let m = null; try { m = localStorage.getItem("meshsplit:model"); } catch {}
-    $("aiModel").value = m || j.model;
+    $("aiModel").value = (m && m !== "google/gemini-2.5-flash") ? m : j.model;
     return j;
   } catch { $("aiState").textContent = "server offline"; return { configured: false }; }
 }
@@ -1929,12 +2034,12 @@ function autosave() { try { localStorage.setItem(autosaveKey(), encodeSession())
 function restoreAutosave() {
   let txt = null;
   try { txt = localStorage.getItem(autosaveKey()); } catch {}
-  if (!txt) return;
-  try { applySession(txt); afterEdit("Restored previous session"); } catch (e) { console.warn("autosave ignored:", e.message); }
+  if (!txt) return false;
+  try { applySession(txt); afterEdit("Restored previous session"); return true; } catch (e) { console.warn("autosave ignored:", e.message); return false; }
 }
-$("exp3mf").onclick = () => later(exportPainted3MF);
-$("expStl").onclick = () => later(exportSTLs);
-$("expMerged").onclick = () => later(exportMergedSTL);
+$("exp3mf").onclick = () => { closeMenus(); later(exportPainted3MF); };
+$("expStl").onclick = () => { closeMenus(); later(exportSTLs); };
+$("expMerged").onclick = () => { closeMenus(); later(exportMergedSTL); };
 $("saveSess").onclick = saveSession;
 $("loadSess").onclick = () => S.G ? $("sessIn").click() : alert("Open the mesh first.");
 $("sessIn").onchange = async () => { const f = $("sessIn").files[0]; if (f) loadSession(await f.text()); $("sessIn").value = ""; };
@@ -1943,12 +2048,12 @@ $("sessIn").onchange = async () => { const f = $("sessIn").files[0]; if (f) load
 document.querySelectorAll("[data-icon]").forEach((b) => b.insertAdjacentHTML("afterbegin", icon(b.dataset.icon)));
 document.querySelectorAll("[data-icon-span]").forEach((b) => (b.innerHTML = icon(b.dataset.iconSpan)));
 new ResizeObserver(resize).observe(view);
-setTool("seed"); syncSliders(); resize(); llmStatus();
+setTool("orbit"); syncSliders(); resize(); llmStatus(); renderRecent(); $("colorMode").classList.toggle("on", byFilament);
 const qp = new URLSearchParams(location.search).get("file");
 if (qp) {
   busy(true);
   fetch("/" + qp.replace(/^\/+/, "")).then((r) => { if (!r.ok) throw new Error(`${qp}: HTTP ${r.status}`); return r.arrayBuffer(); })
-    .then((buf) => loadArrayBuffer(qp.split("/").pop(), buf)).catch((e) => alert(e.message)).finally(() => busy(false));
+    .then((buf) => openBuf(qp.split("/").pop(), buf)).catch((e) => alert(e.message)).finally(() => busy(false));
 }
 window.app = { S, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForReview, runReview, applyXf, ensureXf, xfMatrix, undo, redo, deletePart, smoothBoundaries, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
 </script>

@@ -18,7 +18,7 @@ from pathlib import Path
 LOCAL_CFG = Path(__file__).resolve().parent / "openrouter.local.json"
 DOTENV = Path(__file__).resolve().parent.parent / ".env"
 URL = "https://openrouter.ai/api/v1/chat/completions"
-DEFAULT_MODEL = "google/gemini-2.5-flash"
+DEFAULT_MODEL = "deepseek/deepseek-v4.1-flash"
 MAX_IMAGES = 6
 
 SYSTEM = """You review a 3D mesh that a user split into parts for multi-color / multi-piece 3D printing (FDM).
