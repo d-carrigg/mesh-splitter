@@ -655,7 +655,7 @@ function segmentFromSeeds(opts = {}) {
   const { lab } = grow(src, mask, creaseStep());
   let n = 0;
   for (let f = 0; f < S.nF; f++) if (mask[f] && lab[f] >= 0) { S.labels[f] = lab[f]; n++; }
-  smoothCut(mask);
+  snapCreases(mask); smoothCut(mask);
   afterEdit(`Segmented ${n.toLocaleString()} faces into ${seeded.size} part(s)`);
 }
 
@@ -706,7 +706,7 @@ function autoSplit(k, scopeAll = false) {
   }
   for (let f = 0; f < S.nF; f++) if (mask[f] && lab[f] >= 0) S.labels[f] = idx.get(lab[f]);
   if (scope > 0) S.parts[scope].seeds = [];
-  smoothCut(mask);
+  snapCreases(mask); smoothCut(mask);
   dropEmptyParts();
   afterEdit(`Auto split into ${order.length} parts`);
 }
@@ -963,6 +963,100 @@ function pinches(f, to) {
 // is unchanged. A crossing is clamped to [CUT_T, 1-CUT_T] along its edge to avoid slivers. Faces at a junction of
 // three parts get a centroid vertex. A face sharing an edge it would cut with a face that may not change (outside
 // the mask) stays whole, so no T-junctions are made. mask: only these faces may change. Returns faces split.
+// Crease snapping. Watershed boundaries can leave a flap of one part lying on its neighbour's smooth surface,
+// short of the crease where the two actually meet; smoothing alone only rounds the flap off. For every pair of
+// touching parts, faces within SNAP_RINGS of their shared boundary are relabelled by an s-t minimum cut on the
+// face graph, where cutting edge e costs len(e) * (SNAP_EPS + exp(-crease(e) / SNAP_DEG)): a boundary along a
+// concave crease is nearly free, one across a smooth surface costs its length. Faces outside the band, seed
+// faces, and other parts stay put. mask: only these faces may change. Returns faces relabelled.
+const SNAP_RINGS = 12, SNAP_EPS = 0.03, SNAP_DEG = 10;
+function maxflowCut(n, eu, ev, cap, src, snk) { // Dinic on an undirected graph; returns 1 for nodes on the source side
+  const m = eu.length, head = new Int32Array(n).fill(-1), nxt = new Int32Array(4 * m), to = new Int32Array(4 * m), c = new Float64Array(4 * m);
+  let k = 0;
+  const add = (a, b, w) => { to[k] = b; c[k] = w; nxt[k] = head[a]; head[a] = k++; to[k] = a; c[k] = 0; nxt[k] = head[b]; head[b] = k++; };
+  for (let i = 0; i < m; i++) { add(eu[i], ev[i], cap[i]); add(ev[i], eu[i], cap[i]); }
+  const lvl = new Int32Array(n), it = new Int32Array(n), q = new Int32Array(n);
+  const bfs = () => {
+    lvl.fill(-1); lvl[src] = 0; let h = 0, t = 0; q[t++] = src;
+    while (h < t) { const a = q[h++]; for (let e = head[a]; e >= 0; e = nxt[e]) if (c[e] > 1e-12 && lvl[to[e]] < 0) { lvl[to[e]] = lvl[a] + 1; q[t++] = to[e]; } }
+    return lvl[snk] >= 0;
+  };
+  const stE = new Int32Array(n), stN = new Int32Array(n + 1);
+  const dfs = () => { // iterative blocking-flow augment along level graph; returns pushed amount
+    let d = 0; stN[0] = src;
+    while (true) {
+      const a = stN[d];
+      if (a === snk) {
+        let f = Infinity; for (let i = 0; i < d; i++) f = Math.min(f, c[stE[i]]);
+        for (let i = 0; i < d; i++) { c[stE[i]] -= f; c[stE[i] ^ 1] += f; }
+        return f;
+      }
+      let e = it[a];
+      for (; e >= 0; e = nxt[e]) if (c[e] > 1e-12 && lvl[to[e]] === lvl[a] + 1) break;
+      it[a] = e;
+      if (e < 0) { if (!d) return 0; lvl[a] = -1; d--; it[stN[d]] = nxt[it[stN[d]]]; continue; }
+      stE[d] = e; stN[++d] = to[e];
+    }
+  };
+  while (bfs()) { for (let i = 0; i < n; i++) it[i] = head[i]; while (dfs() > 0); }
+  const side = new Uint8Array(n); let h = 0, t = 0; q[t++] = src; side[src] = 1;
+  while (h < t) { const a = q[h++]; for (let e = head[a]; e >= 0; e = nxt[e]) if (c[e] > 1e-12 && !side[to[e]]) { side[to[e]] = 1; q[t++] = to[e]; } }
+  return side;
+}
+function snapCreases(mask = null) {
+  const G = S.G, L = S.labels, tri = S.tri, pos = S.pos;
+  ensureBarrier();
+  const ok = (f) => !mask || mask[f];
+  const fixed = new Uint8Array(S.nF);
+  for (const p of S.parts) for (const f of p.seeds) if (f >= 0 && f < S.nF) fixed[f] = 1;
+  const elen = (e) => { // length of the mesh edge shared by the two faces of dual edge e
+    const f = G.ea[e], g = G.eb[e], sh = [];
+    for (let i = 0; i < 3; i++) { const v = tri[3*f+i]; if (v === tri[3*g] || v === tri[3*g+1] || v === tri[3*g+2]) sh.push(v); }
+    if (sh.length < 2) return 0;
+    const [a, b] = sh; return Math.hypot(pos[3*a]-pos[3*b], pos[3*a+1]-pos[3*b+1], pos[3*a+2]-pos[3*b+2]);
+  };
+  const cost = (e) => elen(e) * (SNAP_EPS + Math.exp(-Math.max(G.bar[e], G.concave[e] ? G.theta[e] : 0) / SNAP_DEG));
+  const pairs = new Set();
+  for (let e = 0; e < G.nE; e++) {
+    const a = L[G.ea[e]], b = L[G.eb[e]];
+    if (a !== b && a > 0 && b > 0 && ok(G.ea[e]) && ok(G.eb[e])) pairs.add(a < b ? a * 65536 + b : b * 65536 + a);
+  }
+  let changed = 0;
+  const ring = new Int32Array(S.nF), idx = new Int32Array(S.nF);
+  for (const key of pairs) {
+    const A = Math.floor(key / 65536), B = key % 65536;
+    const inAB = (f) => (L[f] === A || L[f] === B) && ok(f) && !fixed[f];
+    ring.fill(-1);
+    let front = [];
+    for (let e = 0; e < G.nE; e++) {
+      const f = G.ea[e], g = G.eb[e];
+      if (L[f] !== L[g] && inAB(f) && inAB(g)) for (const h of [f, g]) if (ring[h] < 0) { ring[h] = 0; front.push(h); }
+    }
+    const band = front.slice();
+    for (let r = 1; r < SNAP_RINGS && front.length; r++) {
+      const nx = [];
+      for (const f of front) for (let k = G.adjS[f]; k < G.adjS[f + 1]; k++) { const g = G.adjN[k]; if (ring[g] < 0 && inAB(g)) { ring[g] = r; nx.push(g); } }
+      band.push(...nx); front = nx;
+    }
+    if (band.length < 2) continue;
+    band.forEach((f, i) => (idx[f] = i));
+    const n = band.length + 2, src = n - 2, snk = n - 1, eu = [], ev = [], cap = [];
+    for (const f of band) for (let k = G.adjS[f]; k < G.adjS[f + 1]; k++) {
+      const g = G.adjN[k], e = G.adjE[k];
+      if (ring[g] >= 0) { if (f < g) { eu.push(idx[f]); ev.push(idx[g]); cap.push(cost(e)); } }
+      else if (L[g] === A) { eu.push(idx[f]); ev.push(src); cap.push(cost(e)); }   // neighbour outside the band keeps its label
+      else if (L[g] === B) { eu.push(idx[f]); ev.push(snk); cap.push(cost(e)); }
+    }
+    const side = maxflowCut(n, eu, ev, cap, src, snk);
+    // a cut that swallows most of one side's band is erasing a small part, not moving a boundary: skip it
+    let a0 = 0, b0 = 0, a1 = 0, b1 = 0;
+    for (const f of band) { if (L[f] === A) a0++; else b0++; if (side[idx[f]]) a1++; else b1++; }
+    if (a1 < 0.4 * a0 || b1 < 0.4 * b0) continue;
+    for (const f of band) { const l = side[idx[f]] ? A : B; if (L[f] !== l) { L[f] = l; changed++; } }
+  }
+  return changed;
+}
+
 const CUT_RINGS = 8, CUT_ITERS = 30, CUT_T = 0.15, CUT_SIGMA = 25;
 function smoothCut(mask = null) {
   const { pos, tri, nV, nF } = S, L = S.labels;
@@ -1103,7 +1197,7 @@ function setMesh(pos, tri, G = null) {
   buildMesh();
 }
 function smoothBoundaries() {
-  const before = snapshot(), n = smoothCut();
+  const before = snapshot(), n = snapCreases() + smoothCut();
   if (!n) { status("No boundaries to smooth"); return; }
   pushUndo(before);
   afterEdit(`Smoothed boundaries: split ${n.toLocaleString()} faces`);
@@ -2425,7 +2519,7 @@ if (qp) {
   fetch("/" + qp.replace(/^\/+/, "")).then((r) => { if (!r.ok) throw new Error(`${qp}: HTTP ${r.status}`); return r.arrayBuffer(); })
     .then((buf) => openBuf(qp.split("/").pop(), buf)).catch((e) => alert(e.message)).finally(() => busy(false));
 }
-window.app = { S, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForReview, runReview, applyXf, ensureXf, xfMatrix, undo, redo, deletePart, smoothBoundaries, smoothCut, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForReview, runReview, applyXf, ensureXf, xfMatrix, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
 </script>
 </body>
 </html>
