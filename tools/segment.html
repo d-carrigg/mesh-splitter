@@ -41,6 +41,19 @@
   table.parts button { background:none; border:none; padding:2px; color:var(--mute); }
   table.parts button:hover { color:var(--fg); }
   .small { font-size:11px; color:var(--mute); }
+  .xf { display:grid; grid-template-columns:52px repeat(3, 1fr); gap:4px 6px; align-items:center; color:var(--mute); }
+  .xf input[type=number] { width:100%; }
+  .xf .ax { font-size:10px; text-align:center; color:var(--mute); }
+  #xfPanel.off { opacity:.45; pointer-events:none; }
+  #aiModel, #aiNote { width:100%; background:#14161a; color:var(--fg); border:1px solid #3a404a; border-radius:4px; padding:3px 5px; font:inherit; }
+  #aiOut { margin-top:6px; }
+  #aiOut .sec { color:var(--mute); font-size:11px; text-transform:uppercase; letter-spacing:.06em; margin:8px 0 3px; }
+  #aiOut .nm { display:grid; grid-template-columns:18px 44px 1fr; gap:4px; align-items:center; padding:1px 0; }
+  #aiOut .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
+  #aiOut .iss { padding:4px 6px; border-left:3px solid var(--mute); margin:3px 0; background:#191c21; cursor:pointer; border-radius:0 4px 4px 0; }
+  #aiOut .iss:hover { background:#232831; }
+  #aiOut .iss.high { border-color:#ff5d5d; } #aiOut .iss.medium { border-color:#f5a623; } #aiOut .iss.low { border-color:#6fa8ff; }
+  #aiOut .fix { color:var(--mute); font-size:11px; }
 </style>
 </head>
 <body>
@@ -83,6 +96,37 @@
     <button id="soloBtn" data-icon="solo" title="Show only active part"></button>
   </div>
   <table class="parts"><tbody id="partsBody"></tbody></table>
+
+  <div class="row head">
+    <h2 id="xfTitle">Transform</h2>
+    <button id="xfReset" data-icon="reset" title="Reset this part's transform"></button>
+  </div>
+  <div id="xfPanel" class="xf" title="Applies to the active part: view, Part STLs and AI review. Pivot is the part's centre.">
+    <span></span><span class="ax">X</span><span class="ax">Y</span><span class="ax">Z</span>
+    <span>Scale %</span><input id="xfS0" type="number" step="1"><input id="xfS1" type="number" step="1"><input id="xfS2" type="number" step="1">
+    <span>Rotate °</span><input id="xfR0" type="number" step="5"><input id="xfR1" type="number" step="5"><input id="xfR2" type="number" step="5">
+    <span>Move mm</span><input id="xfT0" type="number" step="0.5"><input id="xfT1" type="number" step="0.5"><input id="xfT2" type="number" step="0.5">
+  </div>
+  <div class="row">
+    <label class="small" title="Scale X/Y/Z together"><input id="xfLock" type="checkbox" checked> uniform scale</label>
+    <span id="xfDims" class="small" style="margin-left:auto"></span>
+  </div>
+
+  <div class="row head">
+    <h2>AI review</h2>
+    <span id="aiState" class="small"></span>
+  </div>
+  <div class="row">
+    <button id="aiBtn" data-icon="sparkle" title="Render views + part stats, ask a vision model (OpenRouter) to name parts and flag segmentation problems">Review</button>
+    <button id="aiChk" data-icon="check" title="Local checks only (no AI): fragments, slivers, unassigned faces">Check</button>
+    <input id="aiModel" list="aiModels" title="OpenRouter model id (needs image input)" style="flex:1; width:auto">
+    <datalist id="aiModels">
+      <option value="google/gemini-2.5-flash"><option value="google/gemini-2.5-pro">
+      <option value="anthropic/claude-sonnet-4.5"><option value="openai/gpt-5-mini">
+    </datalist>
+  </div>
+  <input id="aiNote" type="text" placeholder="Note for the model (optional), e.g. curling player with broom">
+  <div id="aiOut"></div>
 
   <h2>Export</h2>
   <div class="row">
@@ -151,6 +195,9 @@ const ICONS = {
   palette: '<circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.6-.7 1.6-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1a1.6 1.6 0 0 1 1.7-1.7h2c3 0 5.5-2.5 5.5-5.5C22 6 17.5 2 12 2z"/>',
   package: '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
   save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/>',
+  reset: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  sparkle: '<path d="M9.94 14.06 4 20M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1"/><circle cx="12" cy="12" r="2.5"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
   load: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
 };
 const icon = (n) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
@@ -666,7 +713,7 @@ function travel(from, to, msg) {
 const undo = () => travel(S.hist.past, S.hist.future, "Undone");
 const redo = () => travel(S.hist.future, S.hist.past, "Redone");
 
-function afterEdit(msg) { updateColors(); updateVisibility(); drawSeeds(); refreshUI(); autosave(); if (msg) status(msg); }
+function afterEdit(msg) { updateColors(); applyXf(); updateVisibility(); drawSeeds(); refreshUI(); autosave(); if (msg) status(msg); }
 
 function deletePart(i) {
   if (i <= 0) return;
@@ -751,8 +798,57 @@ function buildMesh() {
   geo.setAttribute("normal", new THREE.BufferAttribute(N, 3));
   geo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(nF * 9), 3));
   mesh = new THREE.Mesh(geo, material);
+  mesh.userData.P0 = P.slice(); mesh.userData.N0 = N.slice();
   scene.add(mesh);
-  updateColors(); updateVisibility();
+  xfKey = "";
+  updateColors(); applyXf(); updateVisibility();
+}
+
+// ---------------------------------------------------------------- per-part transforms
+// part.xf = { s:[sx,sy,sz], r:[rx,ry,rz] deg (XYZ euler), t:[tx,ty,tz] mm, c:[pivot] }. Display and Part STLs only:
+// the painted 3MF is one mesh, so it keeps the original geometry.
+const isIdXf = (x) => !x || (x.s.every((v) => v === 1) && x.r.every((v) => v === 0) && x.t.every((v) => v === 0));
+function xfMatrix(p) {
+  const x = p?.xf; if (isIdXf(x)) return null;
+  const c = new THREE.Vector3(...x.c);
+  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(...x.r.map((d) => d * Math.PI / 180), "XYZ"));
+  return new THREE.Matrix4().compose(c.clone().add(new THREE.Vector3(...x.t)), q, new THREE.Vector3(...x.s))
+    .multiply(new THREE.Matrix4().makeTranslation(-c.x, -c.y, -c.z));
+}
+function partBox(i) {
+  const b = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+  for (let f = 0; f < S.nF; f++) if (S.labels[f] === i) for (let c = 0; c < 3; c++) {
+    const v = S.tri[3*f+c]; for (let k = 0; k < 3; k++) { b[k] = Math.min(b[k], S.pos[3*v+k]); b[k+3] = Math.max(b[k+3], S.pos[3*v+k]); }
+  }
+  return b;
+}
+function ensureXf(i) {
+  const p = S.parts[i];
+  if (!p.xf) { const b = partBox(i); p.xf = { s: [1, 1, 1], r: [0, 0, 0], t: [0, 0, 0], c: [0, 1, 2].map((k) => isFinite(b[k]) ? (b[k] + b[k+3]) / 2 : 0) }; }
+  return p.xf;
+}
+let xfKey = "";
+function applyXf() {
+  if (!mesh) return;
+  const Ms = S.parts.map(xfMatrix), any = Ms.some(Boolean);
+  const key = any ? JSON.stringify(S.parts.map((p) => p.xf || 0)) + "|" + fullHash() : "";
+  if (key === xfKey) return;
+  xfKey = key;
+  const geo = mesh.geometry, P = geo.getAttribute("position").array, N = geo.getAttribute("normal").array, { P0, N0 } = mesh.userData;
+  const Ns = Ms.map((m) => m && new THREE.Matrix3().getNormalMatrix(m));
+  const v = new THREE.Vector3();
+  for (let f = 0; f < S.nF; f++) {
+    const m = Ms[S.labels[f]], nm = Ns[S.labels[f]], o = 9 * f;
+    for (let k = 0; k < 9; k += 3) {
+      if (!m) { for (let j = 0; j < 3; j++) { P[o+k+j] = P0[o+k+j]; N[o+k+j] = N0[o+k+j]; } continue; }
+      v.set(P0[o+k], P0[o+k+1], P0[o+k+2]).applyMatrix4(m); P[o+k] = v.x; P[o+k+1] = v.y; P[o+k+2] = v.z;
+      v.set(N0[o+k], N0[o+k+1], N0[o+k+2]).applyMatrix3(nm).normalize(); N[o+k] = v.x; N[o+k+1] = v.y; N[o+k+2] = v.z;
+    }
+  }
+  geo.getAttribute("position").needsUpdate = true; geo.getAttribute("normal").needsUpdate = true;
+  geo.computeBoundingBox(); geo.computeBoundingSphere();
+  geo.disposeBoundsTree?.(); geo.computeBoundsTree();
+  render();
 }
 
 function updateColors() {
@@ -782,6 +878,7 @@ function updateVisibility() {
   geo.computeBoundsTree();
   render();
 }
+function fullHash() { let h = 0; for (let f = 0; f < S.nF; f++) h = (h * 31 + S.labels[f]) | 0; return h; }
 function hashLabels() { let h = 0; for (let f = 0; f < S.nF; f += 7) h = (h * 31 + S.labels[f]) | 0; return h; }
 
 function drawSeeds() {
@@ -790,9 +887,10 @@ function drawSeeds() {
   const r = S.G.diag * 0.006, sg = new THREE.SphereGeometry(r, 12, 8), outline = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide });
   S.parts.forEach((p, i) => {
     if (!p.visible) return;
-    const m = new THREE.MeshBasicMaterial({ color: p.color });
+    const m = new THREE.MeshBasicMaterial({ color: p.color }), M = xfMatrix(p);
     for (const f of p.seeds) {
       const pos = new THREE.Vector3(S.G.cen[3*f], S.G.cen[3*f+1], S.G.cen[3*f+2]);
+      if (M) pos.applyMatrix4(M);
       const s = new THREE.Mesh(sg, m); s.position.copy(pos);
       const o = new THREE.Mesh(sg, outline); o.scale.setScalar(1.35); o.position.copy(pos);
       seedGroup.add(o, s);
@@ -817,7 +915,10 @@ function hit(ev) {
   ray.setFromCamera(new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1), camera);
   const h = ray.intersectObject(mesh, false)[0];
   if (!h) return null;
-  return { face: Math.floor(h.face.a / 3), point: h.point };
+  const face = Math.floor(h.face.a / 3), M = xfMatrix(S.parts[S.labels[face]]);
+  // tools work in the original mesh space; the brush ring is drawn at the world hit
+  const point = M ? h.point.clone().applyMatrix4(M.clone().invert()) : h.point;
+  return { face, point, world: h.point, wn: h.face.normal };
 }
 
 const TOOLS = [
@@ -891,9 +992,9 @@ function showBrush(h) {
     brushRing = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, side: THREE.DoubleSide }));
     brushRing.renderOrder = 3; scene.add(brushRing);
   }
-  const r = +$("brushR").value, n = new THREE.Vector3(S.G.nrm[3*h.face], S.G.nrm[3*h.face+1], S.G.nrm[3*h.face+2]);
+  const r = +$("brushR").value, n = h.wn.clone().normalize();
   brushRing.visible = true; brushRing.scale.setScalar(r);
-  brushRing.position.copy(h.point);
+  brushRing.position.copy(h.world);
   brushRing.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
   render();
 }
@@ -934,6 +1035,7 @@ function refreshUI() {
     const ck = tr.querySelector(".mck"); if (ck) ck.dataset.idx = i;
     body.appendChild(tr);
   });
+  refreshXfPanel();
   $("undoBtn").disabled = !S.hist.past.length;
   $("redoBtn").disabled = !S.hist.future.length;
 }
@@ -975,6 +1077,303 @@ window.addEventListener("keydown", (e) => {
   const t = TOOLS.find((t) => t.key === k);
   if (t) setTool(t.id);
 });
+
+// ---------------------------------------------------------------- transform panel
+let xfSnap = null;
+const xfIn = (g, k) => $(`xf${g}${k}`);
+function partWorldBox(i) {
+  const P = mesh.geometry.getAttribute("position").array, b = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+  for (let f = 0; f < S.nF; f++) if (S.labels[f] === i) for (let o = 9 * f; o < 9 * f + 9; o += 3)
+    for (let k = 0; k < 3; k++) { b[k] = Math.min(b[k], P[o+k]); b[k+3] = Math.max(b[k+3], P[o+k]); }
+  return b;
+}
+function refreshXfPanel() {
+  const i = S.active, p = S.parts[i], ok = !!S.G && i > 0 && !!p;
+  $("xfPanel").classList.toggle("off", !ok);
+  $("xfReset").disabled = !ok || isIdXf(p?.xf);
+  $("xfTitle").textContent = ok ? `Transform · ${p.name}` : "Transform";
+  const x = (ok && p.xf) || { s: [1, 1, 1], r: [0, 0, 0], t: [0, 0, 0] };
+  for (let k = 0; k < 3; k++) {
+    xfIn("S", k).value = +(x.s[k] * 100).toFixed(2); xfIn("R", k).value = +x.r[k].toFixed(2); xfIn("T", k).value = +x.t[k].toFixed(3);
+  }
+  showXfDims();
+}
+function showXfDims() {
+  const i = S.active;
+  if (!S.G || !mesh || i <= 0) { $("xfDims").textContent = ""; return; }
+  const b = partWorldBox(i);
+  $("xfDims").textContent = isFinite(b[0]) ? `${(b[3]-b[0]).toFixed(1)} × ${(b[4]-b[1]).toFixed(1)} × ${(b[5]-b[2]).toFixed(1)} mm` : "no faces";
+}
+$("xfPanel").addEventListener("focusin", () => { if (S.G) xfSnap = snapshot(); });
+$("xfPanel").addEventListener("input", (ev) => {
+  const i = S.active; if (!S.G || i <= 0) return;
+  const x = ensureXf(i), id = ev.target.id, num = (el, d) => (Number.isFinite(+el.value) && el.value !== "" ? +el.value : d);
+  if (id.startsWith("xfS") && $("xfLock").checked) for (let k = 0; k < 3; k++) if (xfIn("S", k) !== ev.target) xfIn("S", k).value = ev.target.value;
+  for (let k = 0; k < 3; k++) {
+    let s = num(xfIn("S", k), 100) / 100; if (Math.abs(s) < 0.01) s = s < 0 ? -0.01 : 0.01;
+    x.s[k] = s; x.r[k] = num(xfIn("R", k), 0); x.t[k] = num(xfIn("T", k), 0);
+  }
+  applyXf(); drawSeeds(); showXfDims();
+});
+$("xfPanel").addEventListener("change", () => {
+  if (!S.G || S.active <= 0) return;
+  if (xfSnap) pushUndo(xfSnap);
+  xfSnap = snapshot();
+  refreshUI(); autosave();
+});
+$("xfReset").onclick = () => {
+  const p = S.parts[S.active]; if (!S.G || S.active <= 0 || !p.xf) return;
+  pushUndo(); delete p.xf; afterEdit(`Transform reset on ${p.name}`);
+};
+
+// ---------------------------------------------------------------- AI review
+// Layer 2 on top of the geometric split: renders labelled views + per-part stats, asks a vision model
+// (via the local server -> OpenRouter, key stays server-side) to name parts and flag segmentation problems.
+const VIEWS = [
+  { name: "front (camera at -Y)", d: [0, -1, 0.12] }, { name: "back (+Y)", d: [0, 1, 0.12] },
+  { name: "left (-X)", d: [-1, 0, 0.12] }, { name: "right (+X)", d: [1, 0, 0.12] },
+  { name: "top (+Z)", d: [0, -0.02, 1] }, { name: "front-left iso", d: [-0.8, -1, 0.7] },
+];
+let shotR = null;
+const shotCam = new THREE.PerspectiveCamera(30, 1, 0.1, 10000);
+function shoot(view, w, h, mode) {
+  if (!shotR) { shotR = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); scene.add(shotCam); }
+  shotR.setPixelRatio(1); shotR.setSize(w, h, false);
+  const geo = mesh.geometry; geo.computeBoundingSphere();
+  const sp = geo.boundingSphere, d = new THREE.Vector3(...view.d).normalize();
+  const dist = sp.radius / Math.sin((shotCam.fov / 2) * Math.PI / 180) * 1.02;
+  shotCam.aspect = w / h; shotCam.near = dist / 100; shotCam.far = dist * 4;
+  shotCam.up.set(0, 0, 1); if (Math.abs(d.z) > 0.95) shotCam.up.set(0, 1, 0);
+  shotCam.position.copy(sp.center).addScaledVector(d, dist); shotCam.lookAt(sp.center); shotCam.updateProjectionMatrix();
+  shotCam.add(key); // headlight follows the shot camera
+  const bg = scene.background, sv = seedGroup.visible, bv = brushRing?.visible;
+  seedGroup.visible = false; if (brushRing) brushRing.visible = false;
+  if (mode === "id") {
+    scene.background = null; shotR.setClearColor(0x000000, 1); shotR.outputColorSpace = THREE.LinearSRGBColorSpace;
+    const col = geo.getAttribute("color"), keep = col.array, ids = new Float32Array(keep.length);
+    for (let f = 0; f < S.nF; f++) { const l = S.labels[f] + 1, r = (l & 255) / 255, g = (l >> 8) / 255; for (let k = 0; k < 9; k += 3) { ids[9*f+k] = r; ids[9*f+k+1] = g; } }
+    const saved = keep.slice(); keep.set(ids); col.needsUpdate = true; mesh.material = idMat;
+    shotR.render(scene, shotCam);
+    keep.set(saved); col.needsUpdate = true; mesh.material = material;
+  } else {
+    shotR.outputColorSpace = THREE.SRGBColorSpace;
+    shotR.render(scene, shotCam);
+  }
+  scene.background = bg; seedGroup.visible = sv; if (brushRing) brushRing.visible = bv;
+  camera.add(key);
+  return shotR.domElement;
+}
+const idMat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, side: THREE.DoubleSide });
+
+// Per part: visible pixel count and the most interior visible pixel (label anchor), via a chamfer
+// distance transform over the ID image; anti-aliased edge pixels sit at distance ~1 and never win.
+function idAnalyse(cv, nParts) {
+  const w = cv.width, h = cv.height, c2 = document.createElement("canvas"); c2.width = w; c2.height = h;
+  const cx = c2.getContext("2d"); cx.drawImage(cv, 0, 0);
+  const px = cx.getImageData(0, 0, w, h).data, id = new Int32Array(w * h), D = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) id[i] = px[4*i] + px[4*i+1] * 256 - 1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x, v = id[i];
+    const edge = x === 0 || y === 0 || x === w - 1 || y === h - 1 || id[i-1] !== v || id[i+1] !== v || id[i-w] !== v || id[i+w] !== v;
+    D[i] = edge ? 0 : 1e9;
+  }
+  for (let y = 1; y < h; y++) for (let x = 1; x < w - 1; x++) { const i = y * w + x; D[i] = Math.min(D[i], D[i-1] + 1, D[i-w] + 1, D[i-w-1] + 1.4, D[i-w+1] + 1.4); }
+  for (let y = h - 2; y >= 0; y--) for (let x = w - 2; x > 0; x--) { const i = y * w + x; D[i] = Math.min(D[i], D[i+1] + 1, D[i+w] + 1, D[i+w+1] + 1.4, D[i+w-1] + 1.4); }
+  const count = new Int32Array(nParts), best = Array.from({ length: nParts }, () => ({ d: -1, x: 0, y: 0 }));
+  for (let i = 0; i < w * h; i++) {
+    const v = id[i]; if (v < 0 || v >= nParts) continue;
+    count[v]++;
+    if (D[i] > best[v].d) best[v] = { d: D[i], x: i % w, y: (i / w) | 0 };
+  }
+  return { count, best };
+}
+
+function label(cx, x, y, text, size = 15) {
+  cx.font = `600 ${size}px system-ui,Segoe UI,sans-serif`; cx.textAlign = "center"; cx.textBaseline = "middle";
+  cx.lineWidth = 4; cx.strokeStyle = "#000"; cx.strokeText(text, x, y); cx.fillStyle = "#fff"; cx.fillText(text, x, y);
+}
+
+function captureForReview(stats) {
+  const nP = S.parts.length, vis = S.parts.map((p) => p.visible);
+  S.parts.forEach((p) => (p.visible = true)); updateVisibility();
+  try {
+    const T = 448, cols = 3, over = document.createElement("canvas"); over.width = T * cols; over.height = T * 2;
+    const ox = over.getContext("2d"), perView = [];
+    VIEWS.forEach((v, n) => {
+      const a = idAnalyse(shoot(v, T, T, "id"), nP); perView.push(a);
+      const x0 = (n % cols) * T, y0 = Math.floor(n / cols) * T;
+      ox.drawImage(shoot(v, T, T, "color"), x0, y0);
+      ox.strokeStyle = "#555"; ox.strokeRect(x0 + 0.5, y0 + 0.5, T - 1, T - 1);
+      ox.font = "12px system-ui"; ox.fillStyle = "#ccc"; ox.textAlign = "left"; ox.textBaseline = "top"; ox.fillText(v.name, x0 + 6, y0 + 5);
+      for (let i = 0; i < nP; i++) if (a.count[i] >= 40 && a.best[i].d >= 3) label(ox, x0 + a.best[i].x, y0 + a.best[i].y, `#${i}`);
+    });
+    // contact sheet: each part highlighted from the view that shows most of it
+    const cnt = partCounts();
+    const list = S.parts.map((_, i) => i).filter((i) => cnt[i] > 0 && (i > 0 || cnt[0] > 0)).sort((a, b) => cnt[b] - cnt[a]).slice(0, 16).sort((a, b) => a - b);
+    const t = 256, sc = 4, sheet = document.createElement("canvas"); sheet.width = t * sc; sheet.height = t * Math.ceil(list.length / sc);
+    const sx = sheet.getContext("2d"); sx.fillStyle = "#202329"; sx.fillRect(0, 0, sheet.width, sheet.height);
+    const col = mesh.geometry.getAttribute("color"), keep = col.array.slice(), dim = new THREE.Color("#9097a0").convertSRGBToLinear();
+    list.forEach((i, n) => {
+      let bv = 0; for (let v = 1; v < VIEWS.length; v++) if (perView[v].count[i] > perView[bv].count[i]) bv = v;
+      const c = new THREE.Color(S.parts[i].color).convertSRGBToLinear();
+      for (let f = 0; f < S.nF; f++) { const u = S.labels[f] === i ? c : dim; for (let k = 0; k < 9; k += 3) { col.array[9*f+k] = u.r; col.array[9*f+k+1] = u.g; col.array[9*f+k+2] = u.b; } }
+      col.needsUpdate = true;
+      const x0 = (n % sc) * t, y0 = Math.floor(n / sc) * t;
+      sx.drawImage(shoot(VIEWS[bv], t, t, "color"), x0, y0);
+      sx.strokeStyle = "#555"; sx.strokeRect(x0 + 0.5, y0 + 0.5, t - 1, t - 1);
+      sx.font = "600 13px system-ui"; sx.fillStyle = "#fff"; sx.textAlign = "left"; sx.textBaseline = "top";
+      sx.fillText(`#${i}  ${S.parts[i].name}`.slice(0, 34), x0 + 6, y0 + 5);
+      sx.font = "11px system-ui"; sx.fillStyle = "#aaa"; sx.fillText(VIEWS[bv].name, x0 + 6, y0 + t - 17);
+    });
+    col.array.set(keep); col.needsUpdate = true;
+    return {
+      images: [over.toDataURL("image/jpeg", 0.85), sheet.toDataURL("image/jpeg", 0.85)],
+      captions: ["Image 1: six views, every part in its own colour, labelled #id at its most visible spot.",
+                 "Image 2: one tile per part (#id + current name), that part in colour, the rest dark grey."],
+    };
+  } finally {
+    S.parts.forEach((p, i) => (p.visible = vis[i])); updateVisibility(); render();
+  }
+}
+
+// Geometry facts the model can't see well: fragments (part made of several disconnected patches), cut loops, size.
+function partStats() {
+  const G = S.G, n = S.parts.length, cnt = partCounts(), area = new Float64Array(n);
+  let tot = 0; for (let f = 0; f < S.nF; f++) { area[S.labels[f]] += G.area[f]; tot += G.area[f]; }
+  const comp = new Int32Array(S.nF).fill(-1), frags = Array.from({ length: n }, () => []), stack = [];
+  for (let s = 0; s < S.nF; s++) {
+    if (comp[s] >= 0) continue;
+    const L = S.labels[s]; let a = 0; comp[s] = s; stack.push(s);
+    while (stack.length) {
+      const f = stack.pop(); a += G.area[f];
+      for (let k = G.adjS[f]; k < G.adjS[f + 1]; k++) { const g = G.adjN[k]; if (comp[g] < 0 && S.labels[g] === L) { comp[g] = s; stack.push(g); } }
+    }
+    frags[L].push({ face: s, area: a });
+  }
+  const gb = new THREE.Box3().setFromBufferAttribute(mesh.geometry.getAttribute("position"));
+  const gs = gb.getSize(new THREE.Vector3());
+  const r = (v, d = 1) => +v.toFixed(d);
+  const parts = S.parts.map((p, i) => {
+    if (!cnt[i]) return null;
+    const b = partWorldBox(i), fr = frags[i].sort((x, y) => y.area - x.area);
+    return {
+      id: i, name: p.name, color: p.color, faces: cnt[i], area_pct: r(100 * area[i] / tot, 2),
+      bbox_mm: [r(b[3]-b[0]), r(b[4]-b[1]), r(b[5]-b[2])],
+      center_frac: [0, 1, 2].map((k) => r(((b[k] + b[k+3]) / 2 - gb.min.getComponent(k)) / (gs.getComponent(k) || 1), 2)),
+      fragments: fr.length, stray_area_pct_of_part: r(100 * fr.slice(1).reduce((s, x) => s + x.area, 0) / (area[i] || 1), 2),
+      cut_loops: i ? partMesh(i)?.loops ?? 0 : undefined, transformed: !isIdXf(p.xf) || undefined,
+      _frags: fr,
+    };
+  }).filter(Boolean);
+  return {
+    file: S.name, faces: S.nF, shells: G.shells, model_bbox_mm: [r(gs.x), r(gs.y), r(gs.z)],
+    axes: "Z up; front faces -Y; center_frac is the part centre as 0..1 of the model bbox (x right, y back, z up)",
+    parts,
+  };
+}
+const statsForLLM = (st) => ({ ...st, parts: st.parts.map(({ _frags, ...p }) => p) });
+
+function localChecks(st) {
+  const out = [], un = st.parts.find((p) => p.id === 0);
+  if (un) out.push({ severity: un.area_pct > 5 ? "high" : "medium", parts: [0], problem: `${un.faces.toLocaleString()} faces still Unassigned (${un.area_pct}% of area)`,
+    fix: "Seed them into a part and Segment, or Fill/Brush them" });
+  for (const p of st.parts) {
+    if (p.id === 0) continue;
+    if (p.fragments > 1) out.push({ severity: p.stray_area_pct_of_part > 2 ? "high" : p.stray_area_pct_of_part > 0.2 ? "medium" : "low", parts: [p.id],
+      problem: `#${p.id} ${p.name} is in ${p.fragments} disconnected pieces (${p.stray_area_pct_of_part}% of its area is stray)`,
+      fix: "Smooth, or Brush/Fill the stray pieces into the neighbour; each piece becomes its own body in Part STLs" });
+    if (p.area_pct < 0.2) out.push({ severity: "low", parts: [p.id], problem: `#${p.id} ${p.name} is a sliver (${p.area_pct}% of area, ${p.faces} faces)`,
+      fix: "Merge it into its neighbour unless it is a real detail" });
+  }
+  return out;
+}
+
+let lastReview = null;
+async function llmStatus() {
+  try {
+    const j = await (await fetch("/api/llm/status")).json();
+    $("aiState").textContent = j.configured ? `key: ${j.source}` : "no key";
+    $("aiState").title = j.configured ? "" : "Set OPENROUTER_API_KEY, or put {\"api_key\": \"...\"} in tools/openrouter.local.json, then restart the splitter";
+    let m = null; try { m = localStorage.getItem("meshsplit:model"); } catch {}
+    $("aiModel").value = m || j.model;
+    return j;
+  } catch { $("aiState").textContent = "server offline"; return { configured: false }; }
+}
+$("aiModel").onchange = () => { try { localStorage.setItem("meshsplit:model", $("aiModel").value.trim()); } catch {} };
+
+const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+function renderReview(R) {
+  const o = $("aiOut"), nP = S.parts.length; o.innerHTML = "";
+  const ai = R.ai, add = (h) => o.insertAdjacentHTML("beforeend", h);
+  if (R.error) add(`<div class="iss high">${esc(R.error)}${R.raw ? `<div class="fix">${esc(R.raw.slice(0, 300))}</div>` : ""}</div>`);
+  if (R.pending) add(`<div class="small">Asking ${esc(R.model)}…</div>`);
+  if (ai?.object || ai?.summary) add(`<div class="small" style="margin-top:4px"><b style="color:var(--fg)">${esc(ai.object || "")}</b> ${esc(ai.summary || "")}</div>`);
+  const names = (ai?.parts || []).filter((p) => Number.isInteger(p.id) && p.id > 0 && p.id < nP && p.name);
+  if (names.length) {
+    add(`<div class="sec">Names</div>`);
+    const box = document.createElement("div"); o.appendChild(box);
+    for (const p of names) {
+      const cur = S.parts[p.id], row = document.createElement("label"); row.className = "nm";
+      const conf = typeof p.confidence === "number" ? ` (${Math.round(p.confidence * 100)}%)` : "";
+      row.title = `Now: ${cur.name}${conf}`;
+      row.innerHTML = `<input type="checkbox" ${p.name !== cur.name && (p.confidence ?? 1) >= 0.4 ? "checked" : ""}><span><span class="sw" style="background:${esc(cur.color)}"></span> #${p.id}</span><input type="text" value="${esc(p.name)}">`;
+      row.dataset.id = p.id; box.appendChild(row);
+    }
+    const b = document.createElement("button"); b.innerHTML = icon("check") + "Apply names"; b.style.marginTop = "4px";
+    b.onclick = () => {
+      const rows = [...box.querySelectorAll(".nm")].filter((r) => r.querySelector("input[type=checkbox]").checked);
+      if (!rows.length) return;
+      pushUndo();
+      for (const r of rows) { const v = r.querySelector("input[type=text]").value.trim(); if (v) S.parts[+r.dataset.id].name = v; }
+      afterEdit(`Renamed ${rows.length} part(s)`);
+    };
+    o.appendChild(b);
+  }
+  const issues = [...(R.checks || []).map((x) => ({ ...x, src: "check" })), ...(ai?.issues || []).map((x) => ({ ...x, src: "AI" }))];
+  if (issues.length || R.checks) add(`<div class="sec">Issues</div>`);
+  if (!issues.length && R.checks && !R.pending) add(`<div class="small">None found.</div>`);
+  for (const x of issues) {
+    const ids = (x.parts || []).filter((i) => Number.isInteger(i) && i >= 0 && i < nP);
+    const d = document.createElement("div"); d.className = `iss ${["high", "medium", "low"].includes(x.severity) ? x.severity : "low"}`;
+    d.innerHTML = `${esc(x.problem)} <span class="small">· ${x.src}</span>${x.fix ? `<div class="fix">${esc(x.fix)}</div>` : ""}`;
+    d.title = ids.length ? "Click: make the first part active and show only these parts (eye button shows all again)" : "";
+    d.onclick = () => { if (!ids.length) return; S.active = ids[0]; S.parts.forEach((p, i) => (p.visible = ids.includes(i))); afterEdit(`Showing ${ids.map((i) => "#" + i).join(", ")}`); };
+    o.appendChild(d);
+  }
+  if (R.images) {
+    const urls = R.images.map((u) => { const b = atob(u.split(",")[1]), a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return URL.createObjectURL(new Blob([a], { type: "image/jpeg" })); });
+    add(`<div class="small" style="margin-top:6px">Sent: <a href="${urls[0]}" target="_blank" style="color:var(--acc)">views</a> · <a href="${urls[1]}" target="_blank" style="color:var(--acc)">part sheet</a>${R.usage ? ` · ${R.usage.prompt_tokens ?? "?"}+${R.usage.completion_tokens ?? "?"} tokens` : ""}</div>`);
+  }
+}
+
+function runChecks() {
+  if (!S.G) return;
+  const st = partStats(); renderReview({ checks: localChecks(st) }); status("Local checks done");
+}
+async function runReview() {
+  if (!S.G) return;
+  const model = $("aiModel").value.trim();
+  $("busy").textContent = "Rendering views…"; busy(true);
+  await new Promise((r) => setTimeout(r, 30));
+  let st, cap;
+  try { st = partStats(); cap = captureForReview(st); }
+  catch (e) { console.error(e); busy(false); $("busy").textContent = "Working…"; alert(e.message); return; }
+  const checks = localChecks(st);
+  renderReview({ checks, pending: true, model, images: cap.images });
+  $("busy").textContent = `Asking ${model}…`;
+  try {
+    const r = await fetch("/api/llm/review", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model, images: cap.images, captions: cap.captions, stats: statsForLLM(st), hint: $("aiNote").value }) });
+    const j = await r.json().catch(() => ({ ok: false, error: `HTTP ${r.status}` }));
+    lastReview = j;
+    if (!j.ok) renderReview({ checks, error: j.error, raw: j.raw, images: cap.images });
+    else { renderReview({ checks, ai: j.result, images: cap.images, usage: j.usage }); status(`Reviewed by ${j.model}`); }
+  } catch (e) {
+    renderReview({ checks, error: `Server unreachable: ${e.message}`, images: cap.images });
+  } finally { busy(false); $("busy").textContent = "Working…"; }
+}
+$("aiBtn").onclick = runReview;
+$("aiChk").onclick = runChecks;
 
 // ---------------------------------------------------------------- export
 function download(name, data, type = "application/octet-stream") {
@@ -1057,7 +1456,9 @@ ${tr.join("\n")}
   }
   download(`${S.name}_painted.3mf`, out, "model/3mf");
   const fils = [...new Set(S.parts.filter((_, i) => partCounts()[i] > 0).map((p) => p.filament))].sort((a, b) => a - b);
-  status(`Painted 3MF written. Uses filament slot(s) ${fils.join(", ")}; the slicer project needs at least ${Math.max(...fils)} filaments.`);
+  const moved = S.parts.some((p) => !isIdXf(p.xf));
+  status(`Painted 3MF written. Uses filament slot(s) ${fils.join(", ")}; the slicer project needs at least ${Math.max(...fils)} filaments.` +
+    (moved ? " Part transforms are NOT in this file (one mesh); use Part STLs for scaled/moved parts." : ""));
 }
 
 // One closed mesh per part: the part's faces plus a fan cap over each open boundary loop.
@@ -1115,6 +1516,12 @@ function exportSTLs() {
     if (!cnt[i]) return;
     const m = partMesh(i); if (!m) return;
     loops += m.loops;
+    const M = xfMatrix(p);
+    if (M) {
+      const v = new THREE.Vector3(), flip = M.determinant() < 0;
+      for (let o = 0; o < m.verts.length; o += 3) { v.fromArray(m.verts, o).applyMatrix4(M); v.toArray(m.verts, o); }
+      if (flip) for (let o = 0; o < m.verts.length; o += 9) for (let k = 0; k < 3; k++) [m.verts[o+3+k], m.verts[o+6+k]] = [m.verts[o+6+k], m.verts[o+3+k]];
+    }
     let nm = `${safe(S.name)}_${safe(p.name)}`; while (names.has(nm)) nm += "_"; names.add(nm);
     files[`${nm}.stl`] = stlBinary(m.verts);
   });
@@ -1160,14 +1567,14 @@ $("sessIn").onchange = async () => { const f = $("sessIn").files[0]; if (f) load
 
 // ---------------------------------------------------------------- boot
 document.querySelectorAll("[data-icon]").forEach((b) => b.insertAdjacentHTML("afterbegin", icon(b.dataset.icon)));
-setTool("seed"); syncSliders(); resize();
+setTool("seed"); syncSliders(); resize(); llmStatus();
 const qp = new URLSearchParams(location.search).get("file");
 if (qp) {
   busy(true);
   fetch("/" + qp.replace(/^\/+/, "")).then((r) => { if (!r.ok) throw new Error(`${qp}: HTTP ${r.status}`); return r.arrayBuffer(); })
     .then((buf) => loadArrayBuffer(qp.split("/").pop(), buf)).catch((e) => alert(e.message)).finally(() => busy(false));
 }
-window.app = { S, undo, redo, deletePart, smoothBoundaries, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, partStats, localChecks, captureForReview, runReview, applyXf, ensureXf, xfMatrix, undo, redo, deletePart, smoothBoundaries, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
 </script>
 </body>
 </html>
