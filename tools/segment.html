@@ -1371,6 +1371,7 @@ function refreshUI() {
   const cnt = partCounts();
   for (const i of [...mergeSel]) if (i <= 0 || i >= S.parts.length || i === S.active) mergeSel.delete(i);
   S.parts.forEach((p, i) => {
+    if (i === 0 && !cnt[0]) return; // Unassigned is listed only while some faces are unassigned
     const tr = document.createElement("tr");
     tr.className = i === S.active ? "active" : mergeSel.has(i) ? "msel" : "";
     tr.title = i ? "Click: select · Ctrl/Shift+click: select more · Right-click: actions" : "Click: select · Right-click: actions";
