@@ -44,7 +44,8 @@
   .xf { display:grid; grid-template-columns:52px repeat(3, 1fr); gap:4px 6px; align-items:center; color:var(--mute); }
   .xf input[type=number] { width:100%; }
   .xf .ax { font-size:10px; text-align:center; color:var(--mute); }
-  #xfPanel.off { opacity:.45; pointer-events:none; }
+  #xfPanel.off, #repRow.off, #repOpts.off { opacity:.45; pointer-events:none; }
+  #repOpts.hide { display:none; }
   #aiModel, #aiNote { width:100%; background:#14161a; color:var(--fg); border:1px solid #3a404a; border-radius:4px; padding:3px 5px; font:inherit; }
   #aiOut { margin-top:6px; }
   #aiOut .sec { color:var(--mute); font-size:11px; text-transform:uppercase; letter-spacing:.06em; margin:8px 0 3px; }
@@ -111,6 +112,19 @@
     <label class="small" title="Scale X/Y/Z together"><input id="xfLock" type="checkbox" checked> uniform scale</label>
     <span id="xfDims" class="small" style="margin-left:auto"></span>
   </div>
+  <div class="row" id="repRow">
+    <button id="repBtn" data-icon="replace" title="Swap the active part for another STL/3MF, lined up on the old part's joint">Replace…</button>
+    <span id="repName" class="small" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap"></span>
+    <button id="repDel" data-icon="trash" title="Remove the replacement (old part comes back)"></button>
+    <input id="repIn" type="file" accept=".stl,.3mf" hidden>
+  </div>
+  <div class="row" id="repOpts">
+    <button id="repFlip" title="Attach by the other end of the replacement">Flip</button>
+    <button id="repRoll" title="Roll 90° about the joint axis">Roll 90°</button>
+    <button id="repPick" title="Then click the spot on the replacement that attaches. When a picked joint is set, this button goes back to auto">Pick joint</button>
+    <label class="small" title="Scale the replacement so its longest dimension matches the old part's"><input id="repFit" type="checkbox"> fit</label>
+    <label class="small" title="How far the replacement sinks into the rest so the slicer fuses them">embed <input id="repEmbed" type="number" step="0.5" min="0" style="width:44px"> mm</label>
+  </div>
 
   <div class="row head">
     <h2>AI review</h2>
@@ -132,6 +146,7 @@
   <div class="row">
     <button id="exp3mf" data-icon="palette" title="Same mesh, each triangle painted with its part's filament slot (Bambu/Orca color painting)">Painted 3MF</button>
     <button id="expStl" data-icon="package" title="One closed STL per part, cut faces capped (.zip)">Part STLs</button>
+    <button id="expMerged" data-icon="merge" title="Whole model as one STL, with moved/replaced parts in place">Merged STL</button>
   </div>
   <div class="row">
     <button id="saveSess" data-icon="save" title="Download session (.json)">Save</button>
@@ -196,6 +211,7 @@ const ICONS = {
   package: '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
   save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/>',
   reset: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  replace: '<path d="M21 3v5h-5"/><path d="M3 21v-5h5"/><path d="M20.5 8A9 9 0 0 0 4.6 6.6"/><path d="M3.5 16a9 9 0 0 0 15.9 1.4"/>',
   sparkle: '<path d="M9.94 14.06 4 20M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1"/><circle cx="12" cy="12" r="2.5"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   load: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
@@ -713,7 +729,7 @@ function travel(from, to, msg) {
 const undo = () => travel(S.hist.past, S.hist.future, "Undone");
 const redo = () => travel(S.hist.future, S.hist.past, "Redone");
 
-function afterEdit(msg) { updateColors(); applyXf(); updateVisibility(); drawSeeds(); refreshUI(); autosave(); if (msg) status(msg); }
+function afterEdit(msg) { updateColors(); applyXf(); updateVisibility(); syncReps(); drawSeeds(); refreshUI(); autosave(); if (msg) status(msg); }
 
 function deletePart(i) {
   if (i <= 0) return;
@@ -866,7 +882,7 @@ function updateColors() {
 let visKey = "";
 function updateVisibility() {
   if (!mesh) return;
-  const vis = S.parts.map((p) => p.visible);
+  const vis = S.parts.map((p) => p.visible && !(p.rep && REPS.has(p.rep.id)));
   const key = vis.join(",") + "|" + (vis.every(Boolean) ? "" : hashLabels());
   if (key === visKey && mesh.geometry.boundsTree) return;
   visKey = key;
@@ -967,6 +983,7 @@ window.addEventListener("pointerup", (ev) => {
   if (!down || ev.button !== 0) return;
   const moved = Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 4; down = null;
   if (moved || ev.target !== canvas) return;
+  if (pickingJoint) { pickJointAt(ev); return; }
   const h = hit(ev); if (!h) return;
   if (ev.ctrlKey || S.tool === "pick") { S.active = S.labels[h.face]; refreshUI(); return; }
   if (S.tool === "seed") {
@@ -1078,10 +1095,171 @@ window.addEventListener("keydown", (e) => {
   if (t) setTool(t.id);
 });
 
+// ---------------------------------------------------------------- replace part
+// part.rep = { id, name, fit, embed, flip, roll, joint:{p,n}|null }; mesh data lives in REPS (not in undo snapshots).
+// Alignment: the old part's joint (its longest cut loop: centroid J, normal n pointing out of the part into the rest)
+// is matched by the replacement's joint (an end of its long axis, or a clicked point), long axes are lined up,
+// optionally scaled to the old part's length, and pushed `embed` mm into the rest so the slicer unions them.
+const REPS = new Map();
+const repMeshes = new Map(); // rep id -> THREE.Mesh
+let repSeq = 1;
+const pjCache = new Map();
+
+function eig3(C) { // Jacobi; returns eigenvectors (columns) sorted by eigenvalue desc
+  const a = C.map((r) => r.slice()), V = [[1,0,0],[0,1,0],[0,0,1]];
+  for (let sweep = 0; sweep < 30; sweep++) for (const [p, q] of [[0,1],[0,2],[1,2]]) {
+    if (Math.abs(a[p][q]) < 1e-12) continue;
+    const th = (a[q][q] - a[p][p]) / (2 * a[p][q]), t = Math.sign(th || 1) / (Math.abs(th) + Math.sqrt(th*th + 1));
+    const c = 1 / Math.sqrt(t*t + 1), s = t * c;
+    for (let k = 0; k < 3; k++) { const akp = a[k][p], akq = a[k][q]; a[k][p] = c*akp - s*akq; a[k][q] = s*akp + c*akq; }
+    for (let k = 0; k < 3; k++) { const apk = a[p][k], aqk = a[q][k]; a[p][k] = c*apk - s*aqk; a[q][k] = s*apk + c*aqk; }
+    for (let k = 0; k < 3; k++) { const vkp = V[k][p], vkq = V[k][q]; V[k][p] = c*vkp - s*vkq; V[k][q] = s*vkp + c*vkq; }
+  }
+  return [0, 1, 2].sort((i, j) => a[j][j] - a[i][i]).map((i) => new THREE.Vector3(V[0][i], V[1][i], V[2][i]).normalize());
+}
+// Area-weighted PCA of a triangle soup (flat xyz x9 per triangle).
+function soupPCA(v) {
+  let A = 0; const m = new THREE.Vector3();
+  const tris = [];
+  for (let o = 0; o < v.length; o += 9) {
+    const ux = v[o+3]-v[o], uy = v[o+4]-v[o+1], uz = v[o+5]-v[o+2], wx = v[o+6]-v[o], wy = v[o+7]-v[o+1], wz = v[o+8]-v[o+2];
+    const a = Math.hypot(uy*wz - uz*wy, uz*wx - ux*wz, ux*wy - uy*wx) / 2 + 1e-12;
+    const c = [(v[o]+v[o+3]+v[o+6])/3, (v[o+1]+v[o+4]+v[o+7])/3, (v[o+2]+v[o+5]+v[o+8])/3];
+    tris.push([a, c]); A += a; m.x += a*c[0]; m.y += a*c[1]; m.z += a*c[2];
+  }
+  m.divideScalar(A);
+  const C = [[0,0,0],[0,0,0],[0,0,0]];
+  for (const [a, c] of tris) { const d = [c[0]-m.x, c[1]-m.y, c[2]-m.z]; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) C[i][j] += a*d[i]*d[j]; }
+  return { mean: m, axes: eig3(C) };
+}
+
+function partJoint(pi) {
+  const pm = meshOf((l) => l === pi);
+  if (!pm) return null;
+  const P = (v) => new THREE.Vector3(S.pos[3*v], S.pos[3*v+1], S.pos[3*v+2]);
+  let best = null, bestLen = -1;
+  for (const loop of pm.loopList) {
+    let len = 0; for (const [a, b] of loop) len += P(a).distanceTo(P(b));
+    if (len > bestLen) { bestLen = len; best = loop; }
+  }
+  const pca = soupPCA(pm.verts.slice(0, pm.nFaceVerts));
+  if (!best) { // no cut (whole shell): attach at the bottom
+    const b = partBox(pi);
+    return { J: new THREE.Vector3((b[0]+b[3])/2, (b[1]+b[4])/2, b[2]), n: new THREE.Vector3(0, 0, -1), pca, verts: pm.verts, nv: pm.nFaceVerts };
+  }
+  const J = new THREE.Vector3(); for (const [a] of best) J.add(P(a)); J.divideScalar(best.length);
+  const n = new THREE.Vector3(); // sum of cap triangle normals (b, a, J): outward of the part through the cut
+  for (const [a, b] of best) { const pb = P(b); n.add(new THREE.Vector3().subVectors(P(a), pb).cross(new THREE.Vector3().subVectors(J, pb))); }
+  if (n.lengthSq() < 1e-12) n.subVectors(J, pca.mean);
+  return { J, n: n.normalize(), pca, verts: pm.verts, nv: pm.nFaceVerts, loopLen: bestLen };
+}
+
+function repJoint(R, rep) {
+  if (rep.joint) return { p: new THREE.Vector3(...rep.joint.p), n: new THREE.Vector3(...rep.joint.n).normalize() };
+  const ax = R.pca.axes[0], v = R.pos;
+  let lo = Infinity, hi = -Infinity;
+  for (let o = 0; o < v.length; o += 3) { const t = ax.x*v[o] + ax.y*v[o+1] + ax.z*v[o+2]; lo = Math.min(lo, t); hi = Math.max(hi, t); }
+  const band = (hi - lo) * 0.05, ends = [lo, hi].map((e) => {
+    const c = new THREE.Vector3(); let n = 0, r = 0;
+    for (let o = 0; o < v.length; o += 3) { const t = ax.x*v[o] + ax.y*v[o+1] + ax.z*v[o+2]; if (Math.abs(t - e) <= band) { c.x += v[o]; c.y += v[o+1]; c.z += v[o+2]; n++; } }
+    c.divideScalar(n || 1);
+    for (let o = 0; o < v.length; o += 3) { const t = ax.x*v[o] + ax.y*v[o+1] + ax.z*v[o+2]; if (Math.abs(t - e) <= band) r += Math.hypot(v[o]-c.x, v[o+1]-c.y, v[o+2]-c.z); }
+    c.addScaledVector(ax, e - c.dot(ax)); // onto the end plane
+    return { c, r: r / (n || 1) };
+  });
+  let k = ends[0].r <= ends[1].r ? 0 : 1; // default: the thinner end attaches
+  if (rep.flip) k = 1 - k;
+  return { p: ends[k].c, n: ax.clone().multiplyScalar(k === 0 ? -1 : 1) };
+}
+
+// Matrix from replacement-file space to world (before the part's own Transform panel offset).
+function repAlign(pi) {
+  const p = S.parts[pi], rep = p.rep, R = REPS.get(rep.id); if (!R) return null;
+  const ck = `${rep.id}|${pi}|${fullHash()}`;
+  if (!pjCache.has(ck)) { pjCache.clear(); pjCache.set(ck, partJoint(pi)); }
+  const pj = pjCache.get(ck); if (!pj) return null;
+  const rj = repJoint(R, rep);
+  const q1 = new THREE.Quaternion().setFromUnitVectors(rj.n, pj.n);
+  // roll: line up the second principal axes in the joint plane
+  const proj = (u) => u.clone().addScaledVector(pj.n, -u.dot(pj.n));
+  const a = proj(R.pca.axes[1].clone().applyQuaternion(q1)), b = proj(pj.pca.axes[1]);
+  let ang = 0;
+  if (a.lengthSq() > 1e-8 && b.lengthSq() > 1e-8) {
+    a.normalize(); b.normalize();
+    ang = Math.atan2(new THREE.Vector3().crossVectors(a, b).dot(pj.n), a.dot(b));
+    if (Math.abs(ang) > Math.PI / 2) ang -= Math.sign(ang) * Math.PI; // axes have no sign
+  }
+  const q = new THREE.Quaternion().setFromAxisAngle(pj.n, ang + (rep.roll || 0) * Math.PI / 180).multiply(q1);
+  let s = 1;
+  if (rep.fit) {
+    const span = (v, n, ax) => { let lo = Infinity, hi = -Infinity; for (let o = 0; o < n; o += 3) { const t = ax.x*v[o] + ax.y*v[o+1] + ax.z*v[o+2]; lo = Math.min(lo, t); hi = Math.max(hi, t); } return hi - lo; };
+    const Lp = span(pj.verts, pj.nv, pj.pca.axes[0]), Lr = span(R.pos, R.pos.length, R.pca.axes[0]); // longest dimension to longest dimension
+    if (Lp > 0 && Lr > 0) s = Lp / Lr;
+  }
+  const at = pj.J.clone().addScaledVector(pj.n, +rep.embed || 0);
+  return new THREE.Matrix4().compose(at, q, new THREE.Vector3(s, s, s)).multiply(new THREE.Matrix4().makeTranslation(-rj.p.x, -rj.p.y, -rj.p.z));
+}
+function repMatrix(pi) {
+  const A = repAlign(pi); if (!A) return null;
+  const X = xfMatrix(S.parts[pi]);
+  return X ? X.multiply(A) : A;
+}
+
+function syncReps() {
+  const live = new Set();
+  S.parts.forEach((p, i) => {
+    if (!p.rep || !REPS.has(p.rep.id)) return;
+    live.add(p.rep.id);
+    let m = repMeshes.get(p.rep.id);
+    if (!m) {
+      const R = REPS.get(p.rep.id), g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(R.pos, 3)); g.computeVertexNormals();
+      m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ roughness: 0.75, metalness: 0, side: THREE.DoubleSide }));
+      m.matrixAutoUpdate = false; repMeshes.set(p.rep.id, m); scene.add(m);
+    }
+    m.userData.part = i;
+    m.material.color.set(p.color); m.visible = p.visible;
+    const M = repMatrix(i); if (M) { m.matrix.copy(M); m.matrixWorldNeedsUpdate = true; }
+  });
+  for (const [id, m] of repMeshes) if (!live.has(id)) { scene.remove(m); m.geometry.dispose(); repMeshes.delete(id); }
+  render();
+}
+
+function readMeshFile(name, buf) {
+  const ext = name.toLowerCase().split(".").pop();
+  let pos, tri;
+  if (ext === "stl") { pos = new STLLoader().parse(buf).getAttribute("position").array; tri = null; }
+  else if (ext === "3mf") { const r = parse3MF(buf); pos = r.pos; tri = r.tri; }
+  else throw new Error("Unsupported file type: " + ext);
+  if (!tri) return new Float32Array(pos);
+  const out = new Float32Array(tri.length * 3);
+  for (let i = 0; i < tri.length; i++) for (let k = 0; k < 3; k++) out[3*i+k] = pos[3*tri[i]+k];
+  return out;
+}
+function addRep(name, pos, id = `r${Date.now().toString(36)}${repSeq++}`) {
+  REPS.set(id, { name, pos, pca: soupPCA(pos) });
+  return id;
+}
+async function replaceActive(file) {
+  const i = S.active; if (!S.G || i <= 0) return;
+  const pos = readMeshFile(file.name, await file.arrayBuffer());
+  if (pos.length < 9) throw new Error("No triangles in " + file.name);
+  const id = addRep(file.name.replace(/\.[^.]+$/, ""), pos);
+  pushUndo();
+  const p = S.parts[i];
+  p.rep = { id, name: REPS.get(id).name, fit: true, embed: 1, flip: false, roll: 0, joint: null };
+  const pj = partJoint(i);
+  p.xf = { s: [1, 1, 1], r: [0, 0, 0], t: [0, 0, 0], c: pj ? pj.J.toArray() : ensureXf(i).c }; // transform pivots on the joint
+  afterEdit(`${p.name} replaced by ${p.rep.name}${pj?.loopLen ? "" : " (part has no cut, attached at its bottom)"}`);
+}
+function repEdit(fn, msg) { const p = S.parts[S.active]; if (!p?.rep) return; pushUndo(); fn(p.rep); afterEdit(msg); }
+
 // ---------------------------------------------------------------- transform panel
 let xfSnap = null;
 const xfIn = (g, k) => $(`xf${g}${k}`);
 function partWorldBox(i) {
+  const rm = S.parts[i]?.rep && repMeshes.get(S.parts[i].rep.id);
+  if (rm) { rm.updateMatrixWorld(); const bb = new THREE.Box3().setFromObject(rm); return [...bb.min.toArray(), ...bb.max.toArray()]; }
   const P = mesh.geometry.getAttribute("position").array, b = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
   for (let f = 0; f < S.nF; f++) if (S.labels[f] === i) for (let o = 9 * f; o < 9 * f + 9; o += 3)
     for (let k = 0; k < 3; k++) { b[k] = Math.min(b[k], P[o+k]); b[k+3] = Math.max(b[k+3], P[o+k]); }
@@ -1096,6 +1274,13 @@ function refreshXfPanel() {
   for (let k = 0; k < 3; k++) {
     xfIn("S", k).value = +(x.s[k] * 100).toFixed(2); xfIn("R", k).value = +x.r[k].toFixed(2); xfIn("T", k).value = +x.t[k].toFixed(3);
   }
+  const r = ok && p.rep;
+  $("repRow").classList.toggle("off", !ok);
+  $("repOpts").classList.toggle("hide", !r);
+  $("repDel").style.display = r ? "" : "none";
+  $("repName").textContent = r ? `→ ${r.name}${REPS.has(r.id) ? "" : " (missing mesh)"}` : "";
+  $("repName").title = r ? r.name : "";
+  if (r) { $("repFit").checked = !!r.fit; $("repEmbed").value = r.embed; $("repFlip").classList.toggle("on", !!r.flip && !r.joint); $("repPick").classList.toggle("on", pickingJoint || !!r.joint); }
   showXfDims();
 }
 function showXfDims() {
@@ -1113,7 +1298,7 @@ $("xfPanel").addEventListener("input", (ev) => {
     let s = num(xfIn("S", k), 100) / 100; if (Math.abs(s) < 0.01) s = s < 0 ? -0.01 : 0.01;
     x.s[k] = s; x.r[k] = num(xfIn("R", k), 0); x.t[k] = num(xfIn("T", k), 0);
   }
-  applyXf(); drawSeeds(); showXfDims();
+  applyXf(); syncReps(); drawSeeds(); showXfDims();
 });
 $("xfPanel").addEventListener("change", () => {
   if (!S.G || S.active <= 0) return;
@@ -1125,6 +1310,37 @@ $("xfReset").onclick = () => {
   const p = S.parts[S.active]; if (!S.G || S.active <= 0 || !p.xf) return;
   pushUndo(); delete p.xf; afterEdit(`Transform reset on ${p.name}`);
 };
+
+
+let pickingJoint = false;
+function pickJointAt(ev) {
+  pickingJoint = false;
+  const p = S.parts[S.active], m = p?.rep && repMeshes.get(p.rep.id);
+  if (!m) { refreshUI(); return; }
+  const r = renderer.domElement.getBoundingClientRect();
+  const rc = new THREE.Raycaster();
+  rc.setFromCamera(new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1), camera);
+  m.updateMatrixWorld();
+  const h = rc.intersectObject(m, false)[0];
+  if (!h) { status("Missed the replacement; Pick joint again"); refreshUI(); return; }
+  const lp = m.worldToLocal(h.point.clone());
+  repEdit((rp) => { rp.joint = { p: lp.toArray(), n: h.face.normal.toArray() }; rp.flip = false; }, "Joint set on the replacement");
+}
+$("repBtn").onclick = () => $("repIn").click();
+$("repIn").onchange = async () => {
+  const f = $("repIn").files[0]; $("repIn").value = ""; if (!f) return;
+  busy(true); try { await replaceActive(f); } catch (e) { console.error(e); alert(e.message); } busy(false);
+};
+$("repDel").onclick = () => { const p = S.parts[S.active]; if (!p?.rep) return; pushUndo(); delete p.rep; afterEdit(`${p.name}: replacement removed`); };
+$("repFlip").onclick = () => repEdit((r) => { if (r.joint) r.joint = null; else r.flip = !r.flip; }, "Flipped joint end");
+$("repRoll").onclick = () => repEdit((r) => { r.roll = ((r.roll || 0) + 90) % 360; }, "Rolled 90°");
+$("repPick").onclick = () => {
+  const p = S.parts[S.active]; if (!p?.rep) return;
+  if (p.rep.joint && !pickingJoint) { repEdit((r) => { r.joint = null; }, "Joint back to auto"); return; }
+  pickingJoint = !pickingJoint; refreshUI(); status(pickingJoint ? "Click the replacement where it attaches" : "");
+};
+$("repFit").onchange = () => repEdit((r) => { r.fit = $("repFit").checked; }, $("repFit").checked ? "Fit to old part" : "Original size");
+$("repEmbed").onchange = () => repEdit((r) => { r.embed = Math.max(0, +$("repEmbed").value || 0); }, "Embed changed");
 
 // ---------------------------------------------------------------- AI review
 // Layer 2 on top of the geometric split: renders labelled views + per-part stats, asks a vision model
@@ -1139,8 +1355,9 @@ const shotCam = new THREE.PerspectiveCamera(30, 1, 0.1, 10000);
 function shoot(view, w, h, mode) {
   if (!shotR) { shotR = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); scene.add(shotCam); }
   shotR.setPixelRatio(1); shotR.setSize(w, h, false);
-  const geo = mesh.geometry; geo.computeBoundingSphere();
-  const sp = geo.boundingSphere, d = new THREE.Vector3(...view.d).normalize();
+  const geo = mesh.geometry, box = new THREE.Box3().setFromBufferAttribute(geo.getAttribute("position"));
+  for (const m of repMeshes.values()) if (m.visible) { m.updateMatrixWorld(); box.union(new THREE.Box3().setFromObject(m)); }
+  const sp = box.getBoundingSphere(new THREE.Sphere()), d = new THREE.Vector3(...view.d).normalize();
   const dist = sp.radius / Math.sin((shotCam.fov / 2) * Math.PI / 180) * 1.02;
   shotCam.aspect = w / h; shotCam.near = dist / 100; shotCam.far = dist * 4;
   shotCam.up.set(0, 0, 1); if (Math.abs(d.z) > 0.95) shotCam.up.set(0, 1, 0);
@@ -1153,7 +1370,10 @@ function shoot(view, w, h, mode) {
     const col = geo.getAttribute("color"), keep = col.array, ids = new Float32Array(keep.length);
     for (let f = 0; f < S.nF; f++) { const l = S.labels[f] + 1, r = (l & 255) / 255, g = (l >> 8) / 255; for (let k = 0; k < 9; k += 3) { ids[9*f+k] = r; ids[9*f+k+1] = g; } }
     const saved = keep.slice(); keep.set(ids); col.needsUpdate = true; mesh.material = idMat;
+    const rmats = [];
+    for (const m of repMeshes.values()) { const l = m.userData.part + 1; rmats.push([m, m.material]); m.material = new THREE.MeshBasicMaterial({ color: new THREE.Color((l & 255) / 255, (l >> 8) / 255, 0), toneMapped: false, side: THREE.DoubleSide }); }
     shotR.render(scene, shotCam);
+    for (const [m, mat] of rmats) { m.material.dispose(); m.material = mat; }
     keep.set(saved); col.needsUpdate = true; mesh.material = material;
   } else {
     shotR.outputColorSpace = THREE.SRGBColorSpace;
@@ -1218,6 +1438,7 @@ function captureForReview(stats) {
       const c = new THREE.Color(S.parts[i].color).convertSRGBToLinear();
       for (let f = 0; f < S.nF; f++) { const u = S.labels[f] === i ? c : dim; for (let k = 0; k < 9; k += 3) { col.array[9*f+k] = u.r; col.array[9*f+k+1] = u.g; col.array[9*f+k+2] = u.b; } }
       col.needsUpdate = true;
+      for (const m of repMeshes.values()) m.material.color.set(m.userData.part === i ? S.parts[i].color : "#9097a0");
       const x0 = (n % sc) * t, y0 = Math.floor(n / sc) * t;
       sx.drawImage(shoot(VIEWS[bv], t, t, "color"), x0, y0);
       sx.strokeStyle = "#555"; sx.strokeRect(x0 + 0.5, y0 + 0.5, t - 1, t - 1);
@@ -1226,6 +1447,7 @@ function captureForReview(stats) {
       sx.font = "11px system-ui"; sx.fillStyle = "#aaa"; sx.fillText(VIEWS[bv].name, x0 + 6, y0 + t - 17);
     });
     col.array.set(keep); col.needsUpdate = true;
+    for (const m of repMeshes.values()) m.material.color.set(S.parts[m.userData.part].color);
     return {
       images: [over.toDataURL("image/jpeg", 0.85), sheet.toDataURL("image/jpeg", 0.85)],
       captions: ["Image 1: six views, every part in its own colour, labelled #id at its most visible spot.",
@@ -1262,6 +1484,7 @@ function partStats() {
       center_frac: [0, 1, 2].map((k) => r(((b[k] + b[k+3]) / 2 - gb.min.getComponent(k)) / (gs.getComponent(k) || 1), 2)),
       fragments: fr.length, stray_area_pct_of_part: r(100 * fr.slice(1).reduce((s, x) => s + x.area, 0) / (area[i] || 1), 2),
       cut_loops: i ? partMesh(i)?.loops ?? 0 : undefined, transformed: !isIdXf(p.xf) || undefined,
+      replaced_with: hasRep(p) ? p.rep.name : undefined,
       _frags: fr,
     };
   }).filter(Boolean);
@@ -1402,9 +1625,14 @@ function paintCode(n) {
 
 function exportPainted3MF() {
   if (!S.G) return;
-  const fil = (f) => S.parts[S.labels[f]].filament;
+  const ch = changedParts();
+  let fil = (f) => S.parts[S.labels[f]].filament, src = S;
+  if (ch.size) { // moved/replaced parts: rebuild one mesh from the merged shells
+    const m = mergedSoup(), w = weld(m.v, Uint32Array.from({ length: m.v.length / 3 }, (_, i) => i));
+    src = { pos: w.pos, tri: w.tri, nV: w.pos.length / 3, nF: w.tri.length / 3 }; fil = (f) => m.fil[f];
+  }
   let out;
-  if (S.source.type === "3mf") {
+  if (S.source.type === "3mf" && !ch.size) {
     const files = { ...S.source.files }, texts = {}, done = new Set();
     for (const m of S.source.meshes) {
       const key = m.file + "#" + m.objectId; if (done.has(key)) continue; done.add(key);
@@ -1425,8 +1653,8 @@ function exportPainted3MF() {
     out = zipSync(files, { level: 6 });
   } else {
     const v = [], tr = [];
-    for (let i = 0; i < S.nV; i++) v.push(`<vertex x="${S.pos[3*i]}" y="${S.pos[3*i+1]}" z="${S.pos[3*i+2]}"/>`);
-    for (let f = 0; f < S.nF; f++) tr.push(`<triangle v1="${S.tri[3*f]}" v2="${S.tri[3*f+1]}" v3="${S.tri[3*f+2]}" paint_color="${paintCode(fil(f))}"/>`);
+    for (let i = 0; i < src.nV; i++) v.push(`<vertex x="${src.pos[3*i]}" y="${src.pos[3*i+1]}" z="${src.pos[3*i+2]}"/>`);
+    for (let f = 0; f < src.nF; f++) tr.push(`<triangle v1="${src.tri[3*f]}" v2="${src.tri[3*f+1]}" v3="${src.tri[3*f+2]}" paint_color="${paintCode(fil(f))}"/>`);
     const model = `<?xml version="1.0" encoding="UTF-8"?>
 <model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
  <metadata name="Application">MeshSplitter</metadata>
@@ -1456,15 +1684,15 @@ ${tr.join("\n")}
   }
   download(`${S.name}_painted.3mf`, out, "model/3mf");
   const fils = [...new Set(S.parts.filter((_, i) => partCounts()[i] > 0).map((p) => p.filament))].sort((a, b) => a - b);
-  const moved = S.parts.some((p) => !isIdXf(p.xf));
   status(`Painted 3MF written. Uses filament slot(s) ${fils.join(", ")}; the slicer project needs at least ${Math.max(...fils)} filaments.` +
-    (moved ? " Part transforms are NOT in this file (one mesh); use Part STLs for scaled/moved parts." : ""));
+    (ch.size ? " Rebuilt from moved/replaced parts (overlaps fuse in the slicer); original 3MF settings not carried over." : ""));
 }
 
 // One closed mesh per part: the part's faces plus a fan cap over each open boundary loop.
-function partMesh(pi) {
-  const tri = [];
-  for (let f = 0; f < S.nF; f++) if (S.labels[f] === pi) tri.push(S.tri[3*f], S.tri[3*f+1], S.tri[3*f+2]);
+const partMesh = (pi) => meshOf((l) => l === pi);
+function meshOf(inSet) {
+  const tri = [], triLab = [];
+  for (let f = 0; f < S.nF; f++) if (inSet(S.labels[f])) { tri.push(S.tri[3*f], S.tri[3*f+1], S.tri[3*f+2]); triLab.push(S.labels[f]); }
   if (!tri.length) return null;
   const dir = new Set();
   for (let i = 0; i < tri.length; i += 3) for (let e = 0; e < 3; e++) dir.add(tri[i+e] + "," + tri[i+(e+1)%3]);
@@ -1474,7 +1702,7 @@ function partMesh(pi) {
     if (!dir.has(b + "," + a)) { if (!nextOf.has(a)) nextOf.set(a, []); nextOf.get(a).push(b); }
   }
   const verts = []; for (const v of tri) verts.push(S.pos[3*v], S.pos[3*v+1], S.pos[3*v+2]);
-  const caps = [];
+  const caps = [], loopList = [];
   let loops = 0;
   for (const [start] of nextOf) {
     while (nextOf.get(start)?.length) {
@@ -1484,14 +1712,14 @@ function partMesh(pi) {
         const b = lst.pop(); loop.push([a, b]); a = b;
       } while (a !== start && guard++ < 1e7);
       if (loop.length < 3) continue;
-      loops++;
+      loops++; loopList.push(loop);
       let cx = 0, cy = 0, cz = 0;
       for (const [v] of loop) { cx += S.pos[3*v]; cy += S.pos[3*v+1]; cz += S.pos[3*v+2]; }
       cx /= loop.length; cy /= loop.length; cz /= loop.length;
       for (const [a2, b2] of loop) caps.push(S.pos[3*b2], S.pos[3*b2+1], S.pos[3*b2+2], S.pos[3*a2], S.pos[3*a2+1], S.pos[3*a2+2], cx, cy, cz);
     }
   }
-  return { verts: verts.concat(caps), loops };
+  return { verts: verts.concat(caps), loops, loopList, triLab, nFaceVerts: verts.length };
 }
 
 function stlBinary(v) {
@@ -1509,31 +1737,70 @@ function stlBinary(v) {
   return new Uint8Array(buf);
 }
 
+const hasRep = (p) => !!(p.rep && REPS.has(p.rep.id));
+const changedParts = () => new Set(S.parts.map((_, i) => i).filter((i) => i > 0 && (hasRep(S.parts[i]) || !isIdXf(S.parts[i].xf))));
+function xformSoup(v, M) {
+  const out = Float32Array.from(v), t = new THREE.Vector3();
+  for (let o = 0; o < out.length; o += 3) { t.fromArray(out, o).applyMatrix4(M); t.toArray(out, o); }
+  if (M.determinant() < 0) for (let o = 0; o < out.length; o += 9) for (let k = 0; k < 3; k++) [out[o+3+k], out[o+6+k]] = [out[o+6+k], out[o+3+k]];
+  return out;
+}
+// Final closed geometry of one part: its replacement, or its faces + caps, with the Transform applied.
+function partSoup(i) {
+  const p = S.parts[i];
+  if (hasRep(p)) { const M = repMatrix(i); return M ? xformSoup(REPS.get(p.rep.id).pos, M) : null; }
+  const m = partMesh(i); if (!m) return null;
+  const M = xfMatrix(p); return M ? xformSoup(m.verts, M) : Float32Array.from(m.verts);
+}
+// Whole model as one triangle soup + filament per triangle. Unchanged parts keep their faces with the holes left by
+// moved/replaced parts capped; each moved/replaced part is its own closed shell overlapping the rest (slicers union them).
+function mergedSoup() {
+  const ch = changedParts(), parts = [], fil = [];
+  const rest = meshOf((l) => !ch.has(l));
+  if (rest) {
+    parts.push(rest.verts);
+    rest.triLab.forEach((l) => fil.push(S.parts[l].filament));
+    const ctr = [...ch].map((i) => { const b = partBox(i); return [i, (b[0]+b[3])/2, (b[1]+b[4])/2, (b[2]+b[5])/2]; });
+    for (let o = rest.nFaceVerts; o < rest.verts.length; o += 9) { // cap: filament of the nearest moved/replaced part
+      const x = rest.verts[o+6], y = rest.verts[o+7], z = rest.verts[o+8];
+      let best = 0, bd = Infinity; for (const [i, cx, cy, cz] of ctr) { const d = (x-cx)**2 + (y-cy)**2 + (z-cz)**2; if (d < bd) { bd = d; best = i; } }
+      fil.push(S.parts[best].filament);
+    }
+  }
+  for (const i of ch) { const v = partSoup(i); if (!v) continue; parts.push(v); for (let o = 0; o < v.length; o += 9) fil.push(S.parts[i].filament); }
+  const n = parts.reduce((a, v) => a + v.length, 0), v = new Float32Array(n); let o = 0;
+  for (const a of parts) { v.set(a, o); o += a.length; }
+  return { v, fil };
+}
+
 function exportSTLs() {
   if (!S.G) return;
-  const files = {}, cnt = partCounts(), names = new Set(); let loops = 0;
+  const files = {}, cnt = partCounts(), names = new Set();
   S.parts.forEach((p, i) => {
-    if (!cnt[i]) return;
-    const m = partMesh(i); if (!m) return;
-    loops += m.loops;
-    const M = xfMatrix(p);
-    if (M) {
-      const v = new THREE.Vector3(), flip = M.determinant() < 0;
-      for (let o = 0; o < m.verts.length; o += 3) { v.fromArray(m.verts, o).applyMatrix4(M); v.toArray(m.verts, o); }
-      if (flip) for (let o = 0; o < m.verts.length; o += 9) for (let k = 0; k < 3; k++) [m.verts[o+3+k], m.verts[o+6+k]] = [m.verts[o+6+k], m.verts[o+3+k]];
-    }
+    if (!cnt[i] && !hasRep(p)) return;
+    const v = partSoup(i); if (!v) return;
     let nm = `${safe(S.name)}_${safe(p.name)}`; while (names.has(nm)) nm += "_"; names.add(nm);
-    files[`${nm}.stl`] = stlBinary(m.verts);
+    files[`${nm}.stl`] = stlBinary(v);
   });
   download(`${S.name}_parts.zip`, zipSync(files, { level: 6 }), "application/zip");
-  status(`${Object.keys(files).length} STL(s) zipped; ${loops} cut opening(s) capped.`);
+  status(`${Object.keys(files).length} STL(s) zipped; cut openings capped${S.parts.some(hasRep) ? ", replacements included" : ""}.`);
+}
+function exportMergedSTL() {
+  if (!S.G) return;
+  const m = mergedSoup();
+  download(`${S.name}_merged.stl`, stlBinary(m.v), "model/stl");
+  status(`Merged STL written (${(m.v.length / 9).toLocaleString()} triangles); moved/replaced parts overlap the rest and fuse in the slicer.`);
 }
 
 // v2 zlib-compresses labels so large meshes still fit the localStorage quota; v1 files still load.
+function b64(b) { let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }
+function unb64(t) { const bin = atob(t), b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return b; }
 function encodeSession() {
   const b = zlibSync(new Uint8Array(S.labels.buffer.slice(0)));
   let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
-  return JSON.stringify({ version: 2, file: S.name, faces: S.nF, parts: S.parts, labels: btoa(s) });
+  const reps = {};
+  for (const p of S.parts) if (hasRep(p) && !reps[p.rep.id]) { const R = REPS.get(p.rep.id); reps[p.rep.id] = { name: R.name, pos: b64(zlibSync(new Uint8Array(R.pos.buffer.slice(0)))) }; }
+  return JSON.stringify({ version: 2, file: S.name, faces: S.nF, parts: S.parts, labels: btoa(s), reps });
 }
 function applySession(txt) {
   const j = JSON.parse(txt);
@@ -1543,6 +1810,7 @@ function applySession(txt) {
   for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
   if (j.version >= 2) b = unzlibSync(b);
   S.labels = new Int32Array(b.slice().buffer); S.parts = j.parts; S.active = 0;
+  for (const [id, r] of Object.entries(j.reps || {})) if (!REPS.has(id)) addRep(r.name, new Float32Array(unzlibSync(unb64(r.pos)).buffer), id);
 }
 function saveSession() { if (S.G) download(`${S.name}.split.json`, encodeSession(), "application/json"); }
 function loadSession(txt) {
@@ -1561,6 +1829,7 @@ function restoreAutosave() {
 }
 $("exp3mf").onclick = () => later(exportPainted3MF);
 $("expStl").onclick = () => later(exportSTLs);
+$("expMerged").onclick = () => later(exportMergedSTL);
 $("saveSess").onclick = saveSession;
 $("loadSess").onclick = () => S.G ? $("sessIn").click() : alert("Open the mesh first.");
 $("sessIn").onchange = async () => { const f = $("sessIn").files[0]; if (f) loadSession(await f.text()); $("sessIn").value = ""; };
@@ -1574,7 +1843,7 @@ if (qp) {
   fetch("/" + qp.replace(/^\/+/, "")).then((r) => { if (!r.ok) throw new Error(`${qp}: HTTP ${r.status}`); return r.arrayBuffer(); })
     .then((buf) => loadArrayBuffer(qp.split("/").pop(), buf)).catch((e) => alert(e.message)).finally(() => busy(false));
 }
-window.app = { S, partStats, localChecks, captureForReview, runReview, applyXf, ensureXf, xfMatrix, undo, redo, deletePart, smoothBoundaries, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForReview, runReview, applyXf, ensureXf, xfMatrix, undo, redo, deletePart, smoothBoundaries, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
 </script>
 </body>
 </html>
