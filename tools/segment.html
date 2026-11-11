@@ -1516,7 +1516,7 @@ async function llmStatus() {
   try {
     const j = await (await fetch("/api/llm/status")).json();
     $("aiState").textContent = j.configured ? `key: ${j.source}` : "no key";
-    $("aiState").title = j.configured ? "" : "Set OPENROUTER_API_KEY, or put {\"api_key\": \"...\"} in tools/openrouter.local.json, then restart the splitter";
+    $("aiState").title = j.configured ? "" : "Put OPENROUTER_API_KEY=... in .env (repo root), set the env var, or put {\"api_key\": \"...\"} in tools/openrouter.local.json, then restart the splitter";
     let m = null; try { m = localStorage.getItem("meshsplit:model"); } catch {}
     $("aiModel").value = m || j.model;
     return j;

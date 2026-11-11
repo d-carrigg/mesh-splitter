@@ -3,7 +3,8 @@
 
 Key lookup (never sent to the browser, never committed):
   1. env OPENROUTER_API_KEY
-  2. tools/openrouter.local.json  {"api_key": "...", "model": "..."}   (gitignored)
+  2. .env in the repo root (OPENROUTER_API_KEY=..., optional OPENROUTER_MODEL=...)   (gitignored)
+  3. tools/openrouter.local.json  {"api_key": "...", "model": "..."}   (gitignored)
 """
 from __future__ import annotations
 
@@ -15,6 +16,7 @@ import urllib.request
 from pathlib import Path
 
 LOCAL_CFG = Path(__file__).resolve().parent / "openrouter.local.json"
+DOTENV = Path(__file__).resolve().parent.parent / ".env"
 URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MODEL = "google/gemini-2.5-flash"
 MAX_IMAGES = 6
@@ -32,6 +34,26 @@ Reply with JSON only, no prose, matching:
  "issues": [{"severity": "high|medium|low", "parts": [1, 2], "problem": "...", "fix": "..."}], "summary": "one sentence"}"""
 
 
+def read_dotenv(path: Path) -> dict:
+    """KEY=value lines; ignores blanks, # comments, `export ` prefixes and surrounding quotes."""
+    out: dict = {}
+    try:
+        lines = path.read_text(encoding="utf-8-sig").splitlines()
+    except OSError:
+        return out
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        k = k.strip().removeprefix("export ").strip()
+        v = v.strip()
+        if len(v) >= 2 and v[0] == v[-1] and v[0] in "'\"":
+            v = v[1:-1]
+        out[k] = v
+    return out
+
+
 def load_config() -> dict:
     cfg: dict = {}
     if LOCAL_CFG.is_file():
@@ -39,14 +61,20 @@ def load_config() -> dict:
             cfg = json.loads(LOCAL_CFG.read_text(encoding="utf-8")) or {}
         except (OSError, json.JSONDecodeError):
             cfg = {}
-    key = os.environ.get("OPENROUTER_API_KEY") or cfg.get("api_key") or ""
-    model = os.environ.get("OPENROUTER_MODEL") or cfg.get("model") or DEFAULT_MODEL
+    env = read_dotenv(DOTENV)
+    key = os.environ.get("OPENROUTER_API_KEY") or env.get("OPENROUTER_API_KEY") or cfg.get("api_key") or ""
+    model = os.environ.get("OPENROUTER_MODEL") or env.get("OPENROUTER_MODEL") or cfg.get("model") or DEFAULT_MODEL
     return {"api_key": key.strip(), "model": model}
 
 
 def status() -> dict:
     cfg = load_config()
-    src = "env" if os.environ.get("OPENROUTER_API_KEY") else ("file" if cfg["api_key"] else None)
+    if os.environ.get("OPENROUTER_API_KEY"):
+        src = "env"
+    elif read_dotenv(DOTENV).get("OPENROUTER_API_KEY"):
+        src = ".env"
+    else:
+        src = "file" if cfg["api_key"] else None
     return {"configured": bool(cfg["api_key"]), "source": src, "model": cfg["model"]}
 
 

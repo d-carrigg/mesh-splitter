@@ -29,9 +29,11 @@ class ConfigTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.cfg = Path(self.tmp.name) / "openrouter.local.json"
-        p = mock.patch.object(llm_review, "LOCAL_CFG", self.cfg)
-        p.start()
-        self.addCleanup(p.stop)
+        self.dotenv = Path(self.tmp.name) / ".env"
+        for name, val in (("LOCAL_CFG", self.cfg), ("DOTENV", self.dotenv)):
+            p = mock.patch.object(llm_review, name, val)
+            p.start()
+            self.addCleanup(p.stop)
         self.addCleanup(self.tmp.cleanup)
 
     def test_env_wins_over_file(self):
@@ -39,6 +41,13 @@ class ConfigTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "env-key"}, clear=True):
             self.assertEqual(llm_review.load_config(), {"api_key": "env-key", "model": "m/file"})
             self.assertEqual(llm_review.status()["source"], "env")
+
+    def test_dotenv(self):
+        self.dotenv.write_text('# comment\nexport OPENROUTER_API_KEY="dot-key"\nOPENROUTER_MODEL=m/dot\n')
+        self.cfg.write_text(json.dumps({"api_key": "file-key"}))
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(llm_review.load_config(), {"api_key": "dot-key", "model": "m/dot"})
+            self.assertEqual(llm_review.status()["source"], ".env")
 
     def test_file_and_missing(self):
         with mock.patch.dict(os.environ, {}, clear=True):
