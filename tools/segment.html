@@ -72,6 +72,11 @@
   body.empty #side, body.empty #toolbar, body.empty #opts, body.empty #rightCol { display:none; }
   body.empty #view { grid-column:1 / -1; }
   body.empty #top .needMesh { opacity:.45; pointer-events:none; }
+  #placeHint { pointer-events:none; padding:3px 8px; font-size:12px; z-index:6; transform:translate(14px, 14px); white-space:nowrap; }
+  #view.placing canvas { cursor:crosshair; }
+  #flowPop { z-index:4; padding:8px 10px; width:max-content; }
+  #flowPop .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
+  #flowPop::before { content:""; position:absolute; left:-6px; top:16px; border:6px solid transparent; border-left:0; border-right-color:var(--line); }
   #autoPop { top:58px; z-index:4; padding:6px 10px; display:flex; gap:8px; align-items:center; white-space:nowrap; }
   #autoPop[hidden] { display:none; }
   table.parts { width:100%; border-collapse:collapse; margin-top:6px; }
@@ -128,7 +133,7 @@
     <h2>Parts</h2>
     <button id="mergeBtn" data-icon="merge" title="Merge Shift+clicked parts into the selected part" hidden></button>
     <button id="showAll" data-icon="eye" title="Show all parts"></button>
-    <button id="addPart" data-icon="plus" title="New part"></button>
+    <button id="addPart" data-icon="plus" title="New part: click it on the model"></button>
   </div>
   <table class="parts"><tbody id="partsBody"></tbody></table>
 </aside>
@@ -240,6 +245,15 @@
     </div>
   </div>
 
+  <div id="placeHint" class="float" hidden>Click the new part</div>
+  <div id="flowPop" class="float" hidden>
+    <div class="row" style="margin:0 0 4px">
+      <span id="fpSw" class="sw"></span><b id="fpName" style="margin-right:auto"></b>
+      <button id="fpSeed" data-icon="plus" title="Add another point to this part (if it missed an area)">Point</button>
+      <button id="fpDone" class="pri" data-icon="check">Done</button>
+    </div>
+    <label class="sl" title="Lower splits at softer creases, higher only at sharp ones">Crease<input id="fpCrease" type="range" min="0" max="20" step="0.5"><output id="fpCreaseOut"></output></label>
+  </div>
   <div id="status"></div>
   <div id="busy">Working…</div>
 </div>
@@ -622,11 +636,14 @@ function grow(sources, mask, step) {
   return { dist, lab };
 }
 
-function segmentFromSeeds() {
+// opts.snap: undo snapshot to push instead of the current state; opts.only: re-grow just these parts
+// (and Unassigned) from their seeds, leaving every other part as it is.
+function segmentFromSeeds(opts = {}) {
   const seeded = new Set(), src = [];
-  S.parts.forEach((p, i) => { if (i > 0 && p.seeds.length) { seeded.add(i); p.seeds.forEach((f) => src.push([f, i])); } });
-  if (!seeded.size) { alert("Add seeds first: make a part, pick the Seed tool and click on the model."); return; }
-  pushUndo();
+  S.parts.forEach((p, i) => { if (i > 0 && (!opts.only || opts.only.includes(i)) && p.seeds.length) { seeded.add(i); p.seeds.forEach((f) => src.push([f, i])); } });
+  if (opts.only) opts.only.forEach((i) => i > 0 && seeded.add(i));
+  if (!src.length) { alert("Add seeds first: make a part, pick the Seed tool and click on the model."); return; }
+  pushUndo(opts.snap);
   const mask = new Uint8Array(S.nF);
   for (let f = 0; f < S.nF; f++) mask[f] = (S.labels[f] === 0 || seeded.has(S.labels[f])) ? 1 : 0;
   const { lab } = grow(src, mask, creaseStep());
@@ -847,8 +864,8 @@ function travel(from, to, msg) {
   S.labels = u.labels; S.parts = u.parts; S.active = u.active;
   afterEdit(msg);
 }
-const undo = () => travel(S.hist.past, S.hist.future, "Undone");
-const redo = () => travel(S.hist.future, S.hist.past, "Redone");
+const undo = () => { closeFlow(); travel(S.hist.past, S.hist.future, "Undone"); };
+const redo = () => { closeFlow(); travel(S.hist.future, S.hist.past, "Redone"); };
 
 function afterEdit(msg) { updateColors(); applyXf(); updateVisibility(); syncReps(); drawSeeds(); refreshUI(); autosave(); if (msg) status(msg); }
 
@@ -1094,7 +1111,7 @@ const canvas = renderer.domElement;
 canvas.addEventListener("pointerdown", (ev) => {
   if (ev.button !== 0 || !mesh) return;
   down = { x: ev.clientX, y: ev.clientY };
-  if (S.tool === "brush" && !ev.ctrlKey) {
+  if (S.tool === "brush" && !ev.ctrlKey && !placing) {
     const h = hit(ev);
     if (h) {
       controls.enabled = false; painting = true; pushUndo();
@@ -1105,6 +1122,7 @@ canvas.addEventListener("pointerdown", (ev) => {
 canvas.addEventListener("pointermove", (ev) => {
   if (!mesh) return;
   const h = hit(ev);
+  if (placing) { showGhost(h, ev); return; }
   if (painting && h) { if (brushAt(h.face, h.point, ev.shiftKey ? 0 : S.active)) updateColors(); }
   if (h) {
     const p = S.parts[S.labels[h.face]];
@@ -1118,6 +1136,7 @@ window.addEventListener("pointerup", (ev) => {
   const moved = Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 4; down = null;
   if (moved || ev.target !== canvas) return;
   if (pickingJoint) { pickJointAt(ev); return; }
+  if (placing) { const h = hit(ev); if (h) placeAt(h); return; }
   const h = hit(ev);
   if (!h) { if (S.tool === "orbit" && S.active) selectPart(0); return; }
   if (ev.ctrlKey || S.tool === "orbit") { selectPart(S.labels[h.face]); return; }
@@ -1163,7 +1182,7 @@ function syncSliders() {
 
 let lastActive = -1;
 const mergeSel = new Set(); // parts Shift+clicked in the list, merged into the selected part
-function selectPart(i) { S.active = i; mergeSel.clear(); refreshUI(); }
+function selectPart(i) { if (flow && flow.part !== i) closeFlow(); S.active = i; mergeSel.clear(); refreshUI(); }
 function refreshUI() {
   const body = $("partsBody"); body.innerHTML = "";
   document.body.classList.toggle("empty", !S.G);
@@ -1195,7 +1214,70 @@ function refreshUI() {
   $("redoBtn").disabled = !S.hist.future.length;
 }
 
-$("addPart").onclick = () => { if (!S.G) return; pushUndo(); S.parts.push(newPart()); S.active = S.parts.length - 1; refreshUI(); };
+// ---------------------------------------------------------------- guided add part
+// + → click the model where the part is → it is grown from that point right away → a card next to the
+// point offers Crease (re-grows live), another point, Done.
+let placing = null, flow = null, ghost = null; // placing: {part: index|-1}; flow: {part, world}
+function startPlacing(part = -1, from = 0) {
+  if (!S.G) return;
+  closeFlow(); closeAuto?.();
+  placing = { part, from };
+  $("view").classList.add("placing"); $("addPart").classList.add("on");
+  $("placeHint").textContent = part < 0 ? "Click the new part" : `Click more of ${S.parts[part].name}`;
+}
+function stopPlacing() {
+  placing = null;
+  $("view").classList.remove("placing"); $("addPart").classList.remove("on");
+  $("placeHint").hidden = true; if (ghost) ghost.visible = false; render();
+}
+function showGhost(h, ev) {
+  if (!ghost) {
+    ghost = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    ghost.renderOrder = 4; scene.add(ghost);
+  }
+  const r = view.getBoundingClientRect(), hint = $("placeHint");
+  hint.hidden = false; hint.style.left = `${ev.clientX - r.left}px`; hint.style.top = `${ev.clientY - r.top}px`;
+  if (!h) { ghost.visible = false; render(); return; }
+  ghost.visible = true; ghost.scale.setScalar(S.G.diag * 0.009); ghost.position.copy(h.world);
+  ghost.material.color.set(placing.part < 0 ? newPart().color : S.parts[placing.part].color);
+  render();
+}
+function placeAt(h) {
+  const snap = snapshot(), under = S.labels[h.face], from = placing.part < 0 ? under : placing.from;
+  let i = placing.part;
+  if (i < 0 || !S.parts[i]) { S.parts.push(newPart()); i = S.parts.length - 1; }
+  S.parts[i].seeds.push(h.face); S.active = i;
+  stopPlacing();
+  busy(true);
+  setTimeout(() => {
+    try { segmentFromSeeds({ snap, only: [...new Set([i, under, from])] }); openFlow(i, h.world.clone(), from); }
+    catch (e) { console.error(e); alert(e.message); } finally { busy(false); }
+  }, 30);
+}
+function openFlow(i, world, from) {
+  flow = { part: i, world, from };
+  $("fpSw").style.background = S.parts[i].color; $("fpName").textContent = S.parts[i].name;
+  $("fpCrease").value = $("lambda").value; $("fpCreaseOut").textContent = $("lambda").value + "°";
+  $("flowPop").hidden = false; placeFlow();
+}
+function closeFlow() { flow = null; $("flowPop").hidden = true; }
+function placeFlow() {
+  if (!flow) return;
+  const v = flow.world.clone().project(camera), r = view.getBoundingClientRect(), pop = $("flowPop");
+  const x = (v.x + 1) / 2 * r.width, y = (1 - v.y) / 2 * r.height;
+  pop.style.left = `${Math.min(r.width - pop.offsetWidth - 8, x + 36)}px`;
+  pop.style.top = `${Math.max(8, Math.min(r.height - pop.offsetHeight - 8, y - 22))}px`;
+}
+controls.addEventListener("change", placeFlow);
+canvas.addEventListener("pointerleave", () => { if (placing) { $("placeHint").hidden = true; if (ghost) ghost.visible = false; render(); } });
+$("addPart").onclick = () => (placing ? stopPlacing() : startPlacing());
+$("fpDone").onclick = closeFlow;
+$("fpSeed").onclick = () => { if (flow) startPlacing(flow.part, flow.from); };
+$("fpCrease").oninput = () => { $("fpCreaseOut").textContent = $("fpCrease").value + "°"; };
+$("fpCrease").onchange = () => {
+  $("lambda").value = $("fpCrease").value; syncSliders();
+  const keep = flow; later(() => { segmentFromSeeds(keep ? { only: [keep.part, keep.from] } : {}); if (keep) openFlow(keep.part, keep.world, keep.from); });
+};
 $("mergeBtn").onclick = () => {
   const idx = [...mergeSel].filter((i) => i !== S.active && i > 0 && i < S.parts.length);
   mergeSel.clear();
@@ -1293,7 +1375,7 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (e.key === "Home" && S.G) { e.preventDefault(); frame(); return; }
-  if (e.key === "Escape") { if (!$("autoPop").hidden) closeAuto(); else if (pickingJoint) { pickingJoint = false; refreshUI(); status(""); } else if (S.G && S.active) selectPart(0); return; }
+  if (e.key === "Escape") { if (placing) stopPlacing(); else if (flow) closeFlow(); else if (!$("autoPop").hidden) closeAuto(); else if (pickingJoint) { pickingJoint = false; refreshUI(); status(""); } else if (S.G && S.active) selectPart(0); return; }
   if (e.key === "Delete" && S.G && S.active > 0) { deletePart(S.active); return; }
   if (k === "c" && S.G) { setColorMode(!byFilament); return; }
   const t = TOOLS.find((t) => t.key === k);
