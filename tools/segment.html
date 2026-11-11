@@ -963,7 +963,7 @@ function pinches(f, to) {
 // is unchanged. A crossing is clamped to [CUT_T, 1-CUT_T] along its edge to avoid slivers. Faces at a junction of
 // three parts get a centroid vertex. A face sharing an edge it would cut with a face that may not change (outside
 // the mask) stays whole, so no T-junctions are made. mask: only these faces may change. Returns faces split.
-const CUT_RINGS = 3, CUT_ITERS = 6, CUT_T = 0.15;
+const CUT_RINGS = 8, CUT_ITERS = 30, CUT_T = 0.15, CUT_SIGMA = 25;
 function smoothCut(mask = null) {
   const { pos, tri, nV, nF } = S, L = S.labels;
   const vfS = new Int32Array(nV + 1);
@@ -1001,15 +1001,32 @@ function smoothCut(mask = null) {
   let W = new Map();
   for (const v of band) W.set(v, frac(v));
   const wOf = (v) => W.get(v) || fixedW.get(v) || (fixedW.set(v, frac(v)), fixedW.get(v));
+  // vertex normals: diffusion between vertices whose normals differ by much more than CUT_SIGMA degrees is
+  // weak, so a boundary lying on a real crease stays on it while one on a smooth surface gets straightened
+  const vn = new Map(), G = S.G;
+  const nOf = (v) => {
+    let r = vn.get(v); if (r) return r;
+    let x = 0, y = 0, z = 0;
+    for (let k = vfS[v]; k < vfS[v + 1]; k++) { const f = vf[k], a = area[f]; x += G.nrm[3*f] * a; y += G.nrm[3*f+1] * a; z += G.nrm[3*f+2] * a; }
+    const l = Math.hypot(x, y, z) || 1; r = [x / l, y / l, z / l]; vn.set(v, r); return r;
+  };
+  const kap = 1 - Math.cos(CUT_SIGMA * Math.PI / 180);
+  const wt = (v, u) => { const a = nOf(v), b = nOf(u); return Math.exp(-(1 - (a[0]*b[0] + a[1]*b[1] + a[2]*b[2])) / kap); };
+  const nb = band.map((v) => {
+    const us = [], qs = [];
+    for (let k = vfS[v]; k < vfS[v + 1]; k++) for (let c = 0; c < 3; c++) { const u = tri[3 * vf[k] + c]; if (u !== v) { us.push(u); qs.push(wt(v, u)); } }
+    return [us, qs];
+  });
   for (let it = 0; it < CUT_ITERS; it++) {
     const NW = new Map();
-    for (const v of band) {
-      const acc = new Map(); let n = 0;
-      for (let k = vfS[v]; k < vfS[v + 1]; k++) for (let c = 0; c < 3; c++) {
-        const u = tri[3 * vf[k] + c]; if (u === v) continue;
-        for (const [l, w] of wOf(u)) acc.set(l, (acc.get(l) || 0) + w);
-        n++;
+    for (let bi = 0; bi < band.length; bi++) {
+      const v = band[bi], [us, qs] = nb[bi], acc = new Map(); let n = 0;
+      for (let j = 0; j < us.length; j++) {
+        const q = qs[j]; if (q < 1e-4) continue;
+        for (const [l, w] of wOf(us[j])) acc.set(l, (acc.get(l) || 0) + q * w);
+        n += q;
       }
+      if (n < 1e-6) { NW.set(v, W.get(v)); continue; }
       const out = new Map();
       for (const [l, w] of W.get(v)) out.set(l, 0.5 * w);
       for (const [l, w] of acc) out.set(l, (out.get(l) || 0) + 0.5 * w / n);
