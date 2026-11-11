@@ -197,7 +197,7 @@
         <span id="xfDims" class="small" style="margin-right:auto"></span>
         <button id="soloBtn" data-icon="solo" title="Show only this part"></button>
         <button id="clrSeeds" data-icon="eraser" title="Clear this part's seeds"></button>
-        <button id="pcDel" class="danger" data-icon="trash" title="Delete part, faces go to Unassigned (Del)"></button>
+        <button id="pcDel" class="danger" data-icon="trash" title="Delete part, its faces join the neighbouring part (Del)"></button>
       </div>
       <div class="sub">
         <h2>Transform</h2>
@@ -869,13 +869,35 @@ const redo = () => { closeFlow(); travel(S.hist.future, S.hist.past, "Redone"); 
 
 function afterEdit(msg) { updateColors(); applyXf(); updateVisibility(); syncReps(); drawSeeds(); refreshUI(); autosave(); if (msg) status(msg); }
 
+// Deleting a part hands its faces to the touching parts (grown from the shared border, so a part touching
+// two others splits along its creases). Touching only Unassigned, or a separate shell: nearest part.
 function deletePart(i) {
   if (i <= 0) return;
   pushUndo();
-  for (let f = 0; f < S.nF; f++) { const l = S.labels[f]; S.labels[f] = l === i ? 0 : l > i ? l - 1 : l; }
+  const G = S.G, mask = new Uint8Array(S.nF), src = [], srcU = [];
+  let n = 0, cx = 0, cy = 0, cz = 0;
+  for (let f = 0; f < S.nF; f++) if (S.labels[f] === i) { mask[f] = 1; n++; cx += G.cen[3*f]; cy += G.cen[3*f+1]; cz += G.cen[3*f+2]; }
+  for (let f = 0; f < S.nF; f++) if (mask[f]) for (let k = G.adjS[f]; k < G.adjS[f + 1]; k++) {
+    const g = G.adjN[k], l = S.labels[g]; if (l === i) continue;
+    (l > 0 ? src : srcU).push([f, l]);
+  }
+  let to = src.length ? src : srcU;
+  if (!src.length && n) { // no touching part: nearest face of another part
+    cx /= n; cy /= n; cz /= n; let best = -1, bd = Infinity;
+    for (let f = 0; f < S.nF; f++) { const l = S.labels[f]; if (l <= 0 || l === i) continue;
+      const d = (G.cen[3*f]-cx)**2 + (G.cen[3*f+1]-cy)**2 + (G.cen[3*f+2]-cz)**2; if (d < bd) { bd = d; best = l; } }
+    if (best > 0) to = [[[...mask.keys()].find((f) => mask[f]), best]];
+  }
+  if (n && to.length) {
+    const lab = grow(to, mask, creaseStep()).lab;
+    for (let f = 0; f < S.nF; f++) if (mask[f]) S.labels[f] = lab[f] >= 0 ? lab[f] : 0;
+  } else for (let f = 0; f < S.nF; f++) if (mask[f]) S.labels[f] = 0;
+  const got = new Map(); for (let f = 0; f < S.nF; f++) if (mask[f]) got.set(S.labels[f], (got.get(S.labels[f]) || 0) + 1);
+  const into = [...got].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0;
+  for (let f = 0; f < S.nF; f++) { const l = S.labels[f]; if (l > i) S.labels[f] = l - 1; }
   const [p] = S.parts.splice(i, 1);
-  S.active = S.active === i ? 0 : S.active > i ? S.active - 1 : S.active;
-  afterEdit(`Deleted ${p.name}`);
+  S.active = into > i ? into - 1 : into;
+  afterEdit(into > 0 ? `Deleted ${p.name}, merged into ${S.parts[S.active].name}` : `Deleted ${p.name}`);
 }
 
 // Graph edges incident to each mesh vertex (CSR), for counting label changes around a vertex.
