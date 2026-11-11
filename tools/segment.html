@@ -48,6 +48,9 @@
   .menuWrap { position:relative; }
   .menu { position:absolute; top:calc(100% + 4px); right:0; min-width:220px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 6px 20px #0008; padding:4px; z-index:10; display:flex; flex-direction:column; }
   .menu.left { right:auto; left:0; }
+  #ctxMenu { top:auto; right:auto; min-width:200px; }
+  #ctxMenu .sw { width:10px; height:10px; border-radius:3px; display:inline-block; }
+  #ctxMenu .hd { display:flex; align-items:center; gap:6px; padding:4px 8px 6px; color:var(--mute); font-size:11px; border-bottom:1px solid var(--line); margin-bottom:2px; }
   .menu button { justify-content:flex-start; background:none; border-color:transparent; padding:6px 8px; }
   .menu button:hover { background:#2b3038; }
   .menu .meta { margin-left:auto; padding-left:12px; color:var(--mute); font-size:11px; }
@@ -245,6 +248,7 @@
     </div>
   </div>
 
+  <div id="ctxMenu" class="menu" hidden></div>
   <div id="placeHint" class="float" hidden>Click the new part</div>
   <div id="flowPop" class="float" hidden>
     <div class="row" style="margin:0 0 4px">
@@ -869,6 +873,20 @@ const redo = () => { closeFlow(); travel(S.hist.future, S.hist.past, "Redone"); 
 
 function afterEdit(msg) { updateColors(); applyXf(); updateVisibility(); syncReps(); drawSeeds(); refreshUI(); autosave(); if (msg) status(msg); }
 
+// Unassigned faces (one connected patch from f0, or all) go to the parts touching them, grown from the border.
+function fillUnassigned(f0 = -1) {
+  const G = S.G, mask = new Uint8Array(S.nF);
+  if (f0 >= 0) { const st = [f0]; mask[f0] = 1; while (st.length) { const f = st.pop(); for (let k = G.adjS[f]; k < G.adjS[f + 1]; k++) { const g = G.adjN[k]; if (!mask[g] && S.labels[g] === 0) { mask[g] = 1; st.push(g); } } } }
+  else for (let f = 0; f < S.nF; f++) if (S.labels[f] === 0) mask[f] = 1;
+  const src = [];
+  for (let f = 0; f < S.nF; f++) if (mask[f]) for (let k = G.adjS[f]; k < G.adjS[f + 1]; k++) { const l = S.labels[G.adjN[k]]; if (l > 0) src.push([f, l]); }
+  if (!src.length) { status("Nothing touching it to fill from"); return; }
+  pushUndo();
+  const lab = grow(src, mask, creaseStep()).lab;
+  let n = 0; for (let f = 0; f < S.nF; f++) if (mask[f] && lab[f] > 0) { S.labels[f] = lab[f]; n++; }
+  afterEdit(`Filled ${n.toLocaleString()} unassigned faces into the parts around them`);
+}
+
 // Deleting a part hands its faces to the touching parts (grown from the shared border, so a part touching
 // two others splits along its creases). Touching only Unassigned, or a separate shell: nearest part.
 function deletePart(i) {
@@ -1130,7 +1148,11 @@ function setTool(t) {
 
 let down = null, painting = false;
 const canvas = renderer.domElement;
+let rdown = null;
+canvas.addEventListener("contextmenu", (ev) => ev.preventDefault());
 canvas.addEventListener("pointerdown", (ev) => {
+  if (ev.button === 2) { rdown = { x: ev.clientX, y: ev.clientY }; return; }
+  closeCtx();
   if (ev.button !== 0 || !mesh) return;
   down = { x: ev.clientX, y: ev.clientY };
   if (S.tool === "brush" && !ev.ctrlKey && !placing) {
@@ -1153,6 +1175,11 @@ canvas.addEventListener("pointermove", (ev) => {
   } else showBrush(null);
 });
 window.addEventListener("pointerup", (ev) => {
+  if (ev.button === 2 && rdown) { // right click without drag (right-drag pans)
+    const still = Math.hypot(ev.clientX - rdown.x, ev.clientY - rdown.y) <= 4; rdown = null;
+    if (still && ev.target === canvas && !placing) openCtx(ev);
+    return;
+  }
   if (painting) { painting = false; controls.enabled = true; dropEmptyParts(); afterEdit(); }
   if (!down || ev.button !== 0) return;
   const moved = Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 4; down = null;
@@ -1234,6 +1261,40 @@ function refreshUI() {
   refreshXfPanel();
   $("undoBtn").disabled = !S.hist.past.length;
   $("redoBtn").disabled = !S.hist.future.length;
+}
+
+// ---------------------------------------------------------------- right-click menu
+function closeCtx() { $("ctxMenu").hidden = true; }
+function openCtx(ev) {
+  const h = hit(ev); if (!h) { closeCtx(); return; }
+  const f = h.face, l = S.labels[f], p = S.parts[l], act = S.active > 0 && S.active !== l ? S.parts[S.active] : null;
+  const anyUn = S.labels.some((x) => x === 0);
+  const items = [];
+  const it = (ic, label, fn, cls = "") => items.push({ ic, label, fn, cls });
+  if (l === 0) {
+    it("fill", "Fill into nearest part", () => fillUnassigned(f));
+    if (act) it("fill", `Fill into ${act.name}`, () => fillFrom(f));
+  } else {
+    it("pick", "Select", () => selectPart(l));
+    if (act) it("fill", `Fill area into ${act.name}`, () => fillFrom(f));
+    it("plus", "New part here", () => { placing = { part: -1, from: 0 }; placeAt(h); });
+    it("solo", "Show only this", () => { S.parts.forEach((q, i) => (q.visible = i === l)); afterEdit(); });
+    it("eyeOff", "Hide", () => { p.visible = false; afterEdit(); });
+    it("trash", "Delete (merge into neighbour)", () => deletePart(l), "danger");
+  }
+  if (anyUn && l !== 0) it("fill", "Fill all unassigned", () => fillUnassigned(-1));
+  else if (l === 0) it("fill", "Fill all unassigned", () => fillUnassigned(-1));
+  const m = $("ctxMenu"); m.innerHTML = `<div class="hd"><span class="sw" style="background:${p.color}"></span>${esc(p.name)}</div>`;
+  for (const x of items) {
+    const b = document.createElement("button"); if (x.cls) b.className = x.cls;
+    b.innerHTML = icon(x.ic) + esc(x.label);
+    b.onclick = (e) => { e.stopPropagation(); closeCtx(); later(x.fn); };
+    m.appendChild(b);
+  }
+  m.hidden = false;
+  const r = view.getBoundingClientRect();
+  m.style.left = `${Math.min(ev.clientX - r.left, r.width - m.offsetWidth - 8)}px`;
+  m.style.top = `${Math.min(ev.clientY - r.top, r.height - m.offsetHeight - 8)}px`;
 }
 
 // ---------------------------------------------------------------- guided add part
@@ -1397,7 +1458,7 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (e.key === "Home" && S.G) { e.preventDefault(); frame(); return; }
-  if (e.key === "Escape") { if (placing) stopPlacing(); else if (flow) closeFlow(); else if (!$("autoPop").hidden) closeAuto(); else if (pickingJoint) { pickingJoint = false; refreshUI(); status(""); } else if (S.G && S.active) selectPart(0); return; }
+  if (e.key === "Escape") { if (!$("ctxMenu").hidden) closeCtx(); else if (placing) stopPlacing(); else if (flow) closeFlow(); else if (!$("autoPop").hidden) closeAuto(); else if (pickingJoint) { pickingJoint = false; refreshUI(); status(""); } else if (S.G && S.active) selectPart(0); return; }
   if (e.key === "Delete" && S.G && S.active > 0) { deletePart(S.active); return; }
   if (k === "c" && S.G) { setColorMode(!byFilament); return; }
   const t = TOOLS.find((t) => t.key === k);
