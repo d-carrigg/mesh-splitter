@@ -153,7 +153,7 @@
     </div>
     <span class="sep"></span>
     <div class="grp" data-tools="fill,brush">
-      <button id="smoothBtn" data-icon="smooth" title="Smooth part boundaries (3 majority-vote passes)"></button>
+      <button id="smoothBtn" data-icon="smooth" title="Smooth part boundaries: split the triangles along a smoothed boundary line (also runs after every segment)"></button>
     </div>
     <span class="sep"></span>
     <div class="grp">
@@ -383,6 +383,7 @@ async function loadArrayBuffer(name, buf) {
   const w = weld(raw.pos, raw.tri);
   S.pos = w.pos; S.tri = w.tri; S.nV = w.pos.length / 3; S.nF = w.tri.length / 3;
   S.G = buildGraph(S.pos, S.tri);
+  S.mesh0 = [S.pos, S.tri, S.G];
   S.labels = new Int32Array(S.nF);
   S.parts = [{ name: "Unassigned", color: UNASSIGNED_COLOR, filament: 1, seeds: [], visible: true }];
   S.active = 0; S.hist = { past: [], future: [] };
@@ -654,6 +655,7 @@ function segmentFromSeeds(opts = {}) {
   const { lab } = grow(src, mask, creaseStep());
   let n = 0;
   for (let f = 0; f < S.nF; f++) if (mask[f] && lab[f] >= 0) { S.labels[f] = lab[f]; n++; }
+  smoothCut(mask);
   afterEdit(`Segmented ${n.toLocaleString()} faces into ${seeded.size} part(s)`);
 }
 
@@ -704,6 +706,7 @@ function autoSplit(k, scopeAll = false) {
   }
   for (let f = 0; f < S.nF; f++) if (mask[f] && lab[f] >= 0) S.labels[f] = idx.get(lab[f]);
   if (scope > 0) S.parts[scope].seeds = [];
+  smoothCut(mask);
   dropEmptyParts();
   afterEdit(`Auto split into ${order.length} parts`);
 }
@@ -859,7 +862,7 @@ function dropEmptyParts() {
 
 function partCounts() { const c = new Int32Array(S.parts.length); for (let f = 0; f < S.nF; f++) c[S.labels[f]]++; return c; }
 
-function snapshot() { return { labels: S.labels.slice(), parts: JSON.parse(JSON.stringify(S.parts)), active: S.active }; }
+function snapshot() { return { labels: S.labels.slice(), parts: JSON.parse(JSON.stringify(S.parts)), active: S.active, mesh: [S.pos, S.tri, S.G] }; }
 function pushUndo(snap = snapshot()) {
   S.hist.past.push(snap); S.hist.future = [];
   if (S.hist.past.length > 40) S.hist.past.shift();
@@ -868,6 +871,7 @@ function travel(from, to, msg) {
   const u = from.pop(); if (!u) return;
   to.push(snapshot());
   S.labels = u.labels; S.parts = u.parts; S.active = u.active;
+  if (u.mesh && u.mesh[1] !== S.tri) setMesh(...u.mesh); // undo/redo across a boundary smoothing
   afterEdit(msg);
 }
 const undo = () => { closeFlow(); travel(S.hist.past, S.hist.future, "Undone"); };
@@ -951,25 +955,141 @@ function pinches(f, to) {
   }
   return false;
 }
-// Majority vote: a face adopts a label that at least 2 neighbours share and that outnumbers its own.
-// Flips are applied in place and skipped when they would pinch a part at a vertex, because the
-// STL capper cannot seal a part whose boundary loops touch.
-function smoothBoundaries(passes = 3) {
-  const G = S.G, before = snapshot(), cnt = new Map();
-  vertexEdges(G);
-  let n = 0;
-  for (let it = 0; it < passes; it++) for (let f = 0; f < S.nF; f++) {
-    cnt.clear();
-    for (let k = G.adjS[f]; k < G.adjS[f + 1]; k++) { const l = S.labels[G.adjN[k]]; cnt.set(l, (cnt.get(l) || 0) + 1); }
-    const own = cnt.get(S.labels[f]) || 0;
-    for (const [l, c] of cnt) if (l !== S.labels[f] && c >= 2 && c > own) {
-      if (!pinches(f, l)) { S.labels[f] = l; n++; }
-      break;
+// Boundary anti-aliasing. Face labels make every boundary a zigzag of mesh edges, so on a coarse or uneven
+// triangulation the rim between two parts shows triangle "teeth". Instead, each vertex near a boundary gets a
+// label-weight vector (area fraction of its faces per part), the vectors are diffused for CUT_ITERS Jacobi steps
+// inside a CUT_RINGS-vertex band, and the boundary is re-drawn as the iso-line where the two strongest labels tie
+// (marching triangles). Faces it crosses are split along it, so the mesh gains vertices and faces; the surface itself
+// is unchanged. A crossing is clamped to [CUT_T, 1-CUT_T] along its edge to avoid slivers. Faces at a junction of
+// three parts get a centroid vertex. A face sharing an edge it would cut with a face that may not change (outside
+// the mask) stays whole, so no T-junctions are made. mask: only these faces may change. Returns faces split.
+const CUT_RINGS = 3, CUT_ITERS = 6, CUT_T = 0.15;
+function smoothCut(mask = null) {
+  const { pos, tri, nV, nF } = S, L = S.labels;
+  const vfS = new Int32Array(nV + 1);
+  for (let i = 0; i < tri.length; i++) vfS[tri[i] + 1]++;
+  for (let v = 0; v < nV; v++) vfS[v + 1] += vfS[v];
+  const vf = new Int32Array(tri.length), fill = vfS.slice(0, nV);
+  for (let i = 0; i < tri.length; i++) vf[fill[tri[i]]++] = (i / 3) | 0;
+  const ok = (f) => !mask || mask[f];
+  // band: free vertices (every face around them may change) within CUT_RINGS rings of a mixed-label vertex
+  const free = new Uint8Array(nV), ring = new Int8Array(nV).fill(-1);
+  let front = [];
+  for (let v = 0; v < nV; v++) {
+    if (vfS[v] === vfS[v + 1]) continue;
+    let fr = 1, mixed = 0; const l0 = L[vf[vfS[v]]];
+    for (let k = vfS[v]; k < vfS[v + 1]; k++) { const f = vf[k]; if (!ok(f)) fr = 0; if (L[f] !== l0) mixed = 1; }
+    free[v] = fr;
+    if (fr && mixed) { ring[v] = 0; front.push(v); }
+  }
+  if (!front.length) return 0;
+  const band = front.slice();
+  for (let r = 1; r <= CUT_RINGS; r++) {
+    const nx = [];
+    for (const v of front) for (let k = vfS[v]; k < vfS[v + 1]; k++) for (let c = 0; c < 3; c++) {
+      const u = tri[3 * vf[k] + c]; if (ring[u] < 0 && free[u]) { ring[u] = r; nx.push(u); }
+    }
+    band.push(...nx); front = nx;
+  }
+  const area = S.G.area, fixedW = new Map();
+  const frac = (v) => {
+    const m = new Map(); let t = 0;
+    for (let k = vfS[v]; k < vfS[v + 1]; k++) { const f = vf[k], a = area[f] + 1e-12; m.set(L[f], (m.get(L[f]) || 0) + a); t += a; }
+    for (const [l, w] of m) m.set(l, w / t);
+    return m;
+  };
+  let W = new Map();
+  for (const v of band) W.set(v, frac(v));
+  const wOf = (v) => W.get(v) || fixedW.get(v) || (fixedW.set(v, frac(v)), fixedW.get(v));
+  for (let it = 0; it < CUT_ITERS; it++) {
+    const NW = new Map();
+    for (const v of band) {
+      const acc = new Map(); let n = 0;
+      for (let k = vfS[v]; k < vfS[v + 1]; k++) for (let c = 0; c < 3; c++) {
+        const u = tri[3 * vf[k] + c]; if (u === v) continue;
+        for (const [l, w] of wOf(u)) acc.set(l, (acc.get(l) || 0) + w);
+        n++;
+      }
+      const out = new Map();
+      for (const [l, w] of W.get(v)) out.set(l, 0.5 * w);
+      for (const [l, w] of acc) out.set(l, (out.get(l) || 0) + 0.5 * w / n);
+      NW.set(v, out);
+    }
+    W = NW;
+  }
+  const arg = new Int32Array(nV).fill(-1);
+  const argOf = (v) => {
+    if (arg[v] >= 0) return arg[v];
+    let best = 0, bw = -1; for (const [l, w] of wOf(v)) if (w > bw || (w === bw && l < best)) { bw = w; best = l; }
+    return (arg[v] = best);
+  };
+  // faces that may be split: touch the band, are in the mask, are not degenerate
+  const proc = new Uint8Array(nF);
+  for (let f = 0; f < nF; f++) {
+    const a = tri[3*f], b = tri[3*f+1], c = tri[3*f+2];
+    if (ok(f) && a !== b && b !== c && c !== a && (ring[a] >= 0 || ring[b] >= 0 || ring[c] >= 0)) proc[f] = 1;
+  }
+  const facesOn = (u, v) => { const r = []; for (let k = vfS[u]; k < vfS[u + 1]; k++) { const g = vf[k]; if (tri[3*g] === v || tri[3*g+1] === v || tri[3*g+2] === v) r.push(g); } return r; };
+  for (let changed = true; changed;) { // an edge is cut only if every face on it is split
+    changed = false;
+    for (let f = 0; f < nF; f++) if (proc[f]) for (let e = 0; e < 3 && proc[f]; e++) {
+      const u = tri[3*f+e], v = tri[3*f+(e+1)%3];
+      if (argOf(u) === argOf(v)) continue;
+      for (const g of facesOn(u, v)) if (!proc[g]) { proc[f] = 0; changed = true; break; }
     }
   }
-  if (!n) { status("Boundaries already smooth"); return; }
+  const P = Array.from(pos), T = [], Lab = [], par = [], cut = new Map();
+  const pt = (x, y, z) => { P.push(x, y, z); return P.length / 3 - 1; };
+  const cutAt = (u, v) => {
+    if (u > v) [u, v] = [v, u];
+    const key = u * nV + v; let i = cut.get(key);
+    if (i !== undefined) return i;
+    const A = argOf(u), B = argOf(v), wu = wOf(u), wv = wOf(v);
+    const du = (wu.get(A) || 0) - (wu.get(B) || 0), dv = (wv.get(A) || 0) - (wv.get(B) || 0);
+    let t = du - dv > 1e-12 ? du / (du - dv) : 0.5;
+    t = Math.min(1 - CUT_T, Math.max(CUT_T, t));
+    i = pt(pos[3*u] + t * (pos[3*v] - pos[3*u]), pos[3*u+1] + t * (pos[3*v+1] - pos[3*u+1]), pos[3*u+2] + t * (pos[3*v+2] - pos[3*u+2]));
+    cut.set(key, i); return i;
+  };
+  const d2 = (i, j) => (P[3*i]-P[3*j])**2 + (P[3*i+1]-P[3*j+1])**2 + (P[3*i+2]-P[3*j+2])**2;
+  const tri3 = (a, b, c, l, f) => { T.push(a, b, c); Lab.push(l); par.push(f); };
+  const quad = (a, b, c, d, l, f) => { if (d2(a, c) <= d2(b, d)) { tri3(a, b, c, l, f); tri3(a, c, d, l, f); } else { tri3(a, b, d, l, f); tri3(b, c, d, l, f); } };
+  let split = 0;
+  for (let f = 0; f < nF; f++) {
+    let a = tri[3*f], b = tri[3*f+1], c = tri[3*f+2];
+    if (!proc[f]) { tri3(a, b, c, L[f], f); continue; }
+    let la = argOf(a), lb = argOf(b), lc = argOf(c);
+    if (la === lb && lb === lc) { tri3(a, b, c, la, f); continue; }
+    split++;
+    if (la !== lb && lb !== lc && lc !== la) {
+      const m = pt((pos[3*a] + pos[3*b] + pos[3*c]) / 3, (pos[3*a+1] + pos[3*b+1] + pos[3*c+1]) / 3, (pos[3*a+2] + pos[3*b+2] + pos[3*c+2]) / 3);
+      const ab = cutAt(a, b), bc = cutAt(b, c), ca = cutAt(c, a);
+      quad(a, ab, m, ca, la, f); quad(b, bc, m, ab, lb, f); quad(c, ca, m, bc, lc, f);
+      continue;
+    }
+    // rotate so that c is the odd corner (la === lb)
+    while (la !== lb) { [a, b, c] = [b, c, a]; [la, lb, lc] = [lb, lc, la]; }
+    const p = cutAt(b, c), q = cutAt(c, a);
+    tri3(p, c, q, lc, f); quad(a, b, p, q, la, f);
+  }
+  if (!split) return 0;
+  const first = new Int32Array(nF).fill(-1);
+  par.forEach((f, i) => { if (first[f] < 0) first[f] = i; });
+  for (const p of S.parts) p.seeds = p.seeds.map((f) => first[f]).filter((f) => f >= 0);
+  S.labels = Int32Array.from(Lab);
+  setMesh(new Float32Array(P), Uint32Array.from(T));
+  return split;
+}
+function setMesh(pos, tri, G = null) {
+  S.pos = pos; S.tri = tri; S.nV = pos.length / 3; S.nF = tri.length / 3;
+  S.G = G || buildGraph(pos, tri);
+  buildMesh();
+}
+function smoothBoundaries() {
+  const before = snapshot(), n = smoothCut();
+  if (!n) { status("No boundaries to smooth"); return; }
   pushUndo(before);
-  afterEdit(`Smoothed ${n.toLocaleString()} boundary faces`);
+  afterEdit(`Smoothed boundaries: split ${n.toLocaleString()} faces`);
 }
 
 // ---------------------------------------------------------------- mesh display
@@ -2065,7 +2185,7 @@ function exportPainted3MF() {
     src = { pos: w.pos, tri: w.tri, nV: w.pos.length / 3, nF: w.tri.length / 3 }; fil = (f) => m.fil[f];
   }
   let out;
-  if (S.source.type === "3mf" && !ch.size) {
+  if (S.source.type === "3mf" && !ch.size && S.tri === S.mesh0[1]) { // smoothed boundaries split faces: no 1:1 map to the file
     const files = { ...S.source.files }, texts = {}, done = new Set();
     for (const m of S.source.meshes) {
       const key = m.file + "#" + m.objectId; if (done.has(key)) continue; done.add(key);
@@ -2118,7 +2238,8 @@ ${tr.join("\n")}
   download(`${S.name}_painted.3mf`, out, "model/3mf");
   const fils = [...new Set(S.parts.filter((_, i) => partCounts()[i] > 0).map((p) => p.filament))].sort((a, b) => a - b);
   status(`Painted 3MF written. Uses filament slot(s) ${fils.join(", ")}; the slicer project needs at least ${Math.max(...fils)} filaments.` +
-    (ch.size ? " Rebuilt from moved/replaced parts (overlaps fuse in the slicer); original 3MF settings not carried over." : ""));
+    (ch.size ? " Rebuilt from moved/replaced parts (overlaps fuse in the slicer); original 3MF settings not carried over." :
+      S.source.type === "3mf" && S.tri !== S.mesh0[1] ? " Mesh rewritten for the smoothed boundaries; original 3MF settings not carried over." : ""));
 }
 
 // One closed mesh per part: the part's faces plus a fan cap over each open boundary loop.
@@ -2228,21 +2349,29 @@ function exportMergedSTL() {
 // v2 zlib-compresses labels so large meshes still fit the localStorage quota; v1 files still load.
 function b64(b) { let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }
 function unb64(t) { const bin = atob(t), b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return b; }
+let meshEnc = [null, null];
 function encodeSession() {
   const b = zlibSync(new Uint8Array(S.labels.buffer.slice(0)));
   let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
   const reps = {};
   for (const p of S.parts) if (hasRep(p) && !reps[p.rep.id]) { const R = REPS.get(p.rep.id); reps[p.rep.id] = { name: R.name, pos: b64(zlibSync(new Uint8Array(R.pos.buffer.slice(0)))) }; }
-  return JSON.stringify({ version: 2, file: S.name, faces: S.nF, parts: S.parts, labels: btoa(s), reps });
+  // after boundary smoothing the mesh differs from the file, so the session carries it
+  if (S.tri !== S.mesh0[1] && meshEnc[0] !== S.tri)
+    meshEnc = [S.tri, { pos: b64(zlibSync(new Uint8Array(S.pos.buffer.slice(0)))), tri: b64(zlibSync(new Uint8Array(S.tri.buffer.slice(0)))) }];
+  const cutMesh = S.tri === S.mesh0[1] ? undefined : meshEnc[1];
+  return JSON.stringify({ version: 2, file: S.name, faces: S.mesh0[1].length / 3, parts: S.parts, labels: btoa(s), reps, mesh: cutMesh });
 }
 function applySession(txt) {
   const j = JSON.parse(txt);
-  if (j.faces !== S.nF) throw new Error(`Session is for a mesh with ${j.faces} faces; this one has ${S.nF}.`);
+  const nF0 = S.mesh0[1].length / 3;
+  if (j.faces !== nF0) throw new Error(`Session is for a mesh with ${j.faces} faces; this one has ${nF0}.`);
   const bin = atob(j.labels);
   let b = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
   if (j.version >= 2) b = unzlibSync(b);
   S.labels = new Int32Array(b.slice().buffer); S.parts = j.parts; S.active = 0;
+  if (j.mesh) setMesh(new Float32Array(unzlibSync(unb64(j.mesh.pos)).buffer), new Uint32Array(unzlibSync(unb64(j.mesh.tri)).buffer));
+  else if (S.tri !== S.mesh0[1]) setMesh(...S.mesh0);
   for (const [id, r] of Object.entries(j.reps || {})) if (!REPS.has(id)) addRep(r.name, new Float32Array(unzlibSync(unb64(r.pos)).buffer), id);
 }
 function saveSession() { if (S.G) download(`${S.name}.split.json`, encodeSession(), "application/json"); }
@@ -2252,7 +2381,7 @@ function loadSession(txt) {
   pushUndo(before);
   afterEdit("Session loaded");
 }
-const autosaveKey = () => `meshsplit:${S.name}:${S.nF}`;
+const autosaveKey = () => `meshsplit:${S.name}:${S.mesh0[1].length / 3}`;
 function autosave() { try { localStorage.setItem(autosaveKey(), encodeSession()); } catch {} }
 function restoreAutosave() {
   let txt = null;
@@ -2278,7 +2407,7 @@ if (qp) {
   fetch("/" + qp.replace(/^\/+/, "")).then((r) => { if (!r.ok) throw new Error(`${qp}: HTTP ${r.status}`); return r.arrayBuffer(); })
     .then((buf) => openBuf(qp.split("/").pop(), buf)).catch((e) => alert(e.message)).finally(() => busy(false));
 }
-window.app = { S, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForReview, runReview, applyXf, ensureXf, xfMatrix, undo, redo, deletePart, smoothBoundaries, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForReview, runReview, applyXf, ensureXf, xfMatrix, undo, redo, deletePart, smoothBoundaries, smoothCut, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
 </script>
 </body>
 </html>
