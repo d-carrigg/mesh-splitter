@@ -5,46 +5,80 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mesh Splitter</title>
 <style>
-  :root { color-scheme:dark; accent-color:var(--acc); --bg:#16181c; --panel:#1f2228; --line:#2e323a; --fg:#e6e8eb; --mute:#8b919c; --acc:#4da3ff; }
+  :root { color-scheme:dark; accent-color:var(--acc); --bg:#16181c; --panel:#1f2228; --line:#2e323a; --fg:#e6e8eb; --mute:#8b919c; --acc:#4da3ff; --glass:#1f2228f0; }
   * { box-sizing:border-box; }
+  [hidden] { display:none !important; }
   html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:13px/1.35 system-ui,Segoe UI,sans-serif; }
-  body { display:flex; }
-  #side { width:360px; min-width:360px; height:100%; overflow-y:auto; background:var(--panel); border-right:1px solid var(--line); padding:10px 12px 40px; }
-  #view { flex:1; position:relative; }
+  body { display:grid; grid-template-rows:auto 1fr; grid-template-columns:auto 1fr; }
+  #top { grid-column:1 / -1; display:flex; align-items:center; gap:6px; padding:6px 10px; background:var(--panel); border-bottom:1px solid var(--line); min-width:0; }
+  #top h1 { font-size:14px; margin:0 6px 0 0; white-space:nowrap; }
+  #fileInfo { flex:1; text-align:center; color:var(--mute); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sep { width:1px; align-self:stretch; background:var(--line); margin:2px 4px; }
+  #side { width:280px; overflow-y:auto; background:var(--panel); border-right:1px solid var(--line); padding:8px 10px 40px; }
+  #view { position:relative; min-width:0; min-height:0; overflow:hidden; }
   #view canvas { display:block; }
-  h1 { font-size:15px; margin:0 0 8px; }
-  h2 { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--mute); margin:14px 0 6px; }
-  button { background:#2b3038; color:var(--fg); border:1px solid #3a404a; border-radius:5px; padding:4px 8px; font:inherit; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px; }
+  h2 { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--mute); margin:0 auto 0 0; }
+  button { background:#2b3038; color:var(--fg); border:1px solid #3a404a; border-radius:5px; padding:4px 8px; font:inherit; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px; white-space:nowrap; }
   button:has(svg:only-child) { padding:4px 6px; }
   svg.i { width:16px; height:16px; flex:none; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
   button:hover { border-color:#56606e; }
   button.on { background:var(--acc); border-color:var(--acc); color:#06121f; font-weight:600; }
+  button.pri { background:#1d4f86; border-color:#2d6cb0; }
+  button.pri:hover { border-color:var(--acc); }
+  button.danger:hover { border-color:#ff5d5d; color:#ff8a8a; }
   button:disabled { opacity:.45; cursor:default; }
   .row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:4px 0; }
-  .bar h1, .head h2 { margin:0 auto 0 0; }
-  .head { margin-top:14px; }
-  .tools { margin:10px 0 6px; }
-  .tools button { flex:1; padding:6px 0; }
-  label.sl { display:grid; grid-template-columns:64px 1fr 40px; gap:6px; align-items:center; margin:3px 0; color:var(--mute); }
+  .grp { display:flex; gap:2px; align-items:center; }
+  label.sl { display:inline-grid; grid-template-columns:auto 110px 34px; gap:6px; align-items:center; color:var(--mute); }
   label.sl output { color:var(--fg); text-align:right; }
   input[type=number] { width:48px; background:#14161a; color:var(--fg); border:1px solid #3a404a; border-radius:4px; padding:2px 4px; font:inherit; }
   input[type=text] { background:transparent; color:var(--fg); border:1px solid transparent; border-radius:4px; padding:2px 4px; font:inherit; width:100%; }
   input[type=text]:focus { border-color:#3a404a; background:#14161a; outline:none; }
+  input[type=color] { width:22px; height:20px; padding:0; border:none; background:none; cursor:pointer; flex:none; }
+  /* floating viewport chrome */
+  .float { position:absolute; background:var(--glass); border:1px solid var(--line); border-radius:8px; box-shadow:0 4px 16px #0006; }
+  #toolbar { top:10px; left:50%; transform:translateX(-50%); display:flex; gap:4px; align-items:center; padding:4px; z-index:3; }
+  #toolbar button { padding:6px 7px; border-color:transparent; background:transparent; }
+  #toolbar button:hover { background:#2b3038; border-color:#3a404a; }
+  #toolbar button.on { background:var(--acc); color:#06121f; }
+  #opts { top:58px; left:50%; transform:translateX(-50%); display:flex; gap:10px; align-items:center; padding:6px 10px; z-index:2; white-space:nowrap; }
+  #opts:empty, #opts.hide { display:none; }
+  #opts > [data-for] { display:none; gap:10px; align-items:center; }
+  #opts > [data-for].show { display:flex; }
+  #rightCol { position:absolute; top:10px; right:10px; bottom:34px; width:290px; display:flex; flex-direction:column; gap:8px; pointer-events:none; z-index:2; }
+  #rightCol > .card { pointer-events:auto; position:static; padding:8px 10px; overflow-y:auto; min-height:0; flex:none; max-height:100%; }
+  #rightCol > .card.grow { flex:0 1 auto; }
+  .card[hidden] { display:none; }
+  .cardHead { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+  .cardHead input[type=text] { font-weight:600; }
+  .cardHead button { background:none; border-color:transparent; color:var(--mute); }
+  .cardHead button:hover { color:var(--fg); }
+  .sub { display:flex; align-items:center; gap:6px; margin:10px 0 4px; }
   #status { position:absolute; left:10px; bottom:8px; color:var(--mute); font-size:12px; pointer-events:none; }
-  #busy { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:#0008; font-size:15px; }
-  #drop { position:absolute; inset:20px; border:2px dashed #4b5360; border-radius:12px; display:flex; align-items:center; justify-content:center; color:var(--mute); font-size:16px; pointer-events:none; }
-  table.parts { width:100%; border-collapse:collapse; }
-  table.parts td { padding:2px 2px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  #busy { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:#0008; font-size:15px; z-index:5; }
+  #drop { position:absolute; inset:20px; border:2px dashed #4b5360; border-radius:12px; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; color:var(--mute); font-size:16px; }
+  #drop button { font-size:14px; padding:8px 14px; }
+  body.empty #side, body.empty #toolbar, body.empty #opts, body.empty #rightCol { display:none; }
+  body.empty #view { grid-column:1 / -1; }
+  body.empty #top .needMesh { opacity:.45; pointer-events:none; }
+  #autoPop { top:58px; z-index:4; padding:6px 10px; display:flex; gap:8px; align-items:center; white-space:nowrap; }
+  #autoPop[hidden] { display:none; }
+  table.parts { width:100%; border-collapse:collapse; margin-top:6px; }
+  table.parts td { padding:3px 2px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  table.parts tr { cursor:pointer; }
+  table.parts tr:hover td { background:#242a32; }
   table.parts tr.active td { background:#27313d; }
-  table.parts input[type=color] { width:22px; height:20px; padding:0; border:none; background:none; cursor:pointer; }
+  table.parts tr.msel td { background:#2a2f22; }
+  table.parts td.nm { width:100%; max-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  table.parts .sw { width:12px; height:12px; border-radius:3px; display:inline-block; vertical-align:-1px; }
   table.parts .n { color:var(--mute); font-size:11px; text-align:right; white-space:nowrap; }
   table.parts button { background:none; border:none; padding:2px; color:var(--mute); }
   table.parts button:hover { color:var(--fg); }
   .small { font-size:11px; color:var(--mute); }
-  .xf { display:grid; grid-template-columns:52px repeat(3, 1fr); gap:4px 6px; align-items:center; color:var(--mute); }
+  .xf { display:grid; grid-template-columns:24px repeat(3, 1fr); gap:4px 6px; align-items:center; color:var(--mute); }
   .xf input[type=number] { width:100%; }
   .xf .ax { font-size:10px; text-align:center; color:var(--mute); }
-  #xfPanel.off, #repRow.off, #repOpts.off { opacity:.45; pointer-events:none; }
+  .xf svg.i { width:14px; height:14px; }
   #repOpts.hide { display:none; }
   #aiModel, #aiNote { width:100%; background:#14161a; color:var(--fg); border:1px solid #3a404a; border-radius:4px; padding:3px 5px; font:inherit; }
   #aiOut { margin-top:6px; }
@@ -57,105 +91,139 @@
   #aiOut .fix { color:var(--mute); font-size:11px; }
 </style>
 </head>
-<body>
-<div id="side">
-  <div class="row bar">
-    <h1>Mesh Splitter</h1>
-    <button id="openBtn" data-icon="open" title="Open STL / 3MF"></button>
-    <button id="undoBtn" data-icon="undo" title="Undo (Ctrl+Z)"></button>
-    <button id="redoBtn" data-icon="redo" title="Redo (Ctrl+Y)"></button>
-    <button id="frameBtn" data-icon="frame" title="Frame view (Home)"></button>
-    <input id="fileIn" type="file" accept=".stl,.3mf" hidden>
-  </div>
-  <div id="fileInfo" class="small">Drop or open an STL / 3MF</div>
+<body class="empty">
+<header id="top">
+  <h1>Mesh Splitter</h1>
+  <button id="openBtn" data-icon="open" title="Open STL / 3MF"></button>
+  <button id="saveSess" class="needMesh" data-icon="save" title="Save session (.json)"></button>
+  <button id="loadSess" class="needMesh" data-icon="load" title="Load session (.json)"></button>
+  <span class="sep"></span>
+  <button id="undoBtn" disabled data-icon="undo" title="Undo (Ctrl+Z)"></button>
+  <button id="redoBtn" disabled data-icon="redo" title="Redo (Ctrl+Y)"></button>
+  <span id="fileInfo"></span>
+  <button id="exp3mf" class="pri needMesh" data-icon="palette" title="Same mesh, each triangle painted with its part's filament slot (Bambu/Orca color painting)">Painted 3MF</button>
+  <button id="expStl" class="pri needMesh" data-icon="package" title="One closed STL per part, cut faces capped (.zip)">Part STLs</button>
+  <button id="expMerged" class="pri needMesh" data-icon="merge" title="Whole model as one STL, with moved/replaced parts in place">Merged STL</button>
+  <input id="fileIn" type="file" accept=".stl,.3mf" hidden>
+  <input id="sessIn" type="file" accept=".json" hidden>
+</header>
 
-  <div class="row tools" id="tools"></div>
-  <label class="sl" title="Concave creases sharper than this separate parts; lower = more sensitive, 0 = pure distance">Crease<input id="lambda" type="range" min="0" max="20" step="0.5" value="2"><output id="lambdaOut"></output></label>
-  <label class="sl" title="Neighbour-averaging passes on the concavity map; more = ignores small dents">Denoise<input id="smooth" type="range" min="0" max="20" step="1" value="4"><output id="smoothOut"></output></label>
-  <label class="sl" title="Fill stops at concave creases sharper than this">Fill stop<input id="fillAng" type="range" min="2" max="90" step="1" value="25"><output id="fillAngOut"></output></label>
-  <label class="sl" title="Brush radius (mm)">Brush<input id="brushR" type="range" min="0.2" max="30" step="0.1" value="3"><output id="brushROut"></output></label>
-
-  <h2>Segment</h2>
+<aside id="side">
   <div class="row">
-    <button id="segBtn" data-icon="segment" title="Grow every seeded part from its seeds; boundaries settle on concave creases">Segment</button>
-    <button id="smoothBtn" data-icon="smooth" title="Smooth part boundaries (3 majority-vote passes)">Smooth</button>
-    <button id="shellBtn" data-icon="shells" title="One part per disconnected shell">Shells</button>
-  </div>
-  <div class="row">
-    <button id="autoBtn" data-icon="auto" title="Split automatically into N parts">Auto split</button>
-    <input id="autoK" type="number" min="2" max="32" value="6" title="Number of parts">
-    <label class="small" title="Split only the active part"><input id="autoScope" type="checkbox"> active only</label>
-  </div>
-
-  <div class="row head">
     <h2>Parts</h2>
-    <button id="addPart" data-icon="plus" title="New part"></button>
-    <button id="mergeBtn" data-icon="merge" title="Merge checked parts into active"></button>
-    <button id="clrSeeds" data-icon="eraser" title="Clear active part's seeds"></button>
-    <button id="clrAllSeeds" data-icon="eraser" title="Clear all seeds">All</button>
+    <button id="mergeBtn" data-icon="merge" title="Merge Shift+clicked parts into the selected part" hidden></button>
     <button id="showAll" data-icon="eye" title="Show all parts"></button>
-    <button id="soloBtn" data-icon="solo" title="Show only active part"></button>
+    <button id="addPart" data-icon="plus" title="New part"></button>
   </div>
   <table class="parts"><tbody id="partsBody"></tbody></table>
+</aside>
 
-  <div class="row head">
-    <h2 id="xfTitle">Transform</h2>
-    <button id="xfReset" data-icon="reset" title="Reset this part's transform"></button>
-  </div>
-  <div id="xfPanel" class="xf" title="Applies to the active part: view, Part STLs and AI review. Pivot is the part's centre.">
-    <span></span><span class="ax">X</span><span class="ax">Y</span><span class="ax">Z</span>
-    <span>Scale %</span><input id="xfS0" type="number" step="1"><input id="xfS1" type="number" step="1"><input id="xfS2" type="number" step="1">
-    <span>Rotate °</span><input id="xfR0" type="number" step="5"><input id="xfR1" type="number" step="5"><input id="xfR2" type="number" step="5">
-    <span>Move mm</span><input id="xfT0" type="number" step="0.5"><input id="xfT1" type="number" step="0.5"><input id="xfT2" type="number" step="0.5">
-  </div>
-  <div class="row">
-    <label class="small" title="Scale X/Y/Z together"><input id="xfLock" type="checkbox" checked> uniform scale</label>
-    <span id="xfDims" class="small" style="margin-left:auto"></span>
-  </div>
-  <div class="row" id="repRow">
-    <button id="repBtn" data-icon="replace" title="Swap the active part for another STL/3MF, lined up on the old part's joint">Replace…</button>
-    <span id="repName" class="small" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap"></span>
-    <button id="repDel" data-icon="trash" title="Remove the replacement (old part comes back)"></button>
-    <input id="repIn" type="file" accept=".stl,.3mf" hidden>
-  </div>
-  <div class="row" id="repOpts">
-    <button id="repFlip" title="Attach by the other end of the replacement">Flip</button>
-    <button id="repRoll" title="Roll 90° about the joint axis">Roll 90°</button>
-    <button id="repPick" title="Then click the spot on the replacement that attaches. When a picked joint is set, this button goes back to auto">Pick joint</button>
-    <label class="small" title="Scale the replacement so its longest dimension matches the old part's"><input id="repFit" type="checkbox"> fit</label>
-    <label class="small" title="How far the replacement sinks into the rest so the slicer fuses them">embed <input id="repEmbed" type="number" step="0.5" min="0" style="width:44px"> mm</label>
-  </div>
-
-  <div class="row head">
-    <h2>AI review</h2>
-    <span id="aiState" class="small"></span>
-  </div>
-  <div class="row">
-    <button id="aiBtn" data-icon="sparkle" title="Render views + part stats, ask a vision model (OpenRouter) to name parts and flag segmentation problems">Review</button>
-    <button id="aiChk" data-icon="check" title="Local checks only (no AI): fragments, slivers, unassigned faces">Check</button>
-    <input id="aiModel" list="aiModels" title="OpenRouter model id (needs image input)" style="flex:1; width:auto">
-    <datalist id="aiModels">
-      <option value="google/gemini-2.5-flash"><option value="google/gemini-2.5-pro">
-      <option value="anthropic/claude-sonnet-4.5"><option value="openai/gpt-5-mini">
-    </datalist>
-  </div>
-  <input id="aiNote" type="text" placeholder="Note for the model (optional), e.g. curling player with broom">
-  <div id="aiOut"></div>
-
-  <h2>Export</h2>
-  <div class="row">
-    <button id="exp3mf" data-icon="palette" title="Same mesh, each triangle painted with its part's filament slot (Bambu/Orca color painting)">Painted 3MF</button>
-    <button id="expStl" data-icon="package" title="One closed STL per part, cut faces capped (.zip)">Part STLs</button>
-    <button id="expMerged" data-icon="merge" title="Whole model as one STL, with moved/replaced parts in place">Merged STL</button>
-  </div>
-  <div class="row">
-    <button id="saveSess" data-icon="save" title="Download session (.json)">Save</button>
-    <button id="loadSess" data-icon="load" title="Load session (.json)">Load</button>
-    <input id="sessIn" type="file" accept=".json" hidden>
-  </div>
-</div>
 <div id="view">
-  <div id="drop">Drop an STL or 3MF here</div>
+  <div id="drop"><span>Drop an STL or 3MF here</span><button id="dropOpen" data-icon="open">Open…</button></div>
+
+  <div id="toolbar" class="float">
+    <div class="grp" data-tools="orbit,pick"></div>
+    <span class="sep"></span>
+    <div class="grp" data-tools="seed">
+      <button id="autoBtn" data-icon="auto" title="Auto split into N parts"></button>
+      <button id="shellBtn" data-icon="shells" title="One part per disconnected shell"></button>
+    </div>
+    <span class="sep"></span>
+    <div class="grp" data-tools="fill,brush">
+      <button id="smoothBtn" data-icon="smooth" title="Smooth part boundaries (3 majority-vote passes)"></button>
+    </div>
+    <span class="sep"></span>
+    <div class="grp">
+      <button id="aiChk" data-icon="check" title="Check parts: fragments, slivers, unassigned faces"></button>
+      <button id="aiToggle" data-icon="sparkle" title="AI review"></button>
+    </div>
+    <span class="sep"></span>
+    <div class="grp">
+      <button id="frameBtn" data-icon="frame" title="Frame view (Home)"></button>
+    </div>
+  </div>
+
+  <div id="autoPop" class="float" hidden>
+    <span class="small">Parts</span><input id="autoK" type="number" min="2" max="32" value="6">
+    <label class="small" title="Split only the selected part"><input id="autoScope" type="checkbox"> selected only</label>
+    <button id="autoRun" class="pri" data-icon="auto">Split</button>
+  </div>
+
+  <div id="opts" class="float">
+    <div data-for="seed">
+      <label class="sl" title="Concave creases sharper than this separate parts; lower = more sensitive, 0 = pure distance">Crease<input id="lambda" type="range" min="0" max="20" step="0.5" value="2"><output id="lambdaOut"></output></label>
+      <label class="sl" title="Neighbour-averaging passes on the concavity map; more = ignores small dents">Denoise<input id="smooth" type="range" min="0" max="20" step="1" value="4"><output id="smoothOut"></output></label>
+      <button id="clrAllSeeds" data-icon="eraser" title="Clear all seeds"></button>
+      <button id="segBtn" class="pri" data-icon="segment" title="Grow every seeded part from its seeds; boundaries settle on concave creases">Segment</button>
+    </div>
+    <div data-for="fill">
+      <label class="sl" title="Fill stops at concave creases sharper than this">Fill stop<input id="fillAng" type="range" min="2" max="90" step="1" value="25"><output id="fillAngOut"></output></label>
+    </div>
+    <div data-for="brush">
+      <label class="sl" title="Brush radius (mm). Shift erases">Radius<input id="brushR" type="range" min="0.2" max="30" step="0.1" value="3"><output id="brushROut"></output></label>
+    </div>
+  </div>
+
+  <div id="rightCol">
+    <div id="partCard" class="float card" hidden>
+      <div class="cardHead">
+        <input id="pcColor" type="color" title="Display color">
+        <input id="pcName" type="text">
+        <span class="small" title="Filament slot">F</span><input id="pcFil" type="number" min="1" max="32" style="width:40px" title="Filament slot">
+        <button id="pcClose" data-icon="x" title="Deselect (Esc)"></button>
+      </div>
+      <div class="row">
+        <span id="xfDims" class="small" style="margin-right:auto"></span>
+        <button id="soloBtn" data-icon="solo" title="Show only this part"></button>
+        <button id="clrSeeds" data-icon="eraser" title="Clear this part's seeds"></button>
+        <button id="pcDel" class="danger" data-icon="trash" title="Delete part, faces go to Unassigned (Del)"></button>
+      </div>
+      <div class="sub">
+        <h2>Transform</h2>
+        <label class="small" title="Scale X/Y/Z together"><input id="xfLock" type="checkbox" checked> uniform</label>
+        <button id="xfReset" data-icon="reset" title="Reset this part's transform"></button>
+      </div>
+      <div id="xfPanel" class="xf" title="Applies to this part: view, Part STLs, Merged STL and AI review. Pivot is the part's centre.">
+        <span></span><span class="ax">X</span><span class="ax">Y</span><span class="ax">Z</span>
+        <span data-icon-span="scale" title="Scale %"></span><input id="xfS0" type="number" step="1"><input id="xfS1" type="number" step="1"><input id="xfS2" type="number" step="1">
+        <span data-icon-span="rotate" title="Rotate °"></span><input id="xfR0" type="number" step="5"><input id="xfR1" type="number" step="5"><input id="xfR2" type="number" step="5">
+        <span data-icon-span="move" title="Move mm"></span><input id="xfT0" type="number" step="0.5"><input id="xfT1" type="number" step="0.5"><input id="xfT2" type="number" step="0.5">
+      </div>
+      <div class="sub">
+        <h2>Replace</h2>
+        <button id="repDel" data-icon="trash" title="Remove the replacement (old part comes back)"></button>
+        <button id="repBtn" data-icon="replace" title="Swap this part for another STL/3MF, lined up on the old part's joint"></button>
+        <input id="repIn" type="file" accept=".stl,.3mf" hidden>
+      </div>
+      <div id="repName" class="small" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap"></div>
+      <div class="row" id="repOpts">
+        <button id="repFlip" title="Attach by the other end of the replacement">Flip</button>
+        <button id="repRoll" title="Roll 90° about the joint axis">Roll 90°</button>
+        <button id="repPick" title="Then click the spot on the replacement that attaches. When a picked joint is set, this button goes back to auto">Pick joint</button>
+        <label class="small" title="Scale the replacement so its longest dimension matches the old part's"><input id="repFit" type="checkbox"> fit</label>
+        <label class="small" title="How far the replacement sinks into the rest so the slicer fuses them">embed <input id="repEmbed" type="number" step="0.5" min="0" style="width:44px"> mm</label>
+      </div>
+    </div>
+
+    <div id="aiCard" class="float card grow" hidden>
+      <div class="cardHead">
+        <h2>Review</h2>
+        <span id="aiState" class="small"></span>
+        <button id="aiClose" data-icon="x" title="Close"></button>
+      </div>
+      <div class="row">
+        <input id="aiModel" list="aiModels" title="OpenRouter model id (needs image input)" style="flex:1; width:auto">
+        <datalist id="aiModels">
+          <option value="google/gemini-2.5-flash"><option value="google/gemini-2.5-pro">
+          <option value="anthropic/claude-sonnet-4.5"><option value="openai/gpt-5-mini">
+        </datalist>
+        <button id="aiBtn" class="pri" data-icon="sparkle" title="Render views + part stats, ask a vision model (OpenRouter) to name parts and flag segmentation problems">Review</button>
+      </div>
+      <input id="aiNote" type="text" placeholder="Note for the model (optional)">
+      <div id="aiOut"></div>
+    </div>
+  </div>
+
   <div id="status"></div>
   <div id="busy">Working…</div>
 </div>
@@ -214,6 +282,10 @@ const ICONS = {
   replace: '<path d="M21 3v5h-5"/><path d="M3 21v-5h5"/><path d="M20.5 8A9 9 0 0 0 4.6 6.6"/><path d="M3.5 16a9 9 0 0 0 15.9 1.4"/>',
   sparkle: '<path d="M9.94 14.06 4 20M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1"/><circle cx="12" cy="12" r="2.5"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  scale: '<path d="M21 3h-6M21 3v6M21 3l-7 7"/><path d="M3 21h6M3 21v-6M3 21l7-7"/>',
+  rotate: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
+  move: '<path d="M12 2v20M2 12h20"/><path d="m9 5 3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3M19 9l3 3-3 3"/>',
   load: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
 };
 const icon = (n) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
@@ -944,15 +1016,18 @@ const TOOLS = [
   { id: "brush", key: "b", icon: "brush", title: "Brush (B), Shift erases, right-drag rotates" },
   { id: "pick", key: "p", icon: "pick", title: "Pick (P), click makes that part active (Ctrl+click in any tool)" },
 ];
-for (const t of TOOLS) {
-  const b = document.createElement("button");
+document.querySelectorAll("[data-tools]").forEach((g) => [...g.dataset.tools.split(",")].reverse().forEach((id) => {
+  const t = TOOLS.find((t) => t.id === id), b = document.createElement("button");
   b.dataset.tool = t.id; b.title = t.title; b.innerHTML = icon(t.icon);
   b.onclick = () => setTool(t.id);
-  $("tools").appendChild(b);
-}
+  g.prepend(b);
+}));
 function setTool(t) {
   S.tool = t;
   document.querySelectorAll("[data-tool]").forEach((b) => b.classList.toggle("on", b.dataset.tool === t));
+  let any = false;
+  document.querySelectorAll("#opts > [data-for]").forEach((d) => { const on = d.dataset.for === t; d.classList.toggle("show", on); any ||= on; });
+  $("opts").classList.toggle("hide", !any);
 }
 
 let down = null, painting = false;
@@ -1026,32 +1101,33 @@ function syncSliders() {
 }
 ["lambda", "smooth", "fillAng", "brushR"].forEach((id) => $(id).addEventListener("input", syncSliders));
 
+const mergeSel = new Set(); // parts Shift+clicked in the list, merged into the selected part
+function selectPart(i) { S.active = i; mergeSel.clear(); refreshUI(); }
 function refreshUI() {
   const body = $("partsBody"); body.innerHTML = "";
+  document.body.classList.toggle("empty", !S.G);
   if (!S.G) return;
   const cnt = partCounts();
+  for (const i of [...mergeSel]) if (i <= 0 || i >= S.parts.length || i === S.active) mergeSel.delete(i);
   S.parts.forEach((p, i) => {
-    const tr = document.createElement("tr"); if (i === S.active) tr.className = "active";
-    tr.innerHTML = `<td><input type="radio" name="act" ${i === S.active ? "checked" : ""}></td>
-      <td><input type="color" value="${p.color}"></td>
-      <td><input type="text" value="${p.name.replace(/"/g, "&quot;")}" ${i === 0 ? "readonly" : ""}></td>
-      <td style="white-space:nowrap" title="Filament slot">F<input type="number" min="1" max="32" value="${p.filament}" style="width:40px"></td>
+    const tr = document.createElement("tr");
+    tr.className = i === S.active ? "active" : mergeSel.has(i) ? "msel" : "";
+    tr.title = i ? "Click: select · Shift+click: add to merge" : "Click: select";
+    tr.innerHTML = `<td><span class="sw" style="background:${p.color}"></span></td>
+      <td class="nm">${esc(p.name)}</td>
+      <td class="n" title="Filament slot">F${p.filament}</td>
       <td class="n">${cnt[i].toLocaleString()}${p.seeds.length ? ` · ${p.seeds.length}●` : ""}</td>
-      <td><button class="eye" title="${p.visible ? "Hide" : "Show"}">${icon(p.visible ? "eye" : "eyeOff")}</button></td>
-      <td>${i ? '<input type="checkbox" class="mck" title="Select for merge">' : ""}</td>
-      <td>${i ? `<button class="del" title="Delete part (faces go to Unassigned)">${icon("trash")}</button>` : ""}</td>`;
-    const [radio, color, name, fil] = tr.querySelectorAll("input");
-    radio.onchange = () => { S.active = i; refreshUI(); };
-    tr.querySelector(".n").onclick = () => { S.active = i; refreshUI(); };
-    color.oninput = () => { p.color = color.value; updateColors(); drawSeeds(); };
-    color.onchange = autosave;
-    name.onchange = () => { p.name = name.value || p.name; autosave(); };
-    fil.onchange = () => { p.filament = Math.max(1, Math.min(32, Math.round(+fil.value || 1))); fil.value = p.filament; autosave(); };
+      <td><button class="eye" title="${p.visible ? "Hide" : "Show"}">${icon(p.visible ? "eye" : "eyeOff")}</button></td>`;
+    tr.onclick = (ev) => {
+      if (ev.target.closest(".eye")) return;
+      if (ev.shiftKey && i > 0 && S.active > 0 && i !== S.active) { mergeSel.has(i) ? mergeSel.delete(i) : mergeSel.add(i); refreshUI(); }
+      else selectPart(i);
+    };
     tr.querySelector(".eye").onclick = () => { p.visible = !p.visible; updateVisibility(); drawSeeds(); refreshUI(); };
-    if (i) tr.querySelector(".del").onclick = () => deletePart(i);
-    const ck = tr.querySelector(".mck"); if (ck) ck.dataset.idx = i;
     body.appendChild(tr);
   });
+  $("mergeBtn").hidden = !mergeSel.size;
+  $("mergeBtn").title = `Merge ${mergeSel.size} part(s) into ${S.parts[S.active].name}`;
   refreshXfPanel();
   $("undoBtn").disabled = !S.hist.past.length;
   $("redoBtn").disabled = !S.hist.future.length;
@@ -1059,8 +1135,9 @@ function refreshUI() {
 
 $("addPart").onclick = () => { if (!S.G) return; pushUndo(); S.parts.push(newPart()); S.active = S.parts.length - 1; refreshUI(); };
 $("mergeBtn").onclick = () => {
-  const idx = [...document.querySelectorAll(".mck:checked")].map((c) => +c.dataset.idx).filter((i) => i !== S.active);
-  if (!idx.length) return;
+  const idx = [...mergeSel].filter((i) => i !== S.active && i > 0 && i < S.parts.length);
+  mergeSel.clear();
+  if (!idx.length || S.active <= 0) return;
   pushUndo();
   const set = new Set(idx);
   for (let f = 0; f < S.nF; f++) if (set.has(S.labels[f])) S.labels[f] = S.active;
@@ -1076,9 +1153,30 @@ $("redoBtn").onclick = redo;
 $("frameBtn").onclick = () => S.G && frame();
 $("smoothBtn").onclick = () => S.G && later(() => smoothBoundaries());
 $("segBtn").onclick = () => S.G && later(segmentFromSeeds);
-$("autoBtn").onclick = () => S.G && later(() => autoSplit(Math.max(2, Math.min(32, +$("autoK").value | 0))));
 $("shellBtn").onclick = () => S.G && later(splitShells);
-$("openBtn").onclick = () => $("fileIn").click();
+$("openBtn").onclick = $("dropOpen").onclick = () => $("fileIn").click();
+// selected-part card
+const act = () => (S.G && S.active > 0 ? S.parts[S.active] : null);
+$("pcColor").oninput = () => { const p = act(); if (p) { p.color = $("pcColor").value; updateColors(); drawSeeds(); syncReps(); } };
+$("pcColor").onchange = () => refreshUI() || autosave();
+$("pcName").onchange = () => { const p = act(); if (p) { p.name = $("pcName").value.trim() || p.name; refreshUI(); autosave(); } };
+$("pcFil").onchange = () => { const p = act(); if (p) { p.filament = Math.max(1, Math.min(32, Math.round(+$("pcFil").value || 1))); refreshUI(); autosave(); } };
+$("pcClose").onclick = () => selectPart(0);
+$("pcDel").onclick = () => S.active > 0 && deletePart(S.active);
+// auto split popover
+$("autoBtn").onclick = () => {
+  const pop = $("autoPop"), b = $("autoBtn").getBoundingClientRect(), v = view.getBoundingClientRect();
+  pop.hidden = !pop.hidden; $("autoBtn").classList.toggle("on", !pop.hidden);
+  if (!pop.hidden) { pop.style.left = `${Math.max(8, b.left - v.left - 8)}px`; $("opts").style.visibility = "hidden"; $("autoK").focus(); }
+  else $("opts").style.visibility = "";
+};
+const closeAuto = () => { $("autoPop").hidden = true; $("autoBtn").classList.remove("on"); $("opts").style.visibility = ""; };
+$("autoRun").onclick = () => { closeAuto(); S.G && later(() => autoSplit(Math.max(2, Math.min(32, +$("autoK").value | 0)))); };
+$("autoK").addEventListener("keydown", (e) => { if (e.key === "Enter") $("autoRun").click(); if (e.key === "Escape") closeAuto(); });
+// review card
+const showAi = (on) => { $("aiCard").hidden = !on; $("aiToggle").classList.toggle("on", on); };
+$("aiToggle").onclick = () => showAi($("aiCard").hidden);
+$("aiClose").onclick = () => showAi(false);
 $("fileIn").onchange = async () => { const f = $("fileIn").files[0]; if (f) openFile(f); };
 async function openFile(f) { busy(true); try { await loadArrayBuffer(f.name, await f.arrayBuffer()); } catch (e) { console.error(e); alert(e.message); } busy(false); }
 view.addEventListener("dragover", (e) => e.preventDefault());
@@ -1091,6 +1189,8 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (e.key === "Home" && S.G) { e.preventDefault(); frame(); return; }
+  if (e.key === "Escape") { if (!$("autoPop").hidden) closeAuto(); else if (pickingJoint) { pickingJoint = false; refreshUI(); status(""); } else if (S.G && S.active) selectPart(0); return; }
+  if (e.key === "Delete" && S.G && S.active > 0) { deletePart(S.active); return; }
   const t = TOOLS.find((t) => t.key === k);
   if (t) setTool(t.id);
 });
@@ -1267,16 +1367,21 @@ function partWorldBox(i) {
 }
 function refreshXfPanel() {
   const i = S.active, p = S.parts[i], ok = !!S.G && i > 0 && !!p;
-  $("xfPanel").classList.toggle("off", !ok);
+  $("partCard").hidden = !ok;
+  if (ok) {
+    $("pcColor").value = p.color; $("pcFil").value = p.filament;
+    if (document.activeElement !== $("pcName")) $("pcName").value = p.name;
+    $("clrSeeds").disabled = !p.seeds.length;
+  }
+  $("clrAllSeeds").disabled = !S.G || !S.parts.some((q) => q.seeds.length);
   $("xfReset").disabled = !ok || isIdXf(p?.xf);
-  $("xfTitle").textContent = ok ? `Transform · ${p.name}` : "Transform";
   const x = (ok && p.xf) || { s: [1, 1, 1], r: [0, 0, 0], t: [0, 0, 0] };
   for (let k = 0; k < 3; k++) {
     xfIn("S", k).value = +(x.s[k] * 100).toFixed(2); xfIn("R", k).value = +x.r[k].toFixed(2); xfIn("T", k).value = +x.t[k].toFixed(3);
   }
   const r = ok && p.rep;
-  $("repRow").classList.toggle("off", !ok);
   $("repOpts").classList.toggle("hide", !r);
+  $("repBtn").title = r ? "Swap for a different STL/3MF" : "Swap this part for another STL/3MF, lined up on the old part's joint";
   $("repDel").style.display = r ? "" : "none";
   $("repName").textContent = r ? `→ ${r.name}${REPS.has(r.id) ? "" : " (missing mesh)"}` : "";
   $("repName").title = r ? r.name : "";
@@ -1596,7 +1701,7 @@ async function runReview() {
   } finally { busy(false); $("busy").textContent = "Working…"; }
 }
 $("aiBtn").onclick = runReview;
-$("aiChk").onclick = runChecks;
+$("aiChk").onclick = () => { if (S.G) { showAi(true); runChecks(); } };
 
 // ---------------------------------------------------------------- export
 function download(name, data, type = "application/octet-stream") {
@@ -1836,6 +1941,8 @@ $("sessIn").onchange = async () => { const f = $("sessIn").files[0]; if (f) load
 
 // ---------------------------------------------------------------- boot
 document.querySelectorAll("[data-icon]").forEach((b) => b.insertAdjacentHTML("afterbegin", icon(b.dataset.icon)));
+document.querySelectorAll("[data-icon-span]").forEach((b) => (b.innerHTML = icon(b.dataset.iconSpan)));
+new ResizeObserver(resize).observe(view);
 setTool("seed"); syncSliders(); resize(); llmStatus();
 const qp = new URLSearchParams(location.search).get("file");
 if (qp) {
