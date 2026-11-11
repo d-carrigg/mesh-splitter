@@ -1,0 +1,1055 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mesh Splitter</title>
+<style>
+  :root { --bg:#16181c; --panel:#1f2228; --line:#2e323a; --fg:#e6e8eb; --mute:#8b919c; --acc:#4da3ff; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:13px/1.35 system-ui,Segoe UI,sans-serif; }
+  body { display:flex; }
+  #side { width:360px; min-width:360px; height:100%; overflow-y:auto; background:var(--panel); border-right:1px solid var(--line); padding:10px 12px 40px; }
+  #view { flex:1; position:relative; }
+  #view canvas { display:block; }
+  h1 { font-size:15px; margin:0 0 8px; }
+  h2 { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--mute); margin:14px 0 6px; }
+  button { background:#2b3038; color:var(--fg); border:1px solid #3a404a; border-radius:5px; padding:5px 8px; font:inherit; cursor:pointer; }
+  button:hover { border-color:#56606e; }
+  button.on { background:var(--acc); border-color:var(--acc); color:#06121f; font-weight:600; }
+  button:disabled { opacity:.45; cursor:default; }
+  .row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:4px 0; }
+  .tools button { flex:1; padding:5px 0; }
+  label.sl { display:grid; grid-template-columns:110px 1fr 44px; gap:6px; align-items:center; margin:3px 0; color:var(--mute); }
+  label.sl output { color:var(--fg); text-align:right; }
+  input[type=number] { width:48px; background:#14161a; color:var(--fg); border:1px solid #3a404a; border-radius:4px; padding:2px 4px; font:inherit; }
+  input[type=text] { background:transparent; color:var(--fg); border:1px solid transparent; border-radius:4px; padding:2px 4px; font:inherit; width:100%; }
+  input[type=text]:focus { border-color:#3a404a; background:#14161a; outline:none; }
+  #hint { color:var(--mute); font-size:12px; min-height:32px; margin-top:4px; }
+  #status { position:absolute; left:10px; bottom:8px; color:var(--mute); font-size:12px; pointer-events:none; }
+  #busy { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:#0008; font-size:15px; }
+  #drop { position:absolute; inset:20px; border:2px dashed #4b5360; border-radius:12px; display:flex; align-items:center; justify-content:center; color:var(--mute); font-size:16px; pointer-events:none; }
+  table.parts { width:100%; border-collapse:collapse; }
+  table.parts td { padding:2px 2px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  table.parts tr.active td { background:#27313d; }
+  table.parts input[type=color] { width:22px; height:20px; padding:0; border:none; background:none; cursor:pointer; }
+  table.parts .n { color:var(--mute); font-size:11px; text-align:right; white-space:nowrap; }
+  table.parts .eye { cursor:pointer; user-select:none; color:var(--mute); }
+  table.parts .eye.off { opacity:.35; }
+  .small { font-size:11px; color:var(--mute); }
+  kbd { background:#2b3038; border:1px solid #3a404a; border-radius:3px; padding:0 4px; font-size:11px; }
+</style>
+</head>
+<body>
+<div id="side">
+  <h1>Mesh Splitter</h1>
+  <div class="row">
+    <button id="openBtn">Open STL / 3MF…</button>
+    <input id="fileIn" type="file" accept=".stl,.3mf" hidden>
+  </div>
+  <div id="fileInfo" class="small">No mesh loaded. Drop a file on the view.</div>
+
+  <h2>Tool</h2>
+  <div class="row tools">
+    <button data-tool="orbit" title="O">Orbit</button>
+    <button data-tool="seed" title="S">Seed</button>
+    <button data-tool="fill" title="F">Fill</button>
+    <button data-tool="brush" title="B">Brush</button>
+    <button data-tool="pick" title="P">Pick</button>
+  </div>
+  <div id="hint"></div>
+
+  <h2>Settings</h2>
+  <label class="sl" title="Concave creases sharper than this separate parts; lower = more sensitive, 0 = pure distance">Crease step<input id="lambda" type="range" min="0" max="20" step="0.5" value="2"><output id="lambdaOut"></output></label>
+  <label class="sl" title="Neighbour-averaging passes on the concavity map; more = ignores small dents">Smoothing<input id="smooth" type="range" min="0" max="20" step="1" value="4"><output id="smoothOut"></output></label>
+  <label class="sl">Fill stop angle<input id="fillAng" type="range" min="2" max="90" step="1" value="25"><output id="fillAngOut"></output></label>
+  <label class="sl">Brush radius<input id="brushR" type="range" min="0.2" max="30" step="0.1" value="3"><output id="brushROut"></output></label>
+
+  <h2>Segment</h2>
+  <div class="row">
+    <button id="segBtn" title="Grow every seeded part out from its seeds; boundaries settle on concave creases">Segment from seeds</button>
+  </div>
+  <div class="row">
+    <button id="autoBtn">Auto split</button> into <input id="autoK" type="number" min="2" max="32" value="6"> parts
+  </div>
+  <div class="row"><label><input id="autoScope" type="checkbox"> only inside active part</label></div>
+  <div class="row"><button id="shellBtn">Split by shells</button> <span class="small">(disconnected pieces)</span></div>
+
+  <h2>Parts</h2>
+  <table class="parts"><tbody id="partsBody"></tbody></table>
+  <div class="row">
+    <button id="addPart">+ Part</button>
+    <button id="mergeBtn" title="Move the checked parts' faces into the active part">Merge ✓ → active</button>
+  </div>
+  <div class="row">
+    <button id="clrSeeds">Clear seeds (active)</button>
+    <button id="clrAllSeeds">Clear all seeds</button>
+  </div>
+  <div class="row">
+    <button id="showAll">Show all</button>
+    <button id="soloBtn">Solo active</button>
+    <button id="undoBtn">Undo</button>
+  </div>
+
+  <h2>Export</h2>
+  <div class="row">
+    <button id="exp3mf" title="Same mesh, each triangle painted with its part's filament (Bambu/Orca color painting)">Painted 3MF</button>
+    <button id="expStl" title="One closed STL per part, cut faces capped">Part STLs (.zip)</button>
+  </div>
+  <div class="row">
+    <button id="saveSess">Save session</button>
+    <button id="loadSess">Load session</button>
+    <input id="sessIn" type="file" accept=".json" hidden>
+  </div>
+  <p class="small">F# = filament slot written to the painted 3MF. <kbd>Ctrl</kbd>+click picks a part in any tool. <kbd>Shift</kbd>+brush erases to Unassigned. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo.</p>
+</div>
+<div id="view">
+  <div id="drop">Drop an STL or 3MF here</div>
+  <div id="status"></div>
+  <div id="busy">Working…</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/",
+    "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.6/build/index.module.js",
+    "fflate": "https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { STLLoader } from "three/addons/loaders/STLLoader.js";
+import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
+import { unzipSync, zipSync, strFromU8, strToU8 } from "fflate";
+
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
+THREE.Mesh.prototype.raycast = acceleratedRaycast;
+
+const $ = (id) => document.getElementById(id);
+const PALETTE = ["#e6194b","#3cb44b","#4363d8","#f58231","#911eb4","#42d4f4","#f032e6","#bfef45",
+                 "#fabed4","#469990","#dcbeff","#9a6324","#fffac8","#800000","#aaffc3","#000075"];
+const UNASSIGNED_COLOR = "#9aa0a8";
+
+// ---------------------------------------------------------------- state
+const S = {
+  name: "", source: null,          // {type:'stl'} | {type:'3mf', files, meshes:[{file,objectId,triStart,triCount}]}
+  pos: null, tri: null, nF: 0, nV: 0,
+  G: null,                         // face graph
+  labels: null,                    // Int32Array part index per face
+  parts: [],                       // {name,color,filament,seeds:[face],visible}
+  active: 0, tool: "seed", undo: [],
+};
+
+// ---------------------------------------------------------------- three setup
+const view = $("view");
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+view.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x202329);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 10000);
+camera.up.set(0, 0, 1);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = false;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x404050, 1.6));
+const key = new THREE.DirectionalLight(0xffffff, 1.6); camera.add(key); key.position.set(1, 2, 3);
+scene.add(camera);
+const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0.0, side: THREE.DoubleSide });
+let mesh = null, seedGroup = new THREE.Group(), brushRing = null;
+scene.add(seedGroup);
+
+function resize() {
+  const w = view.clientWidth, h = view.clientHeight;
+  renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); render();
+}
+function render() { renderer.render(scene, camera); }
+controls.addEventListener("change", render);
+window.addEventListener("resize", resize);
+
+// ---------------------------------------------------------------- loading
+function busy(on) { $("busy").style.display = on ? "flex" : "none"; }
+function later(fn) { busy(true); setTimeout(() => { try { fn(); } catch (e) { console.error(e); alert(e.message); } finally { busy(false); } }, 30); }
+
+async function loadArrayBuffer(name, buf) {
+  const ext = name.toLowerCase().split(".").pop();
+  let raw;
+  if (ext === "stl") {
+    const g = new STLLoader().parse(buf);
+    const p = g.getAttribute("position").array;
+    raw = { pos: new Float32Array(p), tri: Uint32Array.from({ length: p.length / 3 }, (_, i) => i), source: { type: "stl" } };
+  } else if (ext === "3mf") {
+    raw = parse3MF(buf);
+  } else throw new Error("Unsupported file type: " + ext);
+  S.name = name.replace(/\.[^.]+$/, "");
+  S.source = raw.source;
+  const w = weld(raw.pos, raw.tri);
+  S.pos = w.pos; S.tri = w.tri; S.nV = w.pos.length / 3; S.nF = w.tri.length / 3;
+  S.G = buildGraph(S.pos, S.tri);
+  S.labels = new Int32Array(S.nF);
+  S.parts = [{ name: "Unassigned", color: UNASSIGNED_COLOR, filament: 1, seeds: [], visible: true }];
+  S.active = 0; S.undo = [];
+  buildMesh();
+  frame();
+  refreshUI();
+  const bb = S.G.bbox;
+  $("fileInfo").textContent = `${name}: ${S.nF.toLocaleString()} faces, ${S.G.shells} shell(s), ` +
+    `${(bb[3]-bb[0]).toFixed(1)} × ${(bb[4]-bb[1]).toFixed(1)} × ${(bb[5]-bb[2]).toFixed(1)} mm`;
+  $("drop").style.display = "none";
+  $("brushR").max = (S.G.diag * 0.15).toFixed(1);
+  if (+$("brushR").value > +$("brushR").max) $("brushR").value = (S.G.diag * 0.02).toFixed(1);
+  syncSliders();
+}
+
+// 3MF transform: 12 numbers, row-vector convention p' = p * M
+const I12 = [1,0,0, 0,1,0, 0,0,1, 0,0,0];
+function parseT(s) { if (!s) return I12.slice(); const a = s.trim().split(/\s+/).map(Number); return a.length === 12 ? a : I12.slice(); }
+function mulT(A, B) { // apply A then B
+  const r = new Array(12);
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) {
+    let v = (i === 3 ? B[9 + j] : 0);
+    for (let k = 0; k < 3; k++) v += A[i * 3 + k] * B[k * 3 + j];
+    r[i * 3 + j] = v;
+  }
+  return r;
+}
+
+function parse3MF(buf) {
+  const files = unzipSync(new Uint8Array(buf));
+  const norm = (p) => p.replace(/^\//, "");
+  let root = "3D/3dmodel.model";
+  if (files["_rels/.rels"]) {
+    const m = strFromU8(files["_rels/.rels"]).match(/Target="([^"]+\.model)"/i);
+    if (m) root = norm(m[1]);
+  }
+  const docs = {};
+  const getDoc = (p) => {
+    p = norm(p);
+    if (!docs[p]) {
+      if (!files[p]) throw new Error("3MF part missing: " + p);
+      docs[p] = new DOMParser().parseFromString(strFromU8(files[p]), "application/xml");
+    }
+    return docs[p];
+  };
+  const findObj = (doc, id) => { for (const o of doc.getElementsByTagName("object")) if (o.getAttribute("id") === String(id)) return o; return null; };
+  const pos = [], tri = [], meshes = [];
+  function addObject(file, id, M, depth) {
+    if (depth > 16) return;
+    const obj = findObj(getDoc(file), id);
+    if (!obj) return;
+    const meshEl = [...obj.children].find((c) => c.localName === "mesh");
+    if (meshEl) {
+      const v0 = pos.length / 3, t0 = tri.length / 3;
+      for (const v of meshEl.getElementsByTagName("vertex")) {
+        const x = +v.getAttribute("x"), y = +v.getAttribute("y"), z = +v.getAttribute("z");
+        pos.push(x*M[0] + y*M[3] + z*M[6] + M[9], x*M[1] + y*M[4] + z*M[7] + M[10], x*M[2] + y*M[5] + z*M[8] + M[11]);
+      }
+      for (const t of meshEl.getElementsByTagName("triangle"))
+        tri.push(v0 + +t.getAttribute("v1"), v0 + +t.getAttribute("v2"), v0 + +t.getAttribute("v3"));
+      meshes.push({ file: norm(file), objectId: String(id), triStart: t0, triCount: tri.length / 3 - t0 });
+    }
+    const compsEl = [...obj.children].find((c) => c.localName === "components");
+    if (compsEl) for (const c of compsEl.children) {
+      if (c.localName !== "component") continue;
+      const path = c.getAttribute("p:path") || c.getAttributeNS("http://schemas.microsoft.com/3dmanufacturing/production/2015/06", "path") || file;
+      addObject(path, c.getAttribute("objectid"), mulT(parseT(c.getAttribute("transform")), M), depth + 1);
+    }
+  }
+  const rootDoc = getDoc(root);
+  const items = rootDoc.getElementsByTagName("item");
+  if (items.length) for (const it of items) addObject(root, it.getAttribute("objectid"), parseT(it.getAttribute("transform")), 0);
+  else for (const o of rootDoc.getElementsByTagName("object")) addObject(root, o.getAttribute("id"), I12, 0);
+  if (!tri.length) throw new Error("No triangles found in 3MF");
+  return { pos: new Float32Array(pos), tri: new Uint32Array(tri), source: { type: "3mf", files, meshes } };
+}
+
+// Merge coincident vertices so faces share edges. Face order is preserved (needed to write paint back).
+function weld(pos, tri) {
+  let mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { mn[k] = Math.min(mn[k], pos[i+k]); mx[k] = Math.max(mx[k], pos[i+k]); }
+  const eps = Math.max(1e-9, Math.hypot(mx[0]-mn[0], mx[1]-mn[1], mx[2]-mn[2]) * 1e-6);
+  const map = new Map(), out = [], remap = new Uint32Array(pos.length / 3);
+  for (let i = 0; i < pos.length / 3; i++) {
+    const k = Math.round(pos[3*i]/eps) + "," + Math.round(pos[3*i+1]/eps) + "," + Math.round(pos[3*i+2]/eps);
+    let j = map.get(k);
+    if (j === undefined) { j = out.length / 3; map.set(k, j); out.push(pos[3*i], pos[3*i+1], pos[3*i+2]); }
+    remap[i] = j;
+  }
+  const t = new Uint32Array(tri.length);
+  for (let i = 0; i < tri.length; i++) t[i] = remap[tri[i]];
+  return { pos: new Float32Array(out), tri: t };
+}
+
+const ETA = 0.15; // convex edges count this much of a concave one
+
+// ---------------------------------------------------------------- face graph
+// Dual graph: node = face, edge = shared mesh edge. Each edge stores a geodesic length
+// (centroid -> edge midpoint -> centroid) and an angular distance that is large across concave
+// creases and small across convex ones (Katz & Tal 2003, "Hierarchical mesh decomposition using
+// fuzzy clustering and cuts"). Parts are separated where the surface folds inward (minima rule,
+// Hoffman & Richards 1984).
+function buildGraph(pos, tri) {
+  const nF = tri.length / 3, nV = pos.length / 3;
+  const nrm = new Float32Array(nF * 3), cen = new Float32Array(nF * 3), area = new Float32Array(nF);
+  const bbox = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < nV; i++) for (let k = 0; k < 3; k++) { bbox[k] = Math.min(bbox[k], pos[3*i+k]); bbox[k+3] = Math.max(bbox[k+3], pos[3*i+k]); }
+  for (let f = 0; f < nF; f++) {
+    const a = tri[3*f]*3, b = tri[3*f+1]*3, c = tri[3*f+2]*3;
+    const ux = pos[b]-pos[a], uy = pos[b+1]-pos[a+1], uz = pos[b+2]-pos[a+2];
+    const vx = pos[c]-pos[a], vy = pos[c+1]-pos[a+1], vz = pos[c+2]-pos[a+2];
+    let nx = uy*vz - uz*vy, ny = uz*vx - ux*vz, nz = ux*vy - uy*vx;
+    const l = Math.hypot(nx, ny, nz); area[f] = l / 2;
+    if (l > 0) { nx /= l; ny /= l; nz /= l; }
+    nrm[3*f] = nx; nrm[3*f+1] = ny; nrm[3*f+2] = nz;
+    for (let k = 0; k < 3; k++) cen[3*f+k] = (pos[a+k] + pos[b+k] + pos[c+k]) / 3;
+  }
+  // edge -> faces
+  const emap = new Map();
+  for (let f = 0; f < nF; f++) for (let e = 0; e < 3; e++) {
+    const a = tri[3*f+e], b = tri[3*f+(e+1)%3];
+    if (a === b) continue;
+    const key = a < b ? a * nV + b : b * nV + a;
+    const cur = emap.get(key);
+    if (cur === undefined) emap.set(key, f);
+    else if (typeof cur === "number") emap.set(key, [cur, f]);
+    else cur.push(f);
+  }
+  const EA = [], EB = [], EGEO = [], EANG = [], ETH = [], ECONC = [];
+  for (const [key, val] of emap) {
+    if (typeof val === "number") continue;
+    const va = Math.floor(key / nV), vb = key % nV;
+    const mx = (pos[3*va] + pos[3*vb]) / 2, my = (pos[3*va+1] + pos[3*vb+1]) / 2, mz = (pos[3*va+2] + pos[3*vb+2]) / 2;
+    for (let i = 0; i < val.length; i++) for (let j = i + 1; j < val.length; j++) {
+      const f = val[i], g = val[j];
+      const geo = Math.hypot(cen[3*f]-mx, cen[3*f+1]-my, cen[3*f+2]-mz) + Math.hypot(cen[3*g]-mx, cen[3*g+1]-my, cen[3*g+2]-mz);
+      let cos = nrm[3*f]*nrm[3*g] + nrm[3*f+1]*nrm[3*g+1] + nrm[3*f+2]*nrm[3*g+2];
+      cos = Math.max(-1, Math.min(1, cos));
+      // convex if normals diverge in the direction of travel
+      const conv = (nrm[3*g]-nrm[3*f])*(cen[3*g]-cen[3*f]) + (nrm[3*g+1]-nrm[3*f+1])*(cen[3*g+1]-cen[3*f+1]) + (nrm[3*g+2]-nrm[3*f+2])*(cen[3*g+2]-cen[3*f+2]);
+      const concave = conv < 0;
+      EA.push(f); EB.push(g); EGEO.push(geo); ETH.push(Math.acos(cos) * 180 / Math.PI);
+      ECONC.push(concave ? 1 : 0); EANG.push((concave ? 1 : ETA) * (1 - cos));
+    }
+  }
+  const nE = EA.length;
+  let mg = 0, ma = 0;
+  for (let i = 0; i < nE; i++) { mg += EGEO[i]; ma += EANG[i]; }
+  mg = mg / Math.max(1, nE) || 1; ma = ma / Math.max(1, nE) || 1e-6;
+  const geoN = new Float32Array(nE), angN = new Float32Array(nE);
+  for (let i = 0; i < nE; i++) { geoN[i] = EGEO[i] / mg; angN[i] = EANG[i] / ma; }
+  // CSR adjacency
+  const deg = new Int32Array(nF + 1);
+  for (let i = 0; i < nE; i++) { deg[EA[i] + 1]++; deg[EB[i] + 1]++; }
+  for (let f = 0; f < nF; f++) deg[f + 1] += deg[f];
+  const adjN = new Int32Array(2 * nE), adjE = new Int32Array(2 * nE), fill = deg.slice(0, nF);
+  for (let i = 0; i < nE; i++) {
+    adjN[fill[EA[i]]] = EB[i]; adjE[fill[EA[i]]++] = i;
+    adjN[fill[EB[i]]] = EA[i]; adjE[fill[EB[i]]++] = i;
+  }
+  const theta = Float32Array.from(ETH), concave = Uint8Array.from(ECONC);
+  const bar = new Float32Array(nE); for (let i = 0; i < nE; i++) bar[i] = concave[i] ? theta[i] : ETA * theta[i];
+  const G = { nF, nE, nrm, cen, area, adjS: deg, adjN, adjE, geoN, angN, theta, concave, bar, bbox, ea: Int32Array.from(EA), eb: Int32Array.from(EB), barIters: -1,
+    diag: Math.hypot(bbox[3]-bbox[0], bbox[4]-bbox[1], bbox[5]-bbox[2]) };
+  G.shellOf = components(G); G.shells = G.shellOf.count;
+  return G;
+}
+
+function components(G) {
+  const comp = new Int32Array(G.nF).fill(-1); let n = 0; const stack = [];
+  for (let s = 0; s < G.nF; s++) {
+    if (comp[s] >= 0) continue;
+    comp[s] = n; stack.push(s);
+    while (stack.length) {
+      const f = stack.pop();
+      for (let k = G.adjS[f]; k < G.adjS[f + 1]; k++) { const g = G.adjN[k]; if (comp[g] < 0) { comp[g] = n; stack.push(g); } }
+    }
+    n++;
+  }
+  comp.count = n; return comp;
+}
+
+// ---------------------------------------------------------------- algorithms
+class Heap { // min-heap of (key, value)
+  constructor() { this.k = []; this.v = []; }
+  get size() { return this.k.length; }
+  push(key, val) {
+    const k = this.k, v = this.v; let i = k.length; k.push(key); v.push(val);
+    while (i > 0) { const p = (i - 1) >> 1; if (k[p] <= key) break; k[i] = k[p]; v[i] = v[p]; i = p; }
+    k[i] = key; v[i] = val;
+  }
+  pop() {
+    const k = this.k, v = this.v, top = v[0], lk = k.pop(), lv = v.pop(), n = k.length;
+    if (n) {
+      let i = 0;
+      for (;;) { let c = 2*i + 1; if (c >= n) break; if (c + 1 < n && k[c+1] < k[c]) c++; if (k[c] >= lk) break; k[i] = k[c]; v[i] = v[c]; i = c; }
+      k[i] = lk; v[i] = lv;
+    }
+    return top;
+  }
+}
+
+// Edge barrier in "steps": concave dihedral angle (convex counts ETA of it), quantized by the
+// crease step so that sub-step noise is free and only real creases separate regions.
+const creaseStep = () => +$("lambda").value;
+function barrierQ(e, step) { return Math.floor(S.G.bar[e] / step); }
+
+// Smoothed concavity per face: signed dihedral (concave < 0) averaged over the face's edges, then
+// Laplacian-smoothed over neighbours so triangle noise cancels while real fillets/creases remain.
+// Edge barrier = the larger concavity of its two faces (degrees).
+function computeBarrier(iters) {
+  const G = S.G, h = new Float32Array(G.nF), cnt = new Float32Array(G.nF);
+  for (let e = 0; e < G.nE; e++) {
+    const sgn = G.concave[e] ? -G.theta[e] : ETA * G.theta[e];
+    const a = G.ea[e], b = G.eb[e]; h[a] += sgn; h[b] += sgn; cnt[a]++; cnt[b]++;
+  }
+  for (let f = 0; f < G.nF; f++) if (cnt[f]) h[f] /= cnt[f];
+  let cur = h, nxt = new Float32Array(G.nF);
+  for (let it = 0; it < iters; it++) {
+    for (let f = 0; f < G.nF; f++) {
+      let s = cur[f], n = 1;
+      for (let k = G.adjS[f]; k < G.adjS[f + 1]; k++) { s += cur[G.adjN[k]]; n++; }
+      nxt[f] = s / n;
+    }
+    [cur, nxt] = [nxt, cur];
+  }
+  const conc = new Float32Array(G.nF);
+  for (let f = 0; f < G.nF; f++) conc[f] = Math.max(0, -cur[f]);
+  for (let e = 0; e < G.nE; e++) G.bar[e] = Math.max(conc[G.ea[e]], conc[G.eb[e]]);
+  G.barIters = iters;
+}
+function ensureBarrier() { const it = +$("smooth").value; if (S.G.barIters !== it) computeBarrier(it); }
+
+// Multi-source watershed on the face graph: each face goes to the seed reachable with the lowest
+// worst crease along the path (minimax); ties broken by geodesic distance. A big part therefore
+// keeps its whole smooth surface instead of losing its far side to a nearby small part.
+// sources: [[face, label], ...]. mask: Uint8Array or null. Returns composite key per face.
+const BIG = 1e7;
+function grow(sources, mask, step) {
+  ensureBarrier();
+  const G = S.G, dist = new Float64Array(G.nF).fill(Infinity), lab = new Int32Array(G.nF).fill(-1), h = new Heap();
+  const q = new Float64Array(G.nF), geo = new Float64Array(G.nF);
+  for (const [f, l] of sources) { if (mask && !mask[f]) continue; dist[f] = 0; q[f] = 0; geo[f] = 0; lab[f] = l; h.push(0, f); }
+  while (h.size) {
+    const f = h.pop();
+    for (let k = G.adjS[f]; k < G.adjS[f + 1]; k++) {
+      const g = G.adjN[k]; if (mask && !mask[g]) continue;
+      const e = G.adjE[k];
+      const qg = step > 0 ? Math.max(q[f], barrierQ(e, step)) : 0, gg = geo[f] + G.geoN[e];
+      const d = qg * BIG + gg;
+      if (d < dist[g]) { dist[g] = d; q[g] = qg; geo[g] = gg; lab[g] = lab[f]; h.push(d, g); }
+    }
+  }
+  return { dist, lab };
+}
+
+function segmentFromSeeds() {
+  const seeded = new Set(), src = [];
+  S.parts.forEach((p, i) => { if (i > 0 && p.seeds.length) { seeded.add(i); p.seeds.forEach((f) => src.push([f, i])); } });
+  if (!seeded.size) { alert("Add seeds first: make a part, pick the Seed tool and click on the model."); return; }
+  pushUndo();
+  const mask = new Uint8Array(S.nF);
+  for (let f = 0; f < S.nF; f++) mask[f] = (S.labels[f] === 0 || seeded.has(S.labels[f])) ? 1 : 0;
+  const { lab } = grow(src, mask, creaseStep());
+  let n = 0;
+  for (let f = 0; f < S.nF; f++) if (mask[f] && lab[f] >= 0) { S.labels[f] = lab[f]; n++; }
+  afterEdit(`Segmented ${n.toLocaleString()} faces into ${seeded.size} part(s)`);
+}
+
+// Seeds by farthest-point sampling, then Lloyd-style refinement: each region's seed moves to its
+// deepest face (farthest from the region boundary), regions are re-grown, repeat.
+function autoSplit(k) {
+  const scope = $("autoScope").checked ? S.active : -1;
+  const mask = new Uint8Array(S.nF);
+  let first = -1, count = 0;
+  for (let f = 0; f < S.nF; f++) if (scope < 0 || S.labels[f] === scope) { mask[f] = 1; count++; if (first < 0) first = f; }
+  if (count < k) { alert("Not enough faces in scope."); return; }
+  const L = creaseStep();
+  let seeds = [];
+  // handle disconnected scope: one farthest pass per call is fine; unreached faces get seeds later
+  let d = grow([[first, 0]], mask, 0).dist;
+  let far = argmaxFinite(d, mask); seeds.push(far);
+  while (seeds.length < k) {
+    d = grow(seeds.map((s) => [s, 0]), mask, 0).dist;
+    // unreached faces (another shell) first
+    let un = -1; for (let f = 0; f < S.nF; f++) if (mask[f] && d[f] === Infinity) { un = f; break; }
+    seeds.push(un >= 0 ? un : argmaxFinite(d, mask));
+  }
+  let lab;
+  for (let it = 0; it < 8; it++) {
+    lab = grow(seeds.map((s, i) => [s, i]), mask, L).lab;
+    const next = deepestPerRegion(lab, mask, k, L, seeds);
+    if (next.every((s, i) => s === seeds[i])) break;
+    seeds = next;
+  }
+  lab = grow(seeds.map((s, i) => [s, i]), mask, L).lab;
+  absorbTiny(lab, mask, Math.max(20, count * 0.003));
+  pushUndo();
+  const base = S.parts.length, used = new Map();
+  for (let f = 0; f < S.nF; f++) if (mask[f] && lab[f] >= 0) {
+    if (!used.has(lab[f])) used.set(lab[f], 0);
+    used.set(lab[f], used.get(lab[f]) + 1);
+  }
+  const order = [...used.keys()].sort((a, b) => used.get(b) - used.get(a));
+  const idx = new Map();
+  for (const r of order) {
+    idx.set(r, S.parts.length);
+    S.parts.push(newPart({ seeds: [seeds[r]] }));
+  }
+  for (let f = 0; f < S.nF; f++) if (mask[f] && lab[f] >= 0) S.labels[f] = idx.get(lab[f]);
+  if (scope > 0) S.parts[scope].seeds = [];
+  dropEmptyParts();
+  afterEdit(`Auto split into ${order.length} parts`);
+}
+
+// Regions smaller than minSize (pits, noise) are re-grown from their neighbours.
+function absorbTiny(lab, mask, minSize) {
+  const size = new Map();
+  for (let f = 0; f < S.nF; f++) if (mask[f] && lab[f] >= 0) size.set(lab[f], (size.get(lab[f]) || 0) + 1);
+  const tiny = new Set([...size].filter(([, n]) => n < minSize).map(([l]) => l));
+  if (!tiny.size || tiny.size === size.size) return;
+  const G = S.G, m2 = new Uint8Array(S.nF), src = [];
+  for (let f = 0; f < S.nF; f++) if (mask[f] && tiny.has(lab[f])) { m2[f] = 1; lab[f] = -1; }
+  for (let f = 0; f < S.nF; f++) if (m2[f]) for (let k = G.adjS[f]; k < G.adjS[f + 1]; k++) {
+    const g = G.adjN[k]; if (mask[g] && !m2[g] && lab[g] >= 0) { src.push([g, lab[g]]); m2[g] = 1; }
+  }
+  const r = grow(src, m2, 0).lab;
+  for (let f = 0; f < S.nF; f++) if (m2[f] && lab[f] < 0 && r[f] >= 0) lab[f] = r[f];
+}
+
+function argmaxFinite(d, mask) {
+  let best = -1, bv = -1;
+  for (let f = 0; f < d.length; f++) if (mask[f] && d[f] !== Infinity && d[f] > bv) { bv = d[f]; best = f; }
+  return best;
+}
+
+function deepestPerRegion(lab, mask, k, L, oldSeeds) {
+  const G = S.G, src = [];
+  for (let f = 0; f < S.nF; f++) {
+    if (!mask[f] || lab[f] < 0) continue;
+    for (let j = G.adjS[f]; j < G.adjS[f + 1]; j++) { const g = G.adjN[j]; if (!mask[g] || lab[g] !== lab[f]) { src.push([f, lab[f]]); break; } }
+  }
+  // restrict propagation to stay inside each region: run per-label masked growth in one pass by
+  // forbidding label changes (a face is only relaxed from a source with the same region label)
+  const dist = new Float64Array(S.nF).fill(Infinity), h = new Heap();
+  for (const [f] of src) { dist[f] = 0; h.push(0, f); }
+  while (h.size) {
+    const f = h.pop();
+    for (let j = G.adjS[f]; j < G.adjS[f + 1]; j++) {
+      const g = G.adjN[j]; if (!mask[g] || lab[g] !== lab[f]) continue;
+      const e = G.adjE[j], d = dist[f] + G.geoN[e];
+      if (d < dist[g]) { dist[g] = d; h.push(d, g); }
+    }
+  }
+  const best = oldSeeds.slice(), bv = new Float64Array(k).fill(-1);
+  for (let f = 0; f < S.nF; f++) {
+    if (!mask[f] || lab[f] < 0) continue;
+    const v = dist[f] === Infinity ? 1e30 : dist[f];
+    if (v > bv[lab[f]]) { bv[lab[f]] = v; best[lab[f]] = f; }
+  }
+  return best;
+}
+
+function splitShells() {
+  const c = S.G.shellOf;
+  if (c.count < 2) { alert("The mesh is one connected shell. Use seeds or auto split."); return; }
+  pushUndo();
+  const sizes = new Array(c.count).fill(0);
+  for (let f = 0; f < S.nF; f++) sizes[c[f]]++;
+  const order = sizes.map((s, i) => i).sort((a, b) => sizes[b] - sizes[a]);
+  const MAX = 64, idx = new Int32Array(c.count);
+  S.parts = [S.parts[0]];
+  S.parts[0].seeds = [];
+  order.forEach((sh, r) => {
+    if (r < MAX) { idx[sh] = S.parts.length; S.parts.push(newPart({ name: `Shell ${r + 1}` })); }
+    else { if (r === MAX) S.parts.push(newPart({ name: "Small shells" })); idx[sh] = S.parts.length - 1; }
+  });
+  for (let f = 0; f < S.nF; f++) S.labels[f] = idx[c[f]];
+  afterEdit(`Split into ${S.parts.length - 1} shell part(s)`);
+}
+
+// Flood within the clicked face's part, stopping at concave creases sharper than the angle.
+function fillFrom(f0) {
+  const G = S.G, from = S.labels[f0], T = +$("fillAng").value;
+  let to = S.active;
+  pushUndo();
+  if (to === from) { S.parts.push(newPart()); to = S.parts.length - 1; S.active = to; }
+  const seen = new Uint8Array(S.nF), stack = [f0]; seen[f0] = 1; let n = 0;
+  while (stack.length) {
+    const f = stack.pop(); S.labels[f] = to; n++;
+    for (let k = G.adjS[f]; k < G.adjS[f + 1]; k++) {
+      const g = G.adjN[k], e = G.adjE[k];
+      if (seen[g] || S.labels[g] !== from) continue;
+      if (G.concave[e] && G.theta[e] > T) continue;
+      seen[g] = 1; stack.push(g);
+    }
+  }
+  dropEmptyParts();
+  afterEdit(`Filled ${n.toLocaleString()} faces into ${S.parts[S.active].name}`);
+}
+
+// Brush: faces connected to the hit face whose centroid is within r of the hit point.
+function brushAt(f0, p, to) {
+  const G = S.G, r2 = (+$("brushR").value) ** 2, stack = [f0], seen = new Set([f0]);
+  let changed = false;
+  while (stack.length) {
+    const f = stack.pop();
+    if (S.labels[f] !== to) { S.labels[f] = to; changed = true; }
+    for (let k = G.adjS[f]; k < G.adjS[f + 1]; k++) {
+      const g = G.adjN[k]; if (seen.has(g)) continue; seen.add(g);
+      const dx = G.cen[3*g]-p.x, dy = G.cen[3*g+1]-p.y, dz = G.cen[3*g+2]-p.z;
+      if (dx*dx + dy*dy + dz*dz <= r2) stack.push(g);
+    }
+  }
+  return changed;
+}
+
+// ---------------------------------------------------------------- parts
+function newPart(o = {}) {
+  const i = S.parts.length - 1;
+  const used = new Set(S.parts.map((p) => p.color));
+  const color = PALETTE.find((c) => !used.has(c)) || PALETTE[i % PALETTE.length];
+  const fils = new Set(S.parts.slice(1).map((p) => p.filament));
+  let fil = 2; while (fils.has(fil) && fil < 16) fil++;
+  return Object.assign({ name: `Part ${i + 1}`, color, filament: fil, seeds: [], visible: true }, o);
+}
+
+function dropEmptyParts() {
+  const cnt = new Int32Array(S.parts.length);
+  for (let f = 0; f < S.nF; f++) cnt[S.labels[f]]++;
+  const keep = S.parts.map((p, i) => i === 0 || cnt[i] > 0 || p.seeds.length > 0 || i === S.active);
+  if (keep.every(Boolean)) return;
+  const remap = new Int32Array(S.parts.length); let j = 0;
+  S.parts.forEach((p, i) => { remap[i] = keep[i] ? j++ : 0; });
+  for (let f = 0; f < S.nF; f++) S.labels[f] = remap[S.labels[f]];
+  S.active = remap[S.active];
+  S.parts = S.parts.filter((_, i) => keep[i]);
+}
+
+function partCounts() { const c = new Int32Array(S.parts.length); for (let f = 0; f < S.nF; f++) c[S.labels[f]]++; return c; }
+
+function pushUndo() {
+  S.undo.push({ labels: S.labels.slice(), parts: JSON.parse(JSON.stringify(S.parts)), active: S.active });
+  if (S.undo.length > 40) S.undo.shift();
+}
+function undo() {
+  const u = S.undo.pop(); if (!u) return;
+  S.labels = u.labels; S.parts = u.parts; S.active = u.active;
+  afterEdit("Undone");
+}
+
+function afterEdit(msg) { updateColors(); updateVisibility(); drawSeeds(); refreshUI(); if (msg) status(msg); }
+
+// ---------------------------------------------------------------- mesh display
+function buildMesh() {
+  if (mesh) { scene.remove(mesh); mesh.geometry.disposeBoundsTree?.(); mesh.geometry.dispose(); }
+  const { pos, tri, nF, G } = S;
+  // smooth vertex normals for shading
+  const vn = new Float32Array(pos.length);
+  for (let f = 0; f < nF; f++) for (let c = 0; c < 3; c++) { const v = tri[3*f+c]; for (let k = 0; k < 3; k++) vn[3*v+k] += G.nrm[3*f+k] * G.area[f]; }
+  const P = new Float32Array(nF * 9), N = new Float32Array(nF * 9);
+  for (let f = 0; f < nF; f++) for (let c = 0; c < 3; c++) {
+    const v = tri[3*f+c];
+    let nx = vn[3*v], ny = vn[3*v+1], nz = vn[3*v+2];
+    // fall back to the face normal across sharp edges
+    if (nx*G.nrm[3*f] + ny*G.nrm[3*f+1] + nz*G.nrm[3*f+2] < 0.6 * Math.hypot(nx, ny, nz)) { nx = G.nrm[3*f]; ny = G.nrm[3*f+1]; nz = G.nrm[3*f+2]; }
+    const l = Math.hypot(nx, ny, nz) || 1;
+    for (let k = 0; k < 3; k++) P[9*f+3*c+k] = pos[3*v+k];
+    N[9*f+3*c] = nx/l; N[9*f+3*c+1] = ny/l; N[9*f+3*c+2] = nz/l;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(P, 3));
+  geo.setAttribute("normal", new THREE.BufferAttribute(N, 3));
+  geo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(nF * 9), 3));
+  mesh = new THREE.Mesh(geo, material);
+  scene.add(mesh);
+  updateColors(); updateVisibility();
+}
+
+function updateColors() {
+  if (!mesh) return;
+  const col = mesh.geometry.getAttribute("color").array;
+  const cs = S.parts.map((p) => new THREE.Color(p.color).convertSRGBToLinear());
+  for (let f = 0; f < S.nF; f++) {
+    const c = cs[S.labels[f]] || cs[0];
+    for (let k = 0; k < 3; k++) { col[9*f+3*k] = c.r; col[9*f+3*k+1] = c.g; col[9*f+3*k+2] = c.b; }
+  }
+  mesh.geometry.getAttribute("color").needsUpdate = true;
+  render();
+}
+
+let visKey = "";
+function updateVisibility() {
+  if (!mesh) return;
+  const vis = S.parts.map((p) => p.visible);
+  const key = vis.join(",") + "|" + (vis.every(Boolean) ? "" : hashLabels());
+  if (key === visKey && mesh.geometry.boundsTree) return;
+  visKey = key;
+  const idx = [];
+  for (let f = 0; f < S.nF; f++) if (vis[S.labels[f]] !== false) idx.push(3*f, 3*f+1, 3*f+2);
+  const geo = mesh.geometry;
+  geo.disposeBoundsTree?.();
+  geo.setIndex(idx.length ? idx : [0, 0, 0]);
+  geo.computeBoundsTree();
+  render();
+}
+function hashLabels() { let h = 0; for (let f = 0; f < S.nF; f += 7) h = (h * 31 + S.labels[f]) | 0; return h; }
+
+function drawSeeds() {
+  seedGroup.clear();
+  if (!S.G) return;
+  const r = S.G.diag * 0.006, sg = new THREE.SphereGeometry(r, 12, 8), outline = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide });
+  S.parts.forEach((p, i) => {
+    if (!p.visible) return;
+    const m = new THREE.MeshBasicMaterial({ color: p.color });
+    for (const f of p.seeds) {
+      const pos = new THREE.Vector3(S.G.cen[3*f], S.G.cen[3*f+1], S.G.cen[3*f+2]);
+      const s = new THREE.Mesh(sg, m); s.position.copy(pos);
+      const o = new THREE.Mesh(sg, outline); o.scale.setScalar(1.35); o.position.copy(pos);
+      seedGroup.add(o, s);
+    }
+  });
+  render();
+}
+
+function frame() {
+  const b = S.G.bbox, c = new THREE.Vector3((b[0]+b[3])/2, (b[1]+b[4])/2, (b[2]+b[5])/2), d = S.G.diag;
+  controls.target.copy(c);
+  camera.near = d / 1000; camera.far = d * 20;
+  camera.position.set(c.x + d * 0.55, c.y - d * 1.25, c.z + d * 0.45);
+  camera.updateProjectionMatrix(); controls.update(); render();
+}
+
+// ---------------------------------------------------------------- picking & tools
+const ray = new THREE.Raycaster(); ray.firstHitOnly = true;
+function hit(ev) {
+  if (!mesh) return null;
+  const r = renderer.domElement.getBoundingClientRect();
+  ray.setFromCamera(new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1), camera);
+  const h = ray.intersectObject(mesh, false)[0];
+  if (!h) return null;
+  return { face: Math.floor(h.face.a / 3), point: h.point };
+}
+
+const HINTS = {
+  orbit: "Left-drag rotate, right-drag pan, wheel zoom.",
+  seed: "Click to drop a seed for the active part (make one with + Part). Seed every part, then Segment from seeds. Alt+click removes the nearest seed.",
+  fill: "Click a region: floods the clicked part until a concave crease sharper than the stop angle, into the active part (new part if same).",
+  brush: "Drag to paint the active part. Shift+drag erases to Unassigned. Right-drag still rotates.",
+  pick: "Click a face to make its part active.",
+};
+function setTool(t) {
+  S.tool = t;
+  document.querySelectorAll("[data-tool]").forEach((b) => b.classList.toggle("on", b.dataset.tool === t));
+  $("hint").textContent = HINTS[t];
+}
+document.querySelectorAll("[data-tool]").forEach((b) => b.addEventListener("click", () => setTool(b.dataset.tool)));
+
+let down = null, painting = false;
+const canvas = renderer.domElement;
+canvas.addEventListener("pointerdown", (ev) => {
+  if (ev.button !== 0 || !mesh) return;
+  down = { x: ev.clientX, y: ev.clientY };
+  if (S.tool === "brush" && !ev.ctrlKey) {
+    const h = hit(ev);
+    if (h) {
+      controls.enabled = false; painting = true; pushUndo();
+      if (brushAt(h.face, h.point, ev.shiftKey ? 0 : S.active)) updateColors();
+    }
+  }
+});
+canvas.addEventListener("pointermove", (ev) => {
+  if (!mesh) return;
+  const h = hit(ev);
+  if (painting && h) { if (brushAt(h.face, h.point, ev.shiftKey ? 0 : S.active)) updateColors(); }
+  if (h) {
+    const p = S.parts[S.labels[h.face]];
+    status(`${p.name}  ·  F${p.filament}  ·  face ${h.face}`);
+    showBrush(S.tool === "brush" ? h : null);
+  } else showBrush(null);
+});
+window.addEventListener("pointerup", (ev) => {
+  if (painting) { painting = false; controls.enabled = true; dropEmptyParts(); afterEdit(); }
+  if (!down || ev.button !== 0) return;
+  const moved = Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 4; down = null;
+  if (moved || ev.target !== canvas) return;
+  const h = hit(ev); if (!h) return;
+  if (ev.ctrlKey || S.tool === "pick") { S.active = S.labels[h.face]; refreshUI(); return; }
+  if (S.tool === "seed") {
+    if (ev.altKey) { removeNearestSeed(h.face); return; }
+    if (S.active === 0) { pushUndo(); S.parts.push(newPart()); S.active = S.parts.length - 1; }
+    else pushUndo();
+    S.parts[S.active].seeds.push(h.face);
+    afterEdit(`Seed added to ${S.parts[S.active].name}`);
+  } else if (S.tool === "fill") fillFrom(h.face);
+});
+function removeNearestSeed(f0) {
+  const c = S.G.cen; let best = null, bd = Infinity;
+  S.parts.forEach((p, i) => p.seeds.forEach((f, j) => {
+    const d = Math.hypot(c[3*f]-c[3*f0], c[3*f+1]-c[3*f0+1], c[3*f+2]-c[3*f0+2]);
+    if (d < bd) { bd = d; best = [i, j]; }
+  }));
+  if (!best) return;
+  pushUndo(); S.parts[best[0]].seeds.splice(best[1], 1); afterEdit("Seed removed");
+}
+function showBrush(h) {
+  if (!h) { if (brushRing) { brushRing.visible = false; render(); } return; }
+  if (!brushRing) {
+    brushRing = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, side: THREE.DoubleSide }));
+    brushRing.renderOrder = 3; scene.add(brushRing);
+  }
+  const r = +$("brushR").value, n = new THREE.Vector3(S.G.nrm[3*h.face], S.G.nrm[3*h.face+1], S.G.nrm[3*h.face+2]);
+  brushRing.visible = true; brushRing.scale.setScalar(r);
+  brushRing.position.copy(h.point);
+  brushRing.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
+  render();
+}
+function status(t) { $("status").textContent = t; }
+
+// ---------------------------------------------------------------- UI
+function syncSliders() {
+  $("lambdaOut").textContent = $("lambda").value + "°";
+  $("smoothOut").textContent = $("smooth").value;
+  $("fillAngOut").textContent = $("fillAng").value + "°";
+  $("brushROut").textContent = (+$("brushR").value).toFixed(1);
+}
+["lambda", "smooth", "fillAng", "brushR"].forEach((id) => $(id).addEventListener("input", syncSliders));
+
+function refreshUI() {
+  const body = $("partsBody"); body.innerHTML = "";
+  if (!S.G) return;
+  const cnt = partCounts();
+  S.parts.forEach((p, i) => {
+    const tr = document.createElement("tr"); if (i === S.active) tr.className = "active";
+    tr.innerHTML = `<td><input type="radio" name="act" ${i === S.active ? "checked" : ""}></td>
+      <td><input type="color" value="${p.color}"></td>
+      <td><input type="text" value="${p.name.replace(/"/g, "&quot;")}" ${i === 0 ? "readonly" : ""}></td>
+      <td style="white-space:nowrap" title="Filament slot">F<input type="number" min="1" max="32" value="${p.filament}" style="width:40px"></td>
+      <td class="n">${cnt[i].toLocaleString()}${p.seeds.length ? ` · ${p.seeds.length}●` : ""}</td>
+      <td class="eye ${p.visible ? "" : "off"}" title="Show/hide">👁</td>
+      <td>${i ? '<input type="checkbox" class="mck" title="Merge into active">' : ""}</td>`;
+    const [radio, color, name, fil] = tr.querySelectorAll("input");
+    radio.onchange = () => { S.active = i; refreshUI(); };
+    tr.querySelector(".n").onclick = () => { S.active = i; refreshUI(); };
+    color.oninput = () => { p.color = color.value; updateColors(); drawSeeds(); };
+    name.onchange = () => { p.name = name.value || p.name; };
+    fil.onchange = () => { p.filament = Math.max(1, Math.min(32, Math.round(+fil.value || 1))); fil.value = p.filament; };
+    tr.querySelector(".eye").onclick = () => { p.visible = !p.visible; updateVisibility(); drawSeeds(); refreshUI(); };
+    const ck = tr.querySelector(".mck"); if (ck) ck.dataset.idx = i;
+    body.appendChild(tr);
+  });
+  $("undoBtn").disabled = !S.undo.length;
+}
+
+$("addPart").onclick = () => { if (!S.G) return; pushUndo(); S.parts.push(newPart()); S.active = S.parts.length - 1; refreshUI(); };
+$("mergeBtn").onclick = () => {
+  const idx = [...document.querySelectorAll(".mck:checked")].map((c) => +c.dataset.idx).filter((i) => i !== S.active);
+  if (!idx.length) return;
+  pushUndo();
+  const set = new Set(idx);
+  for (let f = 0; f < S.nF; f++) if (set.has(S.labels[f])) S.labels[f] = S.active;
+  idx.forEach((i) => { S.parts[S.active].seeds.push(...S.parts[i].seeds); S.parts[i].seeds = []; });
+  dropEmptyParts(); afterEdit(`Merged ${idx.length} part(s)`);
+};
+$("clrSeeds").onclick = () => { pushUndo(); S.parts[S.active].seeds = []; afterEdit(); };
+$("clrAllSeeds").onclick = () => { pushUndo(); S.parts.forEach((p) => (p.seeds = [])); afterEdit(); };
+$("showAll").onclick = () => { S.parts.forEach((p) => (p.visible = true)); afterEdit(); };
+$("soloBtn").onclick = () => { S.parts.forEach((p, i) => (p.visible = i === S.active)); afterEdit(); };
+$("undoBtn").onclick = undo;
+$("segBtn").onclick = () => S.G && later(segmentFromSeeds);
+$("autoBtn").onclick = () => S.G && later(() => autoSplit(Math.max(2, Math.min(32, +$("autoK").value | 0))));
+$("shellBtn").onclick = () => S.G && later(splitShells);
+$("openBtn").onclick = () => $("fileIn").click();
+$("fileIn").onchange = async () => { const f = $("fileIn").files[0]; if (f) openFile(f); };
+async function openFile(f) { busy(true); try { await loadArrayBuffer(f.name, await f.arrayBuffer()); } catch (e) { console.error(e); alert(e.message); } busy(false); }
+view.addEventListener("dragover", (e) => e.preventDefault());
+view.addEventListener("drop", (e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) openFile(f); });
+window.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" && e.target.type !== "range") return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); return; }
+  const t = { o: "orbit", s: "seed", f: "fill", b: "brush", p: "pick" }[e.key.toLowerCase()];
+  if (t && !e.ctrlKey) setTool(t);
+});
+
+// ---------------------------------------------------------------- export
+function download(name, data, type = "application/octet-stream") {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([data], { type }));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+const safe = (s) => s.replace(/[^\w.-]+/g, "_").replace(/^_+|_+$/g, "") || "part";
+
+// Bambu/Orca per-triangle paint string (TriangleSelector::serialize + FacetsAnnotation::get_triangle_as_string):
+// bits: 2 bits split count (0), then state: n<3 -> 2 bits; n>=3 -> '11' + 4-bit groups of (n-3);
+// nibbles are emitted most-significant-first. Filament k is state k: 1 -> "4", 2 -> "8", 3 -> "0C", 4 -> "1C".
+function paintCode(n) {
+  if (n <= 0) return "";
+  const bits = [0, 0];
+  if (n >= 3) { bits.push(1, 1); n -= 3; while (n >= 15) { bits.push(1, 1, 1, 1); n -= 15; } for (let i = 0; i < 4; i++) bits.push((n >> i) & 1); }
+  else bits.push(n & 1, (n >> 1) & 1);
+  let s = "";
+  for (let o = 0; o < bits.length; o += 4) {
+    const v = bits[o] | (bits[o+1] << 1) | (bits[o+2] << 2) | (bits[o+3] << 3);
+    s = v.toString(16).toUpperCase() + s;
+  }
+  return s;
+}
+
+function exportPainted3MF() {
+  if (!S.G) return;
+  const fil = (f) => S.parts[S.labels[f]].filament;
+  let out;
+  if (S.source.type === "3mf") {
+    const files = { ...S.source.files }, texts = {}, done = new Set();
+    for (const m of S.source.meshes) {
+      const key = m.file + "#" + m.objectId; if (done.has(key)) continue; done.add(key);
+      let t = texts[m.file] ?? strFromU8(files[m.file]);
+      const re = new RegExp(`<object\\b[^>]*\\bid="${m.objectId}"`, "g");
+      const mm = re.exec(t); if (!mm) continue;
+      const start = mm.index, end = t.indexOf("</object>", start);
+      let i = 0;
+      const body = t.slice(start, end).replace(/<triangle\b([^>]*?)\s*\/>/g, (_, attrs) => {
+        const f = m.triStart + i++;
+        attrs = attrs.replace(/\s+paint_color="[^"]*"/, "");
+        return `<triangle${attrs} paint_color="${paintCode(fil(f))}"/>`;
+      });
+      t = t.slice(0, start) + body + t.slice(end);
+      texts[m.file] = t;
+    }
+    for (const [p, t] of Object.entries(texts)) files[p] = strToU8(t);
+    out = zipSync(files, { level: 6 });
+  } else {
+    const v = [], tr = [];
+    for (let i = 0; i < S.nV; i++) v.push(`<vertex x="${S.pos[3*i]}" y="${S.pos[3*i+1]}" z="${S.pos[3*i+2]}"/>`);
+    for (let f = 0; f < S.nF; f++) tr.push(`<triangle v1="${S.tri[3*f]}" v2="${S.tri[3*f+1]}" v3="${S.tri[3*f+2]}" paint_color="${paintCode(fil(f))}"/>`);
+    const model = `<?xml version="1.0" encoding="UTF-8"?>
+<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
+ <metadata name="Application">MeshSplitter</metadata>
+ <resources>
+  <object id="1" type="model" name="${safe(S.name)}">
+   <mesh>
+    <vertices>
+${v.join("\n")}
+    </vertices>
+    <triangles>
+${tr.join("\n")}
+    </triangles>
+   </mesh>
+  </object>
+ </resources>
+ <build>
+  <item objectid="1"/>
+ </build>
+</model>`;
+    out = zipSync({
+      "[Content_Types].xml": strToU8(`<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>`),
+      "_rels/.rels": strToU8(`<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>`),
+      "3D/3dmodel.model": strToU8(model),
+    }, { level: 6 });
+  }
+  download(`${S.name}_painted.3mf`, out, "model/3mf");
+  const fils = [...new Set(S.parts.filter((_, i) => partCounts()[i] > 0).map((p) => p.filament))].sort((a, b) => a - b);
+  status(`Painted 3MF written. Uses filament slot(s) ${fils.join(", ")}; the slicer project needs at least ${Math.max(...fils)} filaments.`);
+}
+
+// One closed mesh per part: the part's faces plus a fan cap over each open boundary loop.
+function partMesh(pi) {
+  const tri = [];
+  for (let f = 0; f < S.nF; f++) if (S.labels[f] === pi) tri.push(S.tri[3*f], S.tri[3*f+1], S.tri[3*f+2]);
+  if (!tri.length) return null;
+  const dir = new Set();
+  for (let i = 0; i < tri.length; i += 3) for (let e = 0; e < 3; e++) dir.add(tri[i+e] + "," + tri[i+(e+1)%3]);
+  const nextOf = new Map(); // boundary directed edges a->b whose twin b->a is absent
+  for (let i = 0; i < tri.length; i += 3) for (let e = 0; e < 3; e++) {
+    const a = tri[i+e], b = tri[i+(e+1)%3];
+    if (!dir.has(b + "," + a)) { if (!nextOf.has(a)) nextOf.set(a, []); nextOf.get(a).push(b); }
+  }
+  const verts = []; for (const v of tri) verts.push(S.pos[3*v], S.pos[3*v+1], S.pos[3*v+2]);
+  const caps = [];
+  let loops = 0;
+  for (const [start] of nextOf) {
+    while (nextOf.get(start)?.length) {
+      const loop = []; let a = start, guard = 0;
+      do {
+        const lst = nextOf.get(a); if (!lst || !lst.length) break;
+        const b = lst.pop(); loop.push([a, b]); a = b;
+      } while (a !== start && guard++ < 1e7);
+      if (loop.length < 3) continue;
+      loops++;
+      let cx = 0, cy = 0, cz = 0;
+      for (const [v] of loop) { cx += S.pos[3*v]; cy += S.pos[3*v+1]; cz += S.pos[3*v+2]; }
+      cx /= loop.length; cy /= loop.length; cz /= loop.length;
+      for (const [a2, b2] of loop) caps.push(S.pos[3*b2], S.pos[3*b2+1], S.pos[3*b2+2], S.pos[3*a2], S.pos[3*a2+1], S.pos[3*a2+2], cx, cy, cz);
+    }
+  }
+  return { verts: verts.concat(caps), loops };
+}
+
+function stlBinary(v) {
+  const n = v.length / 9, buf = new ArrayBuffer(84 + n * 50), dv = new DataView(buf);
+  dv.setUint32(80, n, true);
+  let o = 84;
+  for (let t = 0; t < n; t++) {
+    const p = v.slice(9*t, 9*t+9);
+    const ux = p[3]-p[0], uy = p[4]-p[1], uz = p[5]-p[2], wx = p[6]-p[0], wy = p[7]-p[1], wz = p[8]-p[2];
+    let nx = uy*wz - uz*wy, ny = uz*wx - ux*wz, nz = ux*wy - uy*wx; const l = Math.hypot(nx, ny, nz) || 1;
+    dv.setFloat32(o, nx/l, true); dv.setFloat32(o+4, ny/l, true); dv.setFloat32(o+8, nz/l, true); o += 12;
+    for (let k = 0; k < 9; k++) { dv.setFloat32(o, p[k], true); o += 4; }
+    dv.setUint16(o, 0, true); o += 2;
+  }
+  return new Uint8Array(buf);
+}
+
+function exportSTLs() {
+  if (!S.G) return;
+  const files = {}, cnt = partCounts(), names = new Set(); let loops = 0;
+  S.parts.forEach((p, i) => {
+    if (!cnt[i]) return;
+    const m = partMesh(i); if (!m) return;
+    loops += m.loops;
+    let nm = `${safe(S.name)}_${safe(p.name)}`; while (names.has(nm)) nm += "_"; names.add(nm);
+    files[`${nm}.stl`] = stlBinary(m.verts);
+  });
+  download(`${S.name}_parts.zip`, zipSync(files, { level: 6 }), "application/zip");
+  status(`${Object.keys(files).length} STL(s) zipped; ${loops} cut opening(s) capped.`);
+}
+
+function saveSession() {
+  if (!S.G) return;
+  const b = new Uint8Array(S.labels.buffer.slice(0));
+  let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+  download(`${S.name}.split.json`, JSON.stringify({ version: 1, file: S.name, faces: S.nF, parts: S.parts, labels: btoa(s) }), "application/json");
+}
+function loadSession(txt) {
+  const j = JSON.parse(txt);
+  if (j.faces !== S.nF) { alert(`Session is for a mesh with ${j.faces} faces; this one has ${S.nF}.`); return; }
+  pushUndo();
+  const bin = atob(j.labels), b = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
+  S.labels = new Int32Array(b.buffer); S.parts = j.parts; S.active = 0;
+  afterEdit("Session loaded");
+}
+$("exp3mf").onclick = () => later(exportPainted3MF);
+$("expStl").onclick = () => later(exportSTLs);
+$("saveSess").onclick = saveSession;
+$("loadSess").onclick = () => S.G ? $("sessIn").click() : alert("Open the mesh first.");
+$("sessIn").onchange = async () => { const f = $("sessIn").files[0]; if (f) loadSession(await f.text()); $("sessIn").value = ""; };
+
+// ---------------------------------------------------------------- boot
+setTool("seed"); syncSliders(); resize();
+const qp = new URLSearchParams(location.search).get("file");
+if (qp) {
+  busy(true);
+  fetch("/" + qp.replace(/^\/+/, "")).then((r) => { if (!r.ok) throw new Error(`${qp}: HTTP ${r.status}`); return r.arrayBuffer(); })
+    .then((buf) => loadArrayBuffer(qp.split("/").pop(), buf)).catch((e) => alert(e.message)).finally(() => busy(false));
+}
+window.app = { S, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+</script>
+</body>
+</html>
