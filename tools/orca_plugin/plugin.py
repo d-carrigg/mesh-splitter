@@ -23,6 +23,7 @@ a 3MF (one object, one part per split part, filament slot per part) that you imp
 import base64
 import os
 import re
+import tempfile
 import zlib
 
 import orca
@@ -48,7 +49,40 @@ def output_dir():
     d = downloads_dir()
     if os.path.isdir(d):
         return d
-    return orca.host.plugin.storage()
+    try:  # only callable inside an audited plugin callback (not from a create_window handler)
+        return orca.host.plugin.storage()
+    except Exception:
+        return tempfile.gettempdir()
+
+
+# Plate edits that make the page's object list stale (orca.LifecycleEvent names).
+PLATE_EVENTS = {"ObjectAdded", "ObjectDeleted", "ObjectChanged", "ObjectRenamed", "ObjectTransformed",
+                "NewProject", "ProjectOpened", "ProjectClosed", "PlateSelected"}
+
+
+def event_name(event):
+    return getattr(event, "name", None) or str(event).split(".")[-1]
+
+
+def filament_colours():
+    """OrcaSlicer's current filament colours by slot ('#RRGGBB'), or [] if unavailable."""
+    try:
+        raw = orca.host.preset_bundle().full_config_value("filament_colour")
+    except Exception:
+        return []
+    if isinstance(raw, (list, tuple)):
+        vals = raw
+    else:
+        vals = str(raw or "").replace(",", ";").split(";")
+    return [v.strip().strip('"') for v in vals if re.fullmatch(r'"?#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?"?', v.strip())]
+
+
+def notify(text):
+    try:
+        ui = orca.host.ui
+        ui.push_notification(ui.NotificationLevel.RegularNotificationLevel, text)
+    except Exception:
+        pass
 
 
 def safe_name(name):
@@ -60,9 +94,11 @@ def safe_name(name):
 def list_objects(model):
     out = []
     for i, obj in enumerate(model.objects()):
-        parts = [v for v in obj.volumes() if v.is_model_part()]
+        vols = obj.volumes()
+        parts = [v for v in vols if v.is_model_part()]
         faces = sum(v.facets_count() for v in parts)
-        out.append({"index": i, "name": obj.name or f"Object {i + 1}", "parts": len(parts), "faces": int(faces)})
+        out.append({"index": i, "id": int(obj.id()), "name": obj.name or f"Object {i + 1}", "parts": len(parts),
+                    "faces": int(faces), "ignored": len(vols) - len(parts)})
     return out
 
 
@@ -90,12 +126,38 @@ def object_mesh(obj):
     return np.concatenate(P), np.concatenate(T)
 
 
-def mesh_messages(name, pos, tri):
+def find_object(model, msg):
+    """The object the page asked for: by id (stable across plate edits), else by list position."""
+    objs = model.objects()
+    oid = msg.get("id")
+    if oid is not None:
+        for o in objs:
+            if int(o.id()) == int(oid):
+                return o
+        raise ValueError("That object is no longer on the plate; pick it again")
+    i = int(msg.get("index", -1))
+    if not 0 <= i < len(objs):
+        raise ValueError("That object is no longer on the plate; pick it again")
+    return objs[i]
+
+
+def mesh_messages(name, pos, tri, req=None):
     data = base64.b64encode(pos.astype("<f4").tobytes() + tri.astype("<u4").tobytes()).decode("ascii")
     n = max(1, -(-len(data) // CHUNK))
     for i in range(n):
-        yield {"cmd": "mesh", "name": name, "nV": int(len(pos)), "nF": int(len(tri)),
+        yield {"cmd": "mesh", "req": req, "name": name, "nV": int(len(pos)), "nF": int(len(tri)),
                "part": i, "of": n, "data": data[i * CHUNK:(i + 1) * CHUNK]}
+
+
+def unique_path(folder, name):
+    """folder/name, or 'name (2).ext' etc. so an earlier export (maybe already imported in Orca) is kept."""
+    path = os.path.join(folder, name)
+    stem, ext = os.path.splitext(name)
+    n = 2
+    while os.path.exists(path):
+        path = os.path.join(folder, f"{stem} ({n}){ext}")
+        n += 1
+    return path
 
 
 class Bridge:
@@ -111,16 +173,14 @@ class Bridge:
         cmd = msg.get("cmd")
         try:
             if cmd == "objects":
-                self.send({"cmd": "objects", "auto": bool(msg.get("auto")), "objects": list_objects(orca.host.model())})
+                self.send({"cmd": "objects", "auto": bool(msg.get("auto")), "objects": list_objects(orca.host.model()),
+                           "filament_colours": filament_colours()})
             elif cmd == "mesh":
                 if np is None:
                     raise RuntimeError("numpy is not installed; reload the plugin so OrcaSlicer can install it")
-                objs = orca.host.model().objects()
-                i = int(msg.get("index", -1))
-                if not 0 <= i < len(objs):
-                    raise ValueError("That object is no longer on the plate; pick it again")
-                pos, tri = object_mesh(objs[i])
-                for m in mesh_messages(objs[i].name or f"Object {i + 1}", pos, tri):
+                obj = find_object(orca.host.model(), msg)
+                pos, tri = object_mesh(obj)
+                for m in mesh_messages(obj.name or "Object", pos, tri, msg.get("req")):
                     self.send(m)
             elif cmd == "save":
                 self.save_chunk(msg)
@@ -138,10 +198,12 @@ class Bridge:
         if any(x is None for x in buf):
             return
         del self.saves[sid]
-        path = os.path.join(output_dir(), safe_name(msg.get("name")))
+        path = unique_path(output_dir(), safe_name(msg.get("name")))
         with open(path, "wb") as f:
             f.write(base64.b64decode("".join(buf)))
         self.send({"cmd": "saved", "id": sid, "path": path})
+        if path.lower().endswith(".3mf"):
+            notify(f"Mesh Splitter saved {os.path.basename(path)} to {os.path.dirname(path)}. Press Ctrl+I to import it.")
 
 
 class MeshSplitterPage(orca.pages.PagesPluginCapabilityBase):
@@ -155,8 +217,18 @@ class MeshSplitterPage(orca.pages.PagesPluginCapabilityBase):
     def get_ui(self):
         return page_html()
 
+    def get_icon(self):
+        return "menu_split_parts"  # name of an OrcaSlicer resources/images icon
+
     def on_message(self, data):
         self.bridge.handle(data)
+
+    def on_lifecycle_event(self, event, ctx):
+        # May run on any thread: only post (the host marshals it to the UI thread); the page re-requests.
+        name = event_name(event)
+        if name in PLATE_EVENTS:
+            self.post_message({"cmd": "plate_changed", "event": name, "id": str(getattr(ctx, "id", "") or ""),
+                               "index": int(getattr(ctx, "index", -1))})
 
 
 class OpenMeshSplitter(orca.script.ScriptPluginCapabilityBase):

@@ -98,17 +98,40 @@ class BridgeTests(unittest.TestCase):
         self.b.handle({"cmd": "objects", "auto": True})
         m = self.sent[-1]
         self.assertTrue(m["auto"])
-        self.assertEqual(m["objects"], [{"index": 0, "name": "cube", "parts": 1, "faces": 4},
-                                        {"index": 1, "name": "Object 2", "parts": 0, "faces": 0}])
+        objs = [{k: v for k, v in o.items() if k != "id"} for o in m["objects"]]
+        self.assertEqual(objs, [{"index": 0, "name": "cube", "parts": 1, "faces": 4, "ignored": 0},
+                                {"index": 1, "name": "Object 2", "parts": 0, "faces": 0, "ignored": 0}])
+        self.assertNotEqual(m["objects"][0]["id"], m["objects"][1]["id"])
+        self.assertEqual(m["filament_colours"], ["#FF0000", "#00AE42"])
 
     def test_mesh_and_errors(self):
-        self.b.handle({"cmd": "mesh", "index": 0})
+        self.b.handle({"cmd": "mesh", "index": 0, "req": "r1"})
+        self.assertTrue(all(m["req"] == "r1" for m in self.sent))
         P, T = reassemble([m for m in self.sent if m["cmd"] == "mesh"])
         self.assertEqual((len(P), len(T)), (4, 4))
         self.b.handle({"cmd": "mesh", "index": 7})
         self.assertEqual(self.sent[-1]["cmd"], "error")
         self.b.handle({"cmd": "mesh", "index": 1})
         self.assertIn("no model parts", self.sent[-1]["message"])
+
+    def test_mesh_by_id_survives_reorder(self):
+        import orca
+        objs = orca.host.model()._objs
+        oid = objs[0].id()
+        objs.insert(0, fake_orca.FakeObject("new", []))  # index 0 is now a different object
+        self.b.handle({"cmd": "mesh", "id": oid, "index": 0})
+        self.assertEqual(self.sent[-1]["cmd"], "mesh")
+        self.assertEqual(self.sent[-1]["name"], "cube")
+        self.b.handle({"cmd": "mesh", "id": 999999})
+        self.assertEqual(self.sent[-1]["cmd"], "error")
+
+    def test_plate_events_reach_page(self):
+        page = self.p.MeshSplitterPage()
+        ev = type("Ev", (), {"name": "ObjectDeleted"})()
+        page.on_lifecycle_event(ev, type("Ctx", (), {"id": "7", "index": 2})())
+        self.assertEqual(page.posted[-1], {"cmd": "plate_changed", "event": "ObjectDeleted", "id": "7", "index": 2})
+        page.on_lifecycle_event(type("Ev", (), {"name": "SliceStarted"})(), None)
+        self.assertEqual(len(page.posted), 1)
 
     def test_save_chunks(self):
         data = base64.b64encode(bytes(range(256)) * 10).decode()
@@ -119,6 +142,10 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(m["path"], os.path.join(self.tmp.name, "x_parts.3mf"))
         self.assertEqual(Path(m["path"]).read_bytes(), bytes(range(256)) * 10)
         self.assertEqual(self.b.saves, {})
+        self.b.handle({"cmd": "save", "id": 4, "name": "x_parts.3mf", "part": 0, "of": 1, "data": "AAAA"})
+        self.assertEqual(self.sent[-1]["path"], os.path.join(self.tmp.name, "x_parts (2).3mf"))  # never overwrite
+        import orca
+        self.assertIn("x_parts (2).3mf", orca._state["notifications"][-1])
 
     def test_save_error_reported(self):
         self.p.output_dir = lambda: os.path.join(self.tmp.name, "missing")

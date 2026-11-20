@@ -60,10 +60,17 @@ class FakeInstance:
 
 
 class FakeObject:
+    _next_id = 100
+
     def __init__(self, name, volumes, instance=None):
+        FakeObject._next_id += 1
+        self._id = FakeObject._next_id
         self.name = name
         self._vols = volumes
         self._inst = [instance or FakeInstance()]
+
+    def id(self):
+        return self._id
 
     def volumes(self):
         return list(self._vols)
@@ -112,13 +119,25 @@ class FakeWindow:
         return self.open
 
 
-def install(objects, storage=None):
+class FakeBundle:
+    def __init__(self, colours):
+        self.colours = colours
+
+    def full_config_value(self, key):
+        return ";".join(f'"{c}"' for c in self.colours) if key == "filament_colour" else None
+
+
+def install(objects, storage=None, colours=("#FF0000", "#00AE42")):
     orca = types.ModuleType("orca")
-    state = {"model": FakeModel(objects), "permissions": [], "capabilities": [], "windows": []}
+    state = {"model": FakeModel(objects), "permissions": [], "capabilities": [], "windows": [], "notifications": []}
     host = types.SimpleNamespace(
         model=lambda: state["model"],
         plugin=types.SimpleNamespace(storage=lambda: storage or tempfile.gettempdir()),
-        ui=types.SimpleNamespace(create_window=lambda **kw: state["windows"].append(FakeWindow(**kw)) or state["windows"][-1]),
+        preset_bundle=lambda: FakeBundle(list(colours)),
+        ui=types.SimpleNamespace(
+            create_window=lambda **kw: state["windows"].append(FakeWindow(**kw)) or state["windows"][-1],
+            push_notification=lambda level, text, hyper_text="", on_click=None: state["notifications"].append(text),
+            NotificationLevel=types.SimpleNamespace(RegularNotificationLevel=2)),
     )
     orca.host = host
     orca.pages = types.SimpleNamespace(PagesPluginCapabilityBase=_CapBase)

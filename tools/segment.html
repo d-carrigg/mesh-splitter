@@ -8,25 +8,42 @@
   :root { color-scheme:dark; accent-color:var(--acc); --bg:#16181c; --panel:#1f2228; --line:#2e323a; --fg:#e6e8eb; --mute:#8b919c; --acc:#4da3ff; --glass:#1f2228f0; }
   * { box-sizing:border-box; }
   [hidden] { display:none !important; }
-  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:13px/1.35 system-ui,Segoe UI,sans-serif; }
+  html:root, html body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:13px/1.35 system-ui,Segoe UI,sans-serif; }
   body { display:grid; grid-template-rows:auto 1fr; grid-template-columns:auto 1fr; }
   #top { grid-column:1 / -1; display:flex; align-items:center; gap:6px; padding:6px 10px; background:var(--panel); border-bottom:1px solid var(--line); min-width:0; }
   #top h1 { font-size:14px; margin:0 6px 0 0; white-space:nowrap; }
-  #fileInfo { flex:1; text-align:center; color:var(--mute); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #fileBtn { max-width:min(46vw, 560px); min-width:0; }
+  #fileName { font-weight:600; overflow:hidden; text-overflow:ellipsis; }
+  #fileInfo { color:var(--mute); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+  #fileInfo:empty { display:none; }
+  @media (max-width:1100px) { #fileInfo { display:none; } }
+  .caretI { width:14px !important; height:14px !important; opacity:.7; }
+  .spacer { flex:1; }
+  #toast { position:absolute; left:50%; bottom:34px; transform:translateX(-50%); max-width:min(640px, 90%); background:#3a1f22; border:1px solid #ff5d5d; color:var(--fg); padding:8px 12px; border-radius:8px; z-index:20; cursor:pointer; box-shadow:0 6px 20px #0008; }
+  .split { display:inline-flex; }
+  .split > .pri:first-child { border-radius:5px 0 0 5px; }
+  .split > .caret { border-radius:0 5px 5px 0; border-left-color:#0005; padding:4px 5px; }
+  .mh { color:var(--mute); font-size:11px; text-transform:uppercase; letter-spacing:.06em; padding:6px 8px 2px; }
+  .msep { height:1px; background:var(--line); margin:4px 2px; }
+  .menu .sub { display:flex; flex-direction:column; }
+  .menu .sub:empty { display:none; }
+  body.inOrca #top { padding:3px 8px; }
+  body.inOrca #top h1 { display:none; }
   .sep { width:1px; align-self:stretch; background:var(--line); margin:2px 4px; }
   #side { width:280px; overflow-y:auto; background:var(--panel); border-right:1px solid var(--line); padding:8px 10px 40px; }
   #view { position:relative; min-width:0; min-height:0; overflow:hidden; }
   #view canvas { display:block; }
-  h2 { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--mute); margin:0 auto 0 0; }
-  button { background:#2b3038; color:var(--fg); border:1px solid #3a404a; border-radius:5px; padding:4px 8px; font:inherit; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px; white-space:nowrap; }
+  html h2 { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--mute); margin:0 auto 0 0; }
+  /* "html " prefixes outrank the element defaults OrcaSlicer injects into plugin pages (orca-plugin-defaults) */
+  html button { background:#2b3038; color:var(--fg); border:1px solid #3a404a; border-radius:5px; padding:4px 8px; font:inherit; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px; white-space:nowrap; }
   button:has(svg:only-child) { padding:4px 6px; }
   svg.i { width:16px; height:16px; flex:none; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
-  button:hover { border-color:#56606e; }
+  html button:hover { border-color:#56606e; filter:none; }
   button.on { background:var(--acc); border-color:var(--acc); color:#06121f; font-weight:600; }
   button.pri { background:#1d4f86; border-color:#2d6cb0; }
   button.pri:hover { border-color:var(--acc); }
   button.danger:hover { border-color:#ff5d5d; color:#ff8a8a; }
-  button:disabled { opacity:.45; cursor:default; }
+  html button:disabled { opacity:.45; cursor:default; }
   .row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:4px 0; }
   .grp { display:flex; gap:2px; align-items:center; }
   label.sl { display:inline-grid; grid-template-columns:auto 110px 34px; gap:6px; align-items:center; color:var(--mute); }
@@ -51,7 +68,7 @@
   #ctxMenu { position:fixed; top:auto; right:auto; min-width:200px; }
   #ctxMenu .sw { width:10px; height:10px; border-radius:3px; display:inline-block; }
   #ctxMenu .hd { display:flex; align-items:center; gap:6px; padding:4px 8px 6px; color:var(--mute); font-size:11px; border-bottom:1px solid var(--line); margin-bottom:2px; }
-  .menu button { justify-content:flex-start; background:none; border-color:transparent; padding:6px 8px; }
+  .menu button { width:100%; justify-content:flex-start; background:none; border-color:transparent; padding:6px 8px; }
   .menu button:hover { background:#2b3038; }
   .menu .meta { margin-left:auto; padding-left:12px; color:var(--mute); font-size:11px; }
   #dropOrca { display:flex; flex-direction:column; gap:2px; min-width:280px; }
@@ -117,17 +134,22 @@
 <body class="empty">
 <header id="top">
   <h1>Mesh Splitter</h1>
-  <button id="openBtn" data-icon="open" title="Open STL / 3MF"></button>
-  <span class="menuWrap orcaOnly" hidden><button id="orcaBtn" data-icon="open" title="Open an object from the OrcaSlicer plate">Plate</button><div id="orcaMenu" class="menu left" hidden></div></span>
-  <span class="menuWrap"><button id="recentBtn" data-icon="clock" title="Recent files"></button><div id="recentMenu" class="menu left" hidden></div></span>
-  <button id="saveSess" class="needMesh" data-icon="save" title="Save session (.json)"></button>
-  <button id="loadSess" class="needMesh" data-icon="load" title="Load session (.json)"></button>
+  <span class="menuWrap"><button id="fileBtn" data-icon="open" title="Open a model, recent files, sessions"><span id="fileName">Open a model</span><span id="fileInfo"></span><svg class="i caretI" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+    <div id="fileMenu" class="menu left" hidden>
+      <div class="orcaOnly mh" hidden>From the plate</div>
+      <div id="orcaMenu" class="orcaOnly sub" hidden></div>
+      <button id="openBtn" data-icon="open" title="Open STL / 3MF">Open file…<span class="meta">Ctrl+O</span></button>
+      <div id="recentHd" class="mh">Recent</div>
+      <div id="recentMenu" class="sub"></div>
+      <div class="msep"></div>
+      <button id="saveSess" class="needMesh" data-icon="save" title="Save the split (labels, part names, transforms) as .json">Save session</button>
+      <button id="loadSess" class="needMesh" data-icon="load" title="Load a saved .json session for this mesh">Load session…</button>
+    </div></span>
   <span class="sep"></span>
   <button id="undoBtn" disabled data-icon="undo" title="Undo (Ctrl+Z)"></button>
   <button id="redoBtn" disabled data-icon="redo" title="Redo (Ctrl+Y)"></button>
-  <span id="fileInfo"></span>
-  <button id="orcaSend" class="pri needMesh orcaOnly" data-icon="download" title="Write a multi-part 3MF (each part keeps its filament slot), then import it in OrcaSlicer with Ctrl+I" hidden>Send to Orca</button>
-  <span class="menuWrap needMesh"><button id="expBtn" class="pri" data-icon="download">Export<svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="m6 9 6 6 6-6"/></svg></button>
+  <span class="spacer"></span>
+  <span class="menuWrap needMesh split"><button id="expMain" class="pri" data-icon="download" title="One object, each part a separate part with its filament slot set (opens as parts in OrcaSlicer / Bambu Studio)">Export 3MF</button><button id="expBtn" class="pri caret" title="More export formats"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="m6 9 6 6 6-6"/></svg></button>
     <div id="expMenu" class="menu" hidden>
       <button id="expParts" data-icon="package" title="One object, each part a separate part with its filament slot set (opens as parts in OrcaSlicer / Bambu Studio)">Multi-part 3MF</button>
       <button id="exp3mf" data-icon="palette" title="Same mesh, each triangle painted with its part's filament slot (Bambu/Orca color painting)">Painted 3MF</button>
@@ -149,6 +171,7 @@
 </aside>
 
 <div id="view">
+  <div id="toast" hidden title="Click to dismiss"></div>
   <div id="drop"><span>Drop an STL or 3MF here</span><div id="dropOrca"></div><button id="dropOpen" data-icon="open">Open…</button><div id="dropRecent"></div></div>
 
   <div id="toolbar" class="float">
@@ -211,6 +234,11 @@
       </div>
       <div class="sub">
         <h2>Transform</h2>
+        <span class="grp" id="gzModes">
+          <button data-gz="translate" data-icon="move" title="Move handles in the view (W). Shift snaps to 1 mm"></button>
+          <button data-gz="rotate" data-icon="rotate" title="Rotate rings in the view (E). Shift snaps to 15°"></button>
+          <button data-gz="scale" data-icon="scale" title="Scale handles in the view (R): corner box = all axes, arrows = one axis. Shift snaps to 5%"></button>
+        </span>
         <label class="small" title="Scale X/Y/Z together"><input id="xfLock" type="checkbox" checked> uniform</label>
         <button id="xfReset" data-icon="reset" title="Reset this part's transform"></button>
       </div>
@@ -282,6 +310,7 @@
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { STLLoader } from "three/addons/loaders/STLLoader.js";
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
 import { unzipSync, zipSync, zlibSync, unzlibSync, strFromU8, strToU8 } from "fflate";
@@ -402,7 +431,8 @@ function loadRaw(name, raw) {
   frame();
   refreshUI();
   const bb = S.G.bbox;
-  $("fileInfo").textContent = `${name} · ${S.nF.toLocaleString()} faces · ${S.G.shells} shell${S.G.shells > 1 ? "s" : ""} · ` +
+  $("fileName").textContent = name; $("fileBtn").title = `${name}: open another model, recent files, sessions`;
+  $("fileInfo").textContent = `${S.nF.toLocaleString()} faces · ${S.G.shells} shell${S.G.shells > 1 ? "s" : ""} · ` +
     `${(bb[3]-bb[0]).toFixed(0)}×${(bb[4]-bb[1]).toFixed(0)}×${(bb[5]-bb[2]).toFixed(0)} mm`;
   $("drop").style.display = "none";
   $("brushR").max = (S.G.diag * 0.15).toFixed(1);
@@ -1289,12 +1319,13 @@ function applyXf() {
   render();
 }
 
+let orcaFil = null; // OrcaSlicer's filament colours by slot (plugin), used by the filament view
 let byFilament = false; try { byFilament = localStorage.getItem("meshsplit:byFil") === "1"; } catch {}
 // Display color of part i: its own color, or (filament view) the color of the first part on the same slot.
 function shownColor(i, plain) {
   const p = S.parts[i];
   let c = p.color;
-  if (byFilament && !plain) { const q = S.parts.find((q) => q.filament === p.filament); if (q) c = q.color; }
+  if (byFilament && !plain) { const q = S.parts.find((q) => q.filament === p.filament); if (q) c = q.color; if (orcaFil?.[p.filament - 1]) c = orcaFil[p.filament - 1]; }
   const col = new THREE.Color(c);
   if (!plain && i === S.active && i > 0) col.lerp(new THREE.Color(0xffffff), 0.45); // selected part reads lighter
   return col;
@@ -1397,6 +1428,7 @@ function setTool(t) {
   let any = false;
   document.querySelectorAll("#opts > [data-for]").forEach((d) => { const on = d.dataset.for === t; d.classList.toggle("show", on); any ||= on; });
   $("opts").classList.toggle("hide", !any);
+  queueMicrotask(() => syncGizmo()); // the gizmo shows with the Select tool only
 }
 
 let down = null, painting = false;
@@ -1407,6 +1439,7 @@ canvas.addEventListener("pointerdown", (ev) => {
   if (ev.button === 2) { rdown = { x: ev.clientX, y: ev.clientY }; return; }
   closeCtx();
   if (ev.button !== 0 || !mesh) return;
+  if (gizmo.object && gizmo.axis) { down = null; return; } // on a gizmo handle: the gizmo owns this drag
   down = { x: ev.clientX, y: ev.clientY };
   if (S.tool === "brush" && !ev.ctrlKey && !placing) {
     const h = hit(ev);
@@ -1682,7 +1715,7 @@ $("frameBtn").onclick = () => S.G && frame();
 $("smoothBtn").onclick = () => S.G && later(() => smoothBoundaries());
 $("segBtn").onclick = () => S.G && later(segmentFromSeeds);
 $("shellBtn").onclick = () => S.G && later(splitShells);
-$("openBtn").onclick = $("dropOpen").onclick = () => $("fileIn").click();
+$("openBtn").onclick = $("dropOpen").onclick = () => { closeMenus(); $("fileIn").click(); };
 // selected-part card
 const act = () => (S.G && S.active > 0 ? S.parts[S.active] : null);
 $("pcColor").oninput = () => { const p = act(); if (p) { p.color = $("pcColor").value; updateColors(); drawSeeds(); syncReps(); } };
@@ -1739,11 +1772,11 @@ async function renderRecent() {
       box.appendChild(b);
     }
   }
-  $("recentBtn").disabled = !all.length;
+  $("recentHd").hidden = !all.length;
 }
 function closeMenus() { document.querySelectorAll(".menu").forEach((m) => (m.hidden = true)); }
 function toggleMenu(id) { const m = $(id), was = m.hidden; closeMenus(); m.hidden = !was; }
-$("recentBtn").onclick = (e) => { e.stopPropagation(); toggleMenu("recentMenu"); };
+$("fileBtn").onclick = (e) => { e.stopPropagation(); if (ORCA.on) orcaSend({ cmd: "objects" }); toggleMenu("fileMenu"); };
 $("expBtn").onclick = (e) => { e.stopPropagation(); toggleMenu("expMenu"); };
 document.addEventListener("click", (e) => { if (!e.target.closest(".menu")) closeMenus(); });
 // filament color view
@@ -1756,12 +1789,16 @@ window.addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
   if (e.ctrlKey || e.metaKey) {
     if (k === "z" || k === "y") { e.preventDefault(); (k === "y" || e.shiftKey ? redo : undo)(); }
+    else if (k === "o" && !document.body.classList.contains("inOrca")) { e.preventDefault(); $("fileIn").click(); }
+    else if (k === "e" && S.G && !document.body.classList.contains("inOrca")) { e.preventDefault(); $("expMain").click(); }
     return;
   }
   if (e.key === "Home" && S.G) { e.preventDefault(); frame(); return; }
   if (e.key === "Escape") { if (!$("ctxMenu").hidden) closeCtx(); else if (placing) stopPlacing(); else if (flow) closeFlow(); else if (!$("autoPop").hidden) closeAuto(); else if (pickingJoint) { pickingJoint = false; refreshUI(); status(""); } else if (S.G && S.active) selectPart(0); return; }
   if (e.key === "Delete" && S.G && S.active > 0) { deletePart(S.active); return; }
   if (k === "c" && S.G) { setColorMode(!byFilament); return; }
+  if (S.G && S.active > 0 && (k === "w" || k === "e" || k === "r")) { setGizmo({ w: "translate", e: "rotate", r: "scale" }[k]); return; }
+  if (S.G && k === "q") { setGizmo("off"); return; }
   const t = TOOLS.find((t) => t.key === k);
   if (t) setTool(t.id);
 });
@@ -1958,6 +1995,7 @@ function refreshXfPanel() {
   $("repName").title = r ? r.name : "";
   if (r) { $("repFit").checked = !!r.fit; $("repEmbed").value = r.embed; $("repFlip").classList.toggle("on", !!r.flip && !r.joint); $("repPick").classList.toggle("on", pickingJoint || !!r.joint); }
   showXfDims();
+  syncGizmo();
 }
 function showXfDims() {
   const i = S.active;
@@ -1987,6 +2025,71 @@ $("xfReset").onclick = () => {
   pushUndo(); delete p.xf; afterEdit(`Transform reset on ${p.name}`);
 };
 
+// ---------------------------------------------------------------- transform gizmo
+// Drag handles in the view, mapped 1:1 onto part.xf: a proxy at pivot+t with rotation r and scale s has the same
+// matrix as xfMatrix(). W/E/R pick move/rotate/scale, Q hides it; Shift snaps. One undo step per drag.
+const gizmo = new TransformControls(camera, renderer.domElement);
+gizmo.setSize(0.85);
+const gzProxy = new THREE.Object3D();
+scene.add(gzProxy); scene.add(gizmo);
+let gzMode = "translate", gzOn = true, gzSnap = null, gzSync = false;
+try { const m = localStorage.getItem("meshsplit:gizmo"); if (m === "off") gzOn = false; else if (m) gzMode = m; } catch {}
+gizmo.addEventListener("change", render);
+function gizmoTarget() { const i = S.active; return S.G && mesh && i > 0 && S.parts[i] && S.parts[i].visible !== false && partCounts()[i] > 0 ? i : -1; }
+function syncGizmo() {
+  const i = gizmoTarget();
+  document.querySelectorAll("#gzModes [data-gz]").forEach((b) => b.classList.toggle("on", gzOn && b.dataset.gz === gzMode));
+  if (!gzOn || i < 0 || S.tool !== "orbit" || placing || pickingJoint) { if (gizmo.object) { gizmo.detach(); render(); } return; }
+  if (gizmo.dragging) return;
+  const x = S.parts[i].xf || { s: [1, 1, 1], r: [0, 0, 0], t: [0, 0, 0], c: (() => { const b = partBox(i); return [0, 1, 2].map((k) => (b[k] + b[k+3]) / 2); })() };
+  gzSync = true;
+  gzProxy.position.set(x.c[0] + x.t[0], x.c[1] + x.t[1], x.c[2] + x.t[2]);
+  gzProxy.rotation.set(...x.r.map((d) => d * Math.PI / 180), "XYZ");
+  gzProxy.scale.set(...x.s);
+  gzProxy.updateMatrixWorld();
+  gzSync = false;
+  gizmo.setMode(gzMode);
+  gizmo.setSpace(gzMode === "scale" ? "local" : "world");
+  if (gizmo.object !== gzProxy) gizmo.attach(gzProxy);
+  render();
+}
+function setGizmo(mode) {
+  if (mode === "off" || (mode === gzMode && gzOn)) gzOn = false; else { gzOn = true; gzMode = mode; }
+  try { localStorage.setItem("meshsplit:gizmo", gzOn ? gzMode : "off"); } catch {}
+  if (gzOn && S.tool !== "orbit") setTool("orbit");
+  syncGizmo();
+}
+document.querySelectorAll("#gzModes [data-gz]").forEach((b) => (b.onclick = () => setGizmo(b.dataset.gz)));
+gizmo.addEventListener("dragging-changed", (e) => {
+  controls.enabled = !e.value;
+  const i = S.active;
+  if (e.value) { gzSnap = snapshot(); ensureXf(i); return; }
+  if (gzSnap) { pushUndo(gzSnap); gzSnap = null; }
+  refreshUI(); autosave();
+});
+gizmo.addEventListener("objectChange", () => {
+  const i = S.active; if (gzSync || i <= 0 || !S.parts[i]) return;
+  const x = ensureXf(i), r2d = 180 / Math.PI;
+  const sc = gzProxy.scale.toArray().map((v) => (Math.abs(v) < 0.01 ? (v < 0 ? -0.01 : 0.01) : v));
+  if (gizmo.mode === "scale" && $("xfLock").checked) { // a single-axis drag scales all three when "uniform" is on
+    const k = [0, 1, 2].reduce((a, j) => (Math.abs(sc[j] - x.s[j]) > Math.abs(sc[a] - x.s[a]) ? j : a), 0), f = sc[k] / (x.s[k] || 1);
+    for (let j = 0; j < 3; j++) sc[j] = x.s[j] * f;
+    gzSync = true; gzProxy.scale.set(...sc); gzSync = false;
+  }
+  x.s = sc.map((v) => +v.toFixed(4));
+  x.r = [gzProxy.rotation.x, gzProxy.rotation.y, gzProxy.rotation.z].map((v) => +(v * r2d).toFixed(2));
+  x.t = [0, 1, 2].map((k) => +(gzProxy.position.getComponent(k) - x.c[k]).toFixed(3));
+  applyXf(); syncReps(); drawSeeds(); showXfDims();
+  for (let k = 0; k < 3; k++) { xfIn("S", k).value = +(x.s[k] * 100).toFixed(2); xfIn("R", k).value = +x.r[k].toFixed(2); xfIn("T", k).value = +x.t[k].toFixed(3); }
+});
+function gizmoSnap(on) {
+  gizmo.setTranslationSnap(on ? 1 : null);
+  gizmo.setRotationSnap(on ? THREE.MathUtils.degToRad(15) : null);
+  gizmo.setScaleSnap(on ? 0.05 : null);
+}
+window.addEventListener("keydown", (e) => { if (e.key === "Shift") gizmoSnap(true); });
+window.addEventListener("keyup", (e) => { if (e.key === "Shift") gizmoSnap(false); });
+window.addEventListener("blur", () => gizmoSnap(false));
 
 let pickingJoint = false;
 function pickJointAt(ev) {
@@ -2091,6 +2194,7 @@ function label(cx, x, y, text, size = 15) {
 
 function captureForReview(stats) {
   const nP = S.parts.length, vis = S.parts.map((p) => p.visible);
+  gizmo.detach(); setTimeout(syncGizmo, 0);
   S.parts.forEach((p) => (p.visible = true)); updateVisibility(); updateColors(true);
   try {
     const T = 448, cols = 3, over = document.createElement("canvas"); over.width = T * cols; over.height = T * 2;
@@ -2189,6 +2293,7 @@ function localChecks(st) {
 
 let lastReview = null;
 async function llmStatus() {
+  if (location.protocol === "file:") { $("aiState").textContent = "needs uv run splitter"; return { configured: false }; } // no local server (e.g. inside OrcaSlicer)
   try {
     const j = await (await fetch("/api/llm/status")).json();
     $("aiState").textContent = j.configured ? `key: ${j.source}` : "no key";
@@ -2465,16 +2570,19 @@ function buildParts3MF() {
     parts.push({ name: p.name, filament: p.filament, pos: w.pos, tri: w.tri });
   });
   if (!parts.length) throw new Error("No parts to export.");
-  const objs = [], comps = [], cfg = [], parent = parts.length + 1;
+  const objs = [], comps = [], cfg = [], kept = [], parent = parts.length + 1;
   parts.forEach((p, k) => {
     const id = k + 1, v = [], t = [];
     for (let i = 0; i < p.pos.length; i += 3) v.push(`<vertex x="${num(p.pos[i])}" y="${num(p.pos[i+1])}" z="${num(p.pos[i+2])}"/>`);
     for (let i = 0; i < p.tri.length; i += 3) if (p.tri[i] !== p.tri[i+1] && p.tri[i+1] !== p.tri[i+2] && p.tri[i] !== p.tri[i+2])
       t.push(`<triangle v1="${p.tri[i]}" v2="${p.tri[i+1]}" v3="${p.tri[i+2]}"/>`);
+    if (!t.length) return; // OrcaSlicer rejects the whole file if any part has no triangles
     objs.push(`  <object id="${id}" type="model" name="${xmlEsc(p.name)}">\n   <mesh>\n    <vertices>\n${v.join("\n")}\n    </vertices>\n    <triangles>\n${t.join("\n")}\n    </triangles>\n   </mesh>\n  </object>`);
+    kept.push(p);
     comps.push(`    <component objectid="${id}"/>`);
     cfg.push(`    <part id="${id}" subtype="normal_part">\n      <metadata key="name" value="${xmlEsc(p.name)}"/>\n      <metadata key="extruder" value="${p.filament}"/>\n    </part>`);
   });
+  if (!kept.length) throw new Error("No parts with printable triangles to export.");
   const model = `<?xml version="1.0" encoding="UTF-8"?>
 <model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
  <metadata name="Application">MeshSplitter</metadata>
@@ -2494,7 +2602,7 @@ ${comps.join("\n")}
 <config>
   <object id="${parent}">
     <metadata key="name" value="${xmlEsc(S.name)}"/>
-    <metadata key="extruder" value="${parts[0].filament}"/>
+    <metadata key="extruder" value="${kept[0].filament}"/>
 ${cfg.join("\n")}
   </object>
 </config>`;
@@ -2506,7 +2614,7 @@ ${cfg.join("\n")}
     "3D/3dmodel.model": strToU8(model),
     "Metadata/model_settings.config": strToU8(config),
   }, { level: 6 });
-  return { out, parts };
+  return { out, parts: kept };
 }
 function exportParts3MF() {
   if (!S.G) return;
@@ -2514,6 +2622,8 @@ function exportParts3MF() {
   download(`${S.name}_parts.3mf`, out, "model/3mf");
   const fils = [...new Set(parts.map((p) => p.filament))].sort((a, b) => a - b);
   status(`Multi-part 3MF written: ${parts.length} part(s), filament slot(s) ${fils.join(", ")}.`);
+  if (orcaFil?.length && fils[fils.length - 1] > orcaFil.length)
+    alert(`Parts use filament slot ${fils[fils.length - 1]}, but OrcaSlicer has ${orcaFil.length} filaments. Add filaments in Orca or change the parts' F numbers.`);
 }
 
 function exportSTLs() {
@@ -2580,10 +2690,11 @@ function restoreAutosave() {
 }
 $("exp3mf").onclick = () => { closeMenus(); later(exportPainted3MF); };
 $("expParts").onclick = () => { closeMenus(); later(exportParts3MF); };
+$("expMain").onclick = () => { closeMenus(); later(exportParts3MF); };
 $("expStl").onclick = () => { closeMenus(); later(exportSTLs); };
 $("expMerged").onclick = () => { closeMenus(); later(exportMergedSTL); };
-$("saveSess").onclick = saveSession;
-$("loadSess").onclick = () => S.G ? $("sessIn").click() : alert("Open the mesh first.");
+$("saveSess").onclick = () => { closeMenus(); saveSession(); };
+$("loadSess").onclick = () => { closeMenus(); S.G ? $("sessIn").click() : alert("Open the mesh first."); };
 $("sessIn").onchange = async () => { const f = $("sessIn").files[0]; if (f) loadSession(await f.text()); $("sessIn").value = ""; };
 
 // ---------------------------------------------------------------- boot
@@ -2602,13 +2713,14 @@ if (qp) {
 // Inside OrcaSlicer the host injects window.orca (postMessage/onMessage). The plugin sends plate meshes
 // in base64 chunks and writes files the page exports (OrcaSlicer plugins cannot add objects to the plate,
 // so the result is a 3MF to import with Ctrl+I). Outside OrcaSlicer none of this runs.
-const ORCA = { on: !!(window.orca && window.orca.postMessage), objects: [], rx: null, saves: new Map(), seq: 0 };
+const ORCA = { on: !!(window.orca && window.orca.postMessage), objects: [], rx: null, req: 0, saves: new Map(), seq: 0,
+  nonce: Math.random().toString(36).slice(2, 8) }; // ids stay unique across page reloads (the plugin outlives the page)
 const CHUNK = 512 * 1024; // base64 chars per message
 function orcaSend(msg) { window.orca.postMessage(msg); }
 function u8ToB64(b) { let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }
 ORCA.save = (name, data) => {
-  const b = data instanceof Uint8Array ? data : new Uint8Array(data);
-  const t = u8ToB64(b), id = ++ORCA.seq, n = Math.max(1, Math.ceil(t.length / CHUNK));
+  const b = typeof data === "string" ? new TextEncoder().encode(data) : data instanceof Uint8Array ? data : new Uint8Array(data);
+  const t = u8ToB64(b), id = `${ORCA.nonce}-${++ORCA.seq}`, n = Math.max(1, Math.ceil(t.length / CHUNK));
   return new Promise((res, rej) => {
     ORCA.saves.set(id, { res, rej, name });
     for (let i = 0; i < n; i++) orcaSend({ cmd: "save", id, name, part: i, of: n, data: t.slice(i * CHUNK, (i + 1) * CHUNK) });
@@ -2622,19 +2734,35 @@ function orcaRenderObjects() {
     if (box === $("dropOrca") && ORCA.objects.length) box.insertAdjacentHTML("beforeend", `<div class="small" style="margin:8px 0 4px">From the plate:</div>`);
     for (const o of ORCA.objects) {
       const b = document.createElement("button"); b.title = o.name;
-      b.innerHTML = `${icon("open")}<span style="overflow:hidden;text-overflow:ellipsis;max-width:320px">${esc(o.name)}</span><span class="meta">${o.faces.toLocaleString()} faces${o.parts > 1 ? ` · ${o.parts} parts` : ""}</span>`;
-      b.onclick = () => { closeMenus(); orcaSend({ cmd: "mesh", index: o.index }); busy(true); status(`Loading ${o.name} from the plate…`); };
+      b.innerHTML = `${icon("open")}<span style="overflow:hidden;text-overflow:ellipsis;max-width:320px">${esc(o.name)}</span><span class="meta">${o.faces.toLocaleString()} faces${o.parts > 1 ? ` · ${o.parts} parts` : ""}${o.ignored ? ` · ${o.ignored} modifier(s) ignored` : ""}</span>`;
+      b.onclick = () => { closeMenus(); orcaLoad(o); };
       box.appendChild(b);
     }
     if (!ORCA.objects.length) box.insertAdjacentHTML("beforeend", `<div class="small" style="padding:6px 8px">No objects on the plate.</div>`);
   }
 }
-function orcaMesh(m) {
-  if (m.part === 0) ORCA.rx = { name: m.name, nV: m.nV, nF: m.nF, parts: [] };
-  const R = ORCA.rx; if (!R) return;
-  R.parts[m.part] = m.data;
-  if (R.parts.filter((x) => x != null).length < m.of) return;
-  ORCA.rx = null;
+let rxTimer = 0;
+function orcaLoad(o) {
+  ORCA.cur = o; ORCA.rx = null; const req = `${ORCA.nonce}-m${++ORCA.req}`; ORCA.want = req;
+  orcaSend({ cmd: "mesh", id: o.id, index: o.index, req }); busy(true); status(`Loading ${o.name} from the plate…`);
+  clearTimeout(rxTimer);
+  rxTimer = setTimeout(() => { if (ORCA.want === req) { ORCA.want = null; ORCA.rx = null; busy(false); alert(`${o.name} did not arrive from OrcaSlicer. Try again.`); } }, 60000);
+}
+let plateTimer = 0;
+function orcaPlateChanged(m) {
+  clearTimeout(plateTimer);
+  plateTimer = setTimeout(() => orcaSend({ cmd: "objects" }), 300);
+  const c = ORCA.cur, hit = c && ((m.id && m.id === String(c.id)) || (m.index >= 0 && m.index === c.index));
+  if (S.G && hit && /Changed|Deleted|Transformed/.test(m.event || ""))
+    status(`${S.name} changed on the plate since you opened it. Reopen it from the file menu to pick up the change.`);
+}
+function orcaMesh(m) { // chunks of the requested transfer, in any order
+  if (!m.req || m.req !== ORCA.want) return; // a stale or superseded transfer
+  if (!ORCA.rx || ORCA.rx.req !== m.req) ORCA.rx = { req: m.req, name: m.name, nV: m.nV, nF: m.nF, parts: new Array(m.of), got: 0 };
+  const R = ORCA.rx;
+  if (R.parts[m.part] == null) { R.parts[m.part] = m.data; R.got++; }
+  if (R.got < m.of) return;
+  ORCA.rx = null; ORCA.want = null; clearTimeout(rxTimer);
   try {
     const bin = atob(R.parts.join("")), b = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
@@ -2646,24 +2774,31 @@ function orcaMesh(m) {
 }
 if (ORCA.on) {
   document.body.classList.add("inOrca");
+  // alert() is not a documented part of OrcaSlicer's plugin webviews: show messages in the page instead.
+  window.alert = (t) => { const d = $("toast"); d.textContent = String(t); d.hidden = false; clearTimeout(d._t); d._t = setTimeout(() => (d.hidden = true), 8000); };
+  $("toast").onclick = () => ($("toast").hidden = true);
+  document.querySelectorAll("#fileMenu .meta").forEach((e) => e.remove()); // Ctrl+O is OrcaSlicer's Open project
   document.querySelectorAll(".orcaOnly").forEach((e) => (e.hidden = false));
-  $("orcaBtn").onclick = (e) => { e.stopPropagation(); orcaSend({ cmd: "objects" }); toggleMenu("orcaMenu"); };
-  $("orcaSend").onclick = () => later(() => { const { out, parts } = buildParts3MF(); download(`${S.name}_parts.3mf`, out, "model/3mf"); status(`Sending ${parts.length} part(s)…`); });
+  $("expMain").lastChild.textContent = "Send to Orca";
+  $("expMain").title = "Save a multi-part 3MF (each part keeps its filament slot) to Downloads, then import it in OrcaSlicer with Ctrl+I";
+  $("expParts").hidden = true;
   $("aiBtn").disabled = true; $("aiBtn").title = "AI review needs the standalone splitter (uv run splitter); Check still works here";
   window.orca.onMessage((m) => {
     if (!m || typeof m !== "object") return;
     if (m.cmd === "objects") {
       ORCA.objects = m.objects || []; orcaRenderObjects();
-      if (m.auto && !S.G && ORCA.objects.length === 1) { orcaSend({ cmd: "mesh", index: ORCA.objects[0].index }); busy(true); }
+      if (Array.isArray(m.filament_colours) && m.filament_colours.length) { orcaFil = m.filament_colours; updateColors(); }
+      if (m.auto && !S.G && ORCA.objects.length === 1) orcaLoad(ORCA.objects[0]);
     } else if (m.cmd === "mesh") orcaMesh(m);
+    else if (m.cmd === "plate_changed") orcaPlateChanged(m);
     else if (m.cmd === "saved" || m.cmd === "save_error") {
       const P = ORCA.saves.get(m.id); if (!P) return; ORCA.saves.delete(m.id);
       m.cmd === "saved" ? P.res(m.path) : P.rej(new Error(m.message || "unknown error"));
-    } else if (m.cmd === "error") { busy(false); status(m.message); alert(m.message); }
+    } else if (m.cmd === "error") { busy(false); ORCA.rx = null; ORCA.want = null; clearTimeout(rxTimer); status(m.message); alert(m.message); }
   });
   orcaSend({ cmd: "objects", auto: true });
 }
-window.app = { S, ORCA, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForReview, runReview, applyXf, ensureXf, xfMatrix, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, ORCA, gizmo, gzProxy, setGizmo, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForReview, runReview, applyXf, ensureXf, xfMatrix, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
 </script>
 </body>
 </html>
