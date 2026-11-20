@@ -9,8 +9,8 @@
  "camera": {
   "az": 20,
   "el": 15,
-  "dist": 1.1,
-  "lift": 0.12
+  "dist": 0.85,
+  "lift": -0.02
  },
  "css": "#__cursor { display: none !important }",
  "steps": [
@@ -37,10 +37,10 @@
    "do": "shot",
    "name": "auto-popup",
    "clip": [
-    280,
-    40,
-    520,
-    140
+    700,
+    32,
+    500,
+    260
    ]
   },
   {

@@ -21,7 +21,7 @@ Each part can be moved, rotated and scaled on its own. The change shows in the v
    - **R:** scale handles (corner box = all axes, arrow = one axis). Shift snaps to 5%.
    - **J:** [rotate on joint](#rotate-on-joint).
    - **Q:** hide the handles.
-3. Or type values in the **Transform** panel that opens under the move / rotate / scale icons: position mm, rotation ° and scale % for X / Y / Z. **Uniform scale** scales all three axes together. **Reset** clears the part's transform and **Done** closes the panel.
+3. Or type values in the **Transform** panel that opens at the right of the view with the move / rotate / scale tools: position mm, rotation ° and scale % for X / Y / Z. **Uniform scale** scales all three axes together. **Reset** clears the part's transform and **Done** closes the panel.
 
 ### Undo
 

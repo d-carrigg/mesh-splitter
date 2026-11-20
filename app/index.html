@@ -108,7 +108,7 @@
   #dropOrca button:hover, #dropRecent button:hover { background:#4D4D54; }
   #dropOrca .meta, #dropRecent .meta { margin-left:auto; padding-left:12px; color:var(--mute); font-size:11px; }
   /* tool panels hang under their toolbar icon, like Orca's gizmo panels */
-  .gp { top:44px; z-index:4; padding:12px 16px 10px; display:flex; flex-direction:column; gap:8px; width:320px; }
+  .gp { top:48px; right:12px; max-height:calc(100% - 140px); overflow:auto; z-index:4; padding:12px 16px 10px; display:flex; flex-direction:column; gap:8px; width:320px; }
   .gp h3 { margin:0; font-size:13.5px; font-weight:600; }
   .gp .ft { display:flex; align-items:center; gap:8px; border-top:1px solid var(--sep); padding-top:9px; margin-top:2px; }
   .gp button { background:var(--btn2); border-color:var(--btn2); }
@@ -427,7 +427,9 @@ scene.add(seedGroup);
 
 function resize() {
   const w = view.clientWidth, h = view.clientHeight;
-  renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); render();
+  renderer.setSize(w, h); camera.aspect = w / h;
+  if (camera.view?.enabled) camera.setViewOffset(w, h, camera.view.offsetX, 0, w, h);
+  camera.updateProjectionMatrix(); render();
 }
 function render() { renderer.render(scene, camera); }
 controls.addEventListener("change", render);
@@ -1370,10 +1372,15 @@ $("pcName").onblur = () => { const p = act(); if (p) $("pcName").value = p.name;
 $("pcFil").onchange = () => { const p = act(); if (p) { p.filament = Math.max(1, Math.min(32, Math.round(+$("pcFil").value || 1))); refreshUI(); autosave(); } };
 $("pcClose").onclick = () => selectPart(0);
 $("pcDel").onclick = () => S.active > 0 && deletePart(S.active);
-// Tool panels hang under their toolbar icon, like OrcaSlicer's gizmo panels.
-function anchorPanel(panel, btn) {
-  const b = btn.getBoundingClientRect(), v = view.getBoundingClientRect();
-  panel.style.left = `${Math.max(8, Math.min(b.left - v.left - 6, v.width - panel.offsetWidth - 8))}px`;
+// Tool panels dock at the right of the view. While one is open, the view's center moves to the middle of the
+// space left of it, so the model isn't hidden behind the panel and keeps its size.
+function fitViewToPanels() {
+  const w = view.clientWidth, h = view.clientHeight;
+  const open = [...document.querySelectorAll("#view > .gp")].find((g) => !g.hidden);
+  const shift = open && w > 2 * open.offsetWidth ? Math.round((open.offsetWidth + 12) / 2) : 0;
+  if (shift === (camera.view?.enabled ? camera.view.offsetX : 0)) return;
+  if (shift) camera.setViewOffset(w, h, shift, 0, w, h); else camera.clearViewOffset();
+  render();
 }
 // Split panel: one place for every way to split. Seeds and Paint are the seed / brush / fill tools.
 let splitMethod = "auto";
@@ -1384,7 +1391,8 @@ function showSplit(on, m = splitMethod) {
   document.querySelectorAll("#splitMethods [data-method]").forEach((b) => b.classList.toggle("on", b.dataset.method === m));
   P.querySelectorAll("[data-m]").forEach((d) => d.classList.toggle("show", d.dataset.m.split(" ").includes(m)));
   syncGizmo();
-  if (on) { anchorPanel(P, $("autoBtn")); renderPaintSw(); }
+  if (on) renderPaintSw();
+  fitViewToPanels();
 }
 function setSplitMethod(m) {
   showSplit(true, m);
@@ -1759,7 +1767,7 @@ function syncGizmo() {
   $("gzJoint").classList.toggle("on", gzJointOn);
   const card = $("xfCard"), show = gzOn && i >= 0 && S.tool === "orbit" && !placing && !pickingJoint && $("splitPanel").hidden;
   card.hidden = !show;
-  if (show) anchorPanel(card, document.querySelector(`#gzModes [data-gz="${gzMode}"]`));
+  fitViewToPanels();
   $("gzCenter").classList.toggle("on", !gzJointOn);
   if (!gzOn || i < 0 || S.tool !== "orbit" || placing || pickingJoint) { jointAxis.visible = false; if (gizmo.object) { gizmo.detach(); render(); } return; }
   if (gizmo.dragging) return;
