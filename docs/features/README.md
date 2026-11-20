@@ -1,6 +1,6 @@
 # Features
 
-Four pages, one section per feature, each with a screenshot or a before / after image of the curling figure.
+Five pages, one section per feature, each with a screenshot or a before / after image of the curling figure.
 
 | Page | Covers |
 | --- | --- |
@@ -8,6 +8,7 @@ Four pages, one section per feature, each with a screenshot or a before / after 
 | [Editing parts](editing-parts.md) | Fill, brush, merge, Replace with…, show only, rename, AI part naming |
 | [Move, rotate, scale and heal](transforms.md) | Handles (W / E / R), Shift snap, undo, rotate on joint (J), heal joint |
 | [Exporting](exporting.md) | Send to Orca, painted 3MF, part STLs, merged STL |
+| [Command line](command-line.md) | `mesh-splitter split`: methods, outputs, settings, seeds file |
 
 ## Regenerating the images
 

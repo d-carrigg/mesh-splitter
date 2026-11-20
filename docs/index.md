@@ -10,6 +10,7 @@ Split one solid mesh into separate, color-coded parts for multi-color or multi-p
 - **[Editing parts](features/editing-parts.md):** fill, brush, merge, Replace with…, show only, rename, AI part naming
 - **[Move, rotate, scale and heal](features/transforms.md):** handles, snapping, undo, rotate on joint, heal joint
 - **[Exporting](features/exporting.md):** Send to Orca, painted 3MF, part STLs, merged STL
+- **[Command line](features/command-line.md):** split and export from a script with `uv run mesh-splitter split`
 
 ## Install in OrcaSlicer
 
