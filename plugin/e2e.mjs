@@ -101,6 +101,20 @@ const mw = await page.evaluate(() => {
   return out;
 });
 console.log("move with:", JSON.stringify(mw));
+// Reach: the head reaches for the cap; after the cap moves, the head's end point lands where the cap carried it.
+const rc = await page.evaluate(() => {
+  const { S } = app, cap = S.active, head = S.parts.findIndex((_, j) => j > 0 && j !== cap && j !== S.labels[0]), before = S.hist.past.length;
+  app.setReach(head, cap);
+  S.active = cap; app.refreshUI();
+  const t0 = document.getElementById("xfT0"); t0.value = +t0.value + 4; t0.dispatchEvent(new Event("input", { bubbles: true })); // panel edit carries/re-solves
+  const E0 = app.gzProxy.position.clone().set(...S.parts[head].reach.e);
+  const a = E0.clone().applyMatrix4(app.partMat(head)), b = E0.clone().applyMatrix4(app.partMat(cap));
+  const out = { reach: app.reachOf(head), err: a.distanceTo(b), moved: !!app.xfMatrix(S.parts[head]) };
+  app.undo(); out.after = !!S.parts[head].reach;
+  return out;
+});
+console.log("reach:", JSON.stringify(rc));
+if (rc.reach <= 0 || !rc.moved || rc.err > 1e-3 || rc.after) errors.push("reach failed: " + JSON.stringify(rc));
 if (mw.leader <= 0 || !mw.moved || mw.relErr > 5e-3 || mw.undo !== 2 || mw.after.follow || mw.after.moved) errors.push("move with failed: " + JSON.stringify(mw));
 // Heal joint: shift the cap 3 mm sideways, heal it, expect its cut edge back on the body's rim and a closed part.
 const hl = await page.evaluate(() => {

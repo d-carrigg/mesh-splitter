@@ -365,6 +365,7 @@ const ICONS = {
   text: '<path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   scale: '<path d="M21 3h-6M21 3v6M21 3l-7 7"/><path d="M3 21h6M3 21v-6M3 21l7-7"/>',
+  reach: '<path d="M4 20 12 12"/><path d="M12 12l6-6"/><path d="M14 5h5v5"/><circle cx="4" cy="20" r="1.5"/>',
   link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
   unlink: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/><path d="M3 3l18 18"/>',
   rotate: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
@@ -618,9 +619,10 @@ function buildMesh() {
 // ---------------------------------------------------------------- per-part transforms
 // part.xf = { s:[sx,sy,sz], r:[rx,ry,rz] deg (XYZ euler), t:[tx,ty,tz] mm, c:[pivot] }. Display and Part STLs only:
 // the painted 3MF is one mesh, so it keeps the original geometry.
-const isIdXf = (x) => !x || (x.s.every((v) => v === 1) && x.r.every((v) => v === 0) && x.t.every((v) => v === 0));
+const isIdXf = (x) => !x || (!x.m && x.s.every((v) => v === 1) && x.r.every((v) => v === 0) && x.t.every((v) => v === 0));
 function xfMatrix(p) {
   const x = p?.xf; if (isIdXf(x)) return null;
+  if (x.m) return new THREE.Matrix4().fromArray(x.m); // set by Reach (rotation + stretch along the arm)
   const c = new THREE.Vector3(...x.c);
   const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(...x.r.map((d) => d * Math.PI / 180), "XYZ"));
   return new THREE.Matrix4().compose(c.clone().add(new THREE.Vector3(...x.t)), q, new THREE.Vector3(...x.s))
@@ -735,6 +737,7 @@ function leaderOf(i) { const f = S.parts[i]?.follow; return f ? S.parts.findInde
 function followersOf(i) { const u = S.parts[i]?.uid; return u ? S.parts.map((q, j) => (j > 0 && q.follow?.to === u ? j : -1)).filter((j) => j > 0) : []; }
 function setXfMatrix(j, M) {
   const x = ensureXf(j), pos = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+  delete x.m;
   M.decompose(pos, q, sc);
   const e = new THREE.Euler().setFromQuaternion(q, "XYZ"), c = new THREE.Vector3(...x.c), w = c.clone().applyMatrix4(M);
   x.s = sc.toArray().map((v) => +v.toFixed(5)); x.r = [e.x, e.y, e.z].map((v) => +(v * 180 / Math.PI).toFixed(3));
@@ -742,9 +745,11 @@ function setXfMatrix(j, M) {
 }
 // Call after part i's own transform changed: refresh its offset to its leader, then carry its followers.
 function xfEdited(i) {
+  if (S.parts[i].xf?.m) delete S.parts[i].xf.m;
   const l = leaderOf(i);
   if (l > 0) S.parts[i].follow.rel = partMat(l).invert().multiply(partMat(i)).toArray();
   carry(i, new Set([i]));
+  updateReach();
 }
 function carry(i, seen) {
   const M = partMat(i);
@@ -768,6 +773,54 @@ function setFollow(js, l) { // js follow part l (null: stop following)
   const names = js.map((j) => S.parts[j].name).join(", ");
   afterEdit(l > 0 ? `${names} now move${js.length > 1 ? "" : "s"} with ${S.parts[l].name}` : `${names} move${js.length > 1 ? "" : "s"} on ${js.length > 1 ? "their" : "its"} own again`);
 }
+// part.reach = { to: target uid, p: pivot, e: end (original coords) }: the part turns about its pivot (its joint with
+// the rest, e.g. a shoulder) and stretches so its end (where it touches the target, e.g. the hand on the broom) stays
+// on the target wherever the target moved. Stored as a full matrix in xf.m.
+function reachPoints(j, k) {
+  const vs = (i) => { const s = new Set(); for (let f = 0; f < S.nF; f++) if (S.labels[f] === i) for (let c = 0; c < 3; c++) s.add(S.tri[3*f+c]); return s; };
+  const A = vs(j), T = vs(k), cen = (arr) => { const c = new THREE.Vector3(); for (const v of arr) c.add(new THREE.Vector3(S.pos[3*v], S.pos[3*v+1], S.pos[3*v+2])); return c.divideScalar(arr.length || 1); };
+  let shared = [...A].filter((v) => T.has(v));
+  if (!shared.length) { // not touching: the band of j closest to k
+    const tv = [...T], d = new Map(); let mn = Infinity;
+    for (const v of A) { let b = Infinity; for (const u of tv) b = Math.min(b, (S.pos[3*v]-S.pos[3*u])**2 + (S.pos[3*v+1]-S.pos[3*u+1])**2 + (S.pos[3*v+2]-S.pos[3*u+2])**2); d.set(v, Math.sqrt(b)); mn = Math.min(mn, Math.sqrt(b)); }
+    shared = [...A].filter((v) => d.get(v) <= mn + 2);
+  }
+  const e = cen(shared);
+  // pivot: the boundary with the neighbor (other than k and parts moving with k) that shares the most vertices
+  const skip = new Set([k, j, 0]); for (let l = leaderOf(k), n = 0; l > 0 && n < 100; l = leaderOf(l), n++) skip.add(l);
+  const cnt = new Map();
+  for (let f = 0; f < S.nF; f++) { const l = S.labels[f]; if (skip.has(l)) continue; for (let c = 0; c < 3; c++) { const v = S.tri[3*f+c]; if (A.has(v)) { if (!cnt.has(l)) cnt.set(l, new Set()); cnt.get(l).add(v); } } }
+  const best = [...cnt].sort((a, b) => b[1].size - a[1].size)[0];
+  let p;
+  if (best) p = cen([...best[1]]);
+  else { let far = null, fd = -1; for (const v of A) { const q = new THREE.Vector3(S.pos[3*v], S.pos[3*v+1], S.pos[3*v+2]), dd = q.distanceTo(e); if (dd > fd) { fd = dd; far = q; } } p = far; }
+  return { p: p.toArray(), e: e.toArray() };
+}
+function reachOf(i) { const r = S.parts[i]?.reach; return r ? S.parts.findIndex((q, j) => j > 0 && q.uid === r.to) : -1; }
+function updateReach() {
+  S.parts.forEach((q, j) => {
+    const k = reachOf(j); if (k <= 0) return;
+    const P = new THREE.Vector3(...q.reach.p), E0 = new THREE.Vector3(...q.reach.e), E1 = E0.clone().applyMatrix4(partMat(k));
+    const d0 = E0.clone().sub(P), d1 = E1.clone().sub(P), L0 = d0.length(), L1 = d1.length();
+    if (L0 < 1e-6 || L1 < 1e-6) return;
+    const a = d0.clone().divideScalar(L0), kS = q.reach.stretch === false ? 1 : L1 / L0;
+    const S3 = new THREE.Matrix4().set( // stretch by kS along a
+      1 + (kS-1)*a.x*a.x, (kS-1)*a.x*a.y, (kS-1)*a.x*a.z, 0,
+      (kS-1)*a.y*a.x, 1 + (kS-1)*a.y*a.y, (kS-1)*a.y*a.z, 0,
+      (kS-1)*a.z*a.x, (kS-1)*a.z*a.y, 1 + (kS-1)*a.z*a.z, 0, 0, 0, 0, 1);
+    const R = new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(a, d1.clone().divideScalar(L1)));
+    const M = new THREE.Matrix4().makeTranslation(P.x, P.y, P.z).multiply(R).multiply(S3).multiply(new THREE.Matrix4().makeTranslation(-P.x, -P.y, -P.z));
+    setXfMatrix(j, M); ensureXf(j).m = M.toArray();
+  });
+}
+function setReach(j, k) { // part j reaches for part k (k <= 0: stop)
+  if (j <= 0 || j === k) return;
+  pushUndo();
+  const q = S.parts[j];
+  if (k > 0) { q.reach = { to: uidOf(k), ...reachPoints(j, k) }; delete q.follow; updateReach(); }
+  else { delete q.reach; if (q.xf) delete q.xf.m; }
+  afterEdit(k > 0 ? `${q.name} now reaches for ${S.parts[k].name}: it turns at its joint and stretches to stay on it` : `${q.name} stopped reaching`);
+}
 function renderFollowRow(i) {
   const row = $("followRow"); row.innerHTML = "";
   if (!S.G || i <= 0 || !S.parts[i]) return;
@@ -776,7 +829,8 @@ function renderFollowRow(i) {
     const x = document.createElement("button"); x.textContent = "×"; x.title = "Stop moving together";
     x.onclick = () => setFollow([j === leaderOf(i) ? i : j], null); c.appendChild(x); return c;
   };
-  const l = leaderOf(i), fs = followersOf(i);
+  const l = leaderOf(i), fs = followersOf(i), rk = reachOf(i);
+  if (rk > 0) { const c = chip(rk, S.parts[rk].name); c.querySelector("button").onclick = () => setReach(i, 0); row.append("Reaches for "); row.appendChild(c); }
   if (l > 0) { row.append("Moves with "); row.appendChild(chip(l, S.parts[l].name)); }
   if (fs.length) { if (l > 0) row.append(" · "); row.append("Carries "); for (const j of fs) row.appendChild(chip(j, S.parts[j].name)); }
 }
@@ -1073,6 +1127,8 @@ function openCtx(ev) {
     it("eyeOff", "Hide", () => { p.visible = false; afterEdit(); });
     if (act) leaderOf(l) === S.active ? it("unlink", `Stop moving with ${act.name}`, () => setFollow([l], null))
       : it("link", `Move with ${act.name}`, () => setFollow([l], S.active));
+    if (act) reachOf(l) === S.active ? it("unlink", `Stop reaching for ${act.name}`, () => setReach(l, 0))
+      : it("reach", `Reach for ${act.name} (turn at its joint, stretch)`, () => setReach(l, S.active));
     it("replace", p.rep ? "Replace with another…" : "Replace with…", () => replaceWith(l));
     if (p.rep) it("reset", "Remove replacement", () => { selectPart(l); $("repDel").click(); });
     it("trash", "Delete (merge into neighbor)", () => deletePart(l), "danger");
@@ -2234,7 +2290,7 @@ if (ORCA.on) {
   });
   orcaSend({ cmd: "objects", auto: true });
 }
-window.app = { S, ORCA, gizmo, gzProxy, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, ORCA, gizmo, gzProxy, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
 </script>
 </body>
 </html>
