@@ -6,16 +6,16 @@ Split one solid mesh into separate, color-coded parts for multi-color or multi-p
 
 ## Features
 
-Each feature has its own page with pictures in [docs/features](docs/features/README.md).
+Every feature is documented with pictures in [docs/features](docs/features/README.md).
 
-- **Split in a few clicks:** [auto split](docs/features/auto-split.md), [split by shells](docs/features/split-by-shells.md), or [click a seed per part](docs/features/seeds.md). Cuts follow the model's creases.
-- **One color per part:** each part gets its own filament slot. [Rename](docs/features/rename.md), hide, or [show only one part](docs/features/show-only.md). Fix parts by hand with [fill, brush and merge](docs/features/fill-brush-merge.md).
-- **[Move, rotate, scale](docs/features/transforms.md):** drag handles in the view (W / E / R, Shift to snap), with undo.
-- **[Rotate on joint](docs/features/rotate-on-joint.md):** spin a part about its cut's axis (J), so a part on an angled surface stays seated on it.
-- **[Heal joint](docs/features/heal-joint.md):** after moving or rotating a part, stretch or squeeze it near its cut so the cut's edge lands back on its neighbor (no gap).
-- **[Replace with…](docs/features/replace.md):** right-click a part and swap in another STL. It snaps onto the joint and keeps the part's name and filament. A replacement made from the same model, such as edited eyes, stays in place.
-- **[Send to Orca](docs/features/send-to-orca.md):** one multi-part 3MF, every part on its filament. Painted 3MF, merged STL and per-part STLs are also available.
-- **Optional [AI part naming](docs/features/ai-part-naming.md):** suggests part names and flags bad cuts (browser version).
+- **Split in a few clicks:** [auto split](docs/features/splitting.md#auto-split), [split by shells](docs/features/splitting.md#split-by-shells), or [click a seed per part](docs/features/splitting.md#seeds-and-add-part). Cuts follow the model's creases.
+- **One color per part:** each part gets its own filament slot. [Rename](docs/features/editing-parts.md#rename), hide, or [show only one part](docs/features/editing-parts.md#show-only-this-part). Fix parts by hand with [fill, brush and merge](docs/features/editing-parts.md#fill).
+- **[Move, rotate, scale](docs/features/transforms.md#move-rotate-scale-and-undo):** drag handles in the view (W / E / R, Shift to snap), with undo.
+- **[Rotate on joint](docs/features/transforms.md#rotate-on-joint):** spin a part about its cut's axis (J), so a part on an angled surface stays seated on it.
+- **[Heal joint](docs/features/transforms.md#heal-joint):** after moving or rotating a part, stretch or squeeze it near its cut so the cut's edge lands back on its neighbor (no gap).
+- **[Replace with…](docs/features/editing-parts.md#replace-with):** right-click a part and swap in another STL. It snaps onto the joint and keeps the part's name and filament. A replacement made from the same model, such as edited eyes, stays in place.
+- **[Send to Orca](docs/features/exporting.md#send-to-orca):** one multi-part 3MF, every part on its filament. Painted 3MF, merged STL and per-part STLs are also available.
+- **Optional [AI part naming](docs/features/editing-parts.md#ai-part-naming):** suggests part names and flags bad cuts (browser version).
 
 ## Install in OrcaSlicer
 

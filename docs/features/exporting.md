@@ -1,10 +1,17 @@
-# Send to Orca
+# Exporting
+
+Get the parts out as a 3MF or STLs, from OrcaSlicer or the browser.
+
+- [Send to Orca](#send-to-orca)
+- [Other exports](#other-exports)
+
+## Send to Orca
 
 Inside OrcaSlicer, the main button is **Send to Orca**. It saves one multi-part 3MF: one object, with each part as a separate part on its own filament slot, and the part names kept.
 
 ![The plugin tab after Send to Orca](img/orca-send.png)
 
-## How to use it
+### How to use it
 
 1. Install the plugin (see [Install in OrcaSlicer](../../README.md#install-in-orcaslicer)) and open the **Mesh Splitter** tab.
 2. Pick the object from the plate in the file menu. A single object on the plate opens by itself.
@@ -13,7 +20,7 @@ Inside OrcaSlicer, the main button is **Send to Orca**. It saves one multi-part 
 
 ![Objects on the plate, in the file menu](img/orca-plate-menu.png)
 
-## Why a file
+### Why a file
 
 OrcaSlicer's plugin API can read the plate's meshes but can't add or replace objects, so the result comes back as a file to import.
 
