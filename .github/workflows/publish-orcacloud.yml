@@ -1,6 +1,6 @@
 name: Publish to OrcaCloud
 
-# Runs when release-please.yml creates a release, or when a vX.Y.Z GitHub release is published by hand. It builds the plugin at that
+# Runs when a vX.Y.Z GitHub release is published (by Release Please or by hand). It builds the plugin at that
 # version, attaches the file to the release, and publishes it to the OrcaCloud Plugin Hub with the release
 # notes as the changelog. Auth is GitHub OIDC (no secrets): the plugin on OrcaCloud
 # must have this repository connected under Edit plugin > GitHub publishing.
@@ -8,11 +8,6 @@ name: Publish to OrcaCloud
 on:
   release:
     types: [published]
-  workflow_call:  # from release-please.yml
-    inputs:
-      tag:
-        type: string
-        required: true
 
 permissions:
   id-token: write
@@ -22,7 +17,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      TAG: ${{ inputs.tag || github.ref_name }}
+      TAG: ${{ github.ref_name }}
     defaults:
       run:
         working-directory: plugin

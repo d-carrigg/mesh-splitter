@@ -2,7 +2,9 @@ name: Release Please
 
 # Every merge to main updates a "chore(main): release X.Y.Z" PR (version bump in pyproject.toml + CHANGELOG.md),
 # built from the Conventional Commit titles (feat:, fix:, ...) of the merged PRs. Merging that release PR creates
-# the vX.Y.Z GitHub release, and the publish job then builds the plugin and publishes it to OrcaCloud.
+# the vX.Y.Z GitHub release, which runs publish-orcacloud.yml (release: published) to publish to OrcaCloud.
+# Needs the RELEASE_PLEASE_TOKEN secret (fine-grained token, Contents + Pull requests: write): a release made
+# with the default GITHUB_TOKEN doesn't start other workflows, and OrcaCloud only accepts a release-event run.
 on:
   push:
     branches: [main]
@@ -14,23 +16,11 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
-    outputs:
-      release_created: ${{ steps.rp.outputs.release_created }}
-      tag_name: ${{ steps.rp.outputs.tag_name }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: rp
         with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}  # falls back so release PRs still update
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-  # A release made with GITHUB_TOKEN doesn't trigger other workflows, so publish from here.
-  publish:
-    needs: release-please
-    if: needs.release-please.outputs.release_created == 'true'
-    permissions:
-      id-token: write
-      contents: write
-    uses: ./.github/workflows/publish-orcacloud.yml
-    with:
-      tag: ${{ needs.release-please.outputs.tag_name }}
