@@ -120,7 +120,7 @@
   .xf input[type=number] { width:100%; }
   .xf .ax { font-size:10px; text-align:center; color:var(--mute); }
   .xf svg.i { width:14px; height:14px; }
-  #repOpts.hide { display:none; }
+  #repOpts.hide, #healRow.hide { display:none; }
   #aiModel, #aiNote { width:100%; background:#14161a; color:var(--fg); border:1px solid #3a404a; border-radius:4px; padding:3px 5px; font:inherit; }
   #aiOut { margin-top:6px; }
   #aiOut .sec { color:var(--mute); font-size:11px; text-transform:uppercase; letter-spacing:.06em; margin:8px 0 3px; }
@@ -249,6 +249,10 @@
         <span data-icon-span="scale" title="Scale %"></span><input id="xfS0" type="number" step="1"><input id="xfS1" type="number" step="1"><input id="xfS2" type="number" step="1">
         <span data-icon-span="rotate" title="Rotate °"></span><input id="xfR0" type="number" step="5"><input id="xfR1" type="number" step="5"><input id="xfR2" type="number" step="5">
         <span data-icon-span="move" title="Move mm"></span><input id="xfT0" type="number" step="0.5"><input id="xfT1" type="number" step="0.5"><input id="xfT2" type="number" step="0.5">
+      </div>
+      <div class="row" id="healRow" title="Heal joint: after a move or rotate, stretch or squeeze this part near its cut so the cut's edge lands back on the neighbor's edge. Only faces within the blend distance of the cut change shape.">
+        <label class="small"><input id="healOn" type="checkbox"> heal joint</label>
+        <input id="healR" type="number" min="0.5" step="0.5" style="width:64px"> <span class="small">mm blend</span>
       </div>
       <div class="sub">
         <h2>Replace</h2>
@@ -1303,17 +1307,19 @@ let xfKey = "";
 function applyXf() {
   if (!mesh) return;
   const Ms = S.parts.map(xfMatrix), any = Ms.some(Boolean);
-  const key = any ? JSON.stringify(S.parts.map((p) => p.xf || 0)) + "|" + fullHash() : "";
+  const key = any ? JSON.stringify(S.parts.map((p) => [p.xf || 0, p.heal || 0])) + "|" + fullHash() : "";
   if (key === xfKey) return;
   xfKey = key;
   const geo = mesh.geometry, P = geo.getAttribute("position").array, N = geo.getAttribute("normal").array, { P0, N0 } = mesh.userData;
   const Ns = Ms.map((m) => m && new THREE.Matrix3().getNormalMatrix(m));
-  const v = new THREE.Vector3();
+  const v = new THREE.Vector3(), Hs = S.parts.map((_, i) => (Ms[i] ? healField(i) : null));
   for (let f = 0; f < S.nF; f++) {
-    const m = Ms[S.labels[f]], nm = Ns[S.labels[f]], o = 9 * f;
+    const m = Ms[S.labels[f]], nm = Ns[S.labels[f]], h = Hs[S.labels[f]], o = 9 * f;
     for (let k = 0; k < 9; k += 3) {
       if (!m) { for (let j = 0; j < 3; j++) { P[o+k+j] = P0[o+k+j]; N[o+k+j] = N0[o+k+j]; } continue; }
-      v.set(P0[o+k], P0[o+k+1], P0[o+k+2]).applyMatrix4(m); P[o+k] = v.x; P[o+k+1] = v.y; P[o+k+2] = v.z;
+      v.set(P0[o+k], P0[o+k+1], P0[o+k+2]).applyMatrix4(m);
+      if (h) { const vi = S.tri[3*f + k/3], w = h.w[vi]; if (w > 0) v.addScaledVector(h.d[h.near[vi]], w); }
+      P[o+k] = v.x; P[o+k+1] = v.y; P[o+k+2] = v.z;
       v.set(N0[o+k], N0[o+k+1], N0[o+k+2]).applyMatrix3(nm).normalize(); N[o+k] = v.x; N[o+k+1] = v.y; N[o+k+2] = v.z;
     }
   }
@@ -1321,6 +1327,79 @@ function applyXf() {
   geo.computeBoundingBox(); geo.computeBoundingSphere();
   geo.disposeBoundsTree?.(); geo.computeBoundsTree();
   render();
+}
+
+// ---------------------------------------------------------------- heal joint
+// part.heal = { r: blend mm }. After the part is moved/rotated, each vertex of its joint loop (longest cut) is pulled
+// to the neighbor's rim (the same loop at its original place) at the same angle about the joint axis; the pull fades
+// to zero over r mm from the cut (cosine falloff), so the part stretches or squeezes to stay flush.
+const healCache = new Map();
+function healBase(i) { // geometry-only part: loop, rim angles, nearest loop vertex + distance for each part vertex
+  const key = `${i}|${S.nF}|${fullHash()}`;
+  if (healCache.has(key)) return healCache.get(key);
+  if (healCache.size > 8) healCache.clear();
+  const pm = meshOf((l) => l === i); let best = null, bl = -1;
+  const P = (v) => new THREE.Vector3(S.pos[3*v], S.pos[3*v+1], S.pos[3*v+2]);
+  for (const lp of pm?.loopList || []) { let len = 0; for (const [a, b] of lp) len += P(a).distanceTo(P(b)); if (len > bl) { bl = len; best = lp; } }
+  if (!best) { healCache.set(key, null); return null; }
+  const L = best.map(([a]) => a), pts = L.map(P), J = new THREE.Vector3();
+  pts.forEach((p) => J.add(p)); J.divideScalar(pts.length);
+  const n = new THREE.Vector3();
+  for (let k = 0; k < pts.length; k++) { const a = pts[k], b = pts[(k+1) % pts.length]; n.add(new THREE.Vector3().subVectors(a, b).cross(new THREE.Vector3().subVectors(J, b))); }
+  n.normalize();
+  const u = new THREE.Vector3(1, 0, 0); if (Math.abs(u.dot(n)) > 0.9) u.set(0, 1, 0);
+  u.addScaledVector(n, -u.dot(n)).normalize(); const v = new THREE.Vector3().crossVectors(n, u);
+  const ang = (p) => { const d = p.clone().sub(J); return Math.atan2(d.dot(v), d.dot(u)); };
+  const rim = pts.map((p) => ({ a: ang(p), p })).sort((x, y) => x.a - y.a);
+  // nearest loop vertex for every vertex of the part (brute force over a subsampled loop, then refined)
+  const verts = new Set(); for (let f = 0; f < S.nF; f++) if (S.labels[f] === i) for (let c = 0; c < 3; c++) verts.add(S.tri[3*f+c]);
+  const near = new Int32Array(S.nV), dist = new Float32Array(S.nV).fill(Infinity);
+  const step = Math.max(1, Math.floor(L.length / 200));
+  for (const vi of verts) {
+    const x = S.pos[3*vi], y = S.pos[3*vi+1], z = S.pos[3*vi+2], d2 = (k) => (x-pts[k].x)**2 + (y-pts[k].y)**2 + (z-pts[k].z)**2;
+    let bk = 0, bd = Infinity;
+    for (let k = 0; k < pts.length; k += step) { const d = d2(k); if (d < bd) { bd = d; bk = k; } }
+    for (let j = -step; j <= step; j++) { const k = (bk + j + pts.length) % pts.length, d = d2(k); if (d < bd) { bd = d; bk = k; } }
+    near[vi] = bk; dist[vi] = Math.sqrt(bd);
+  }
+  const out = { L, pts, J, n, u, v, rim, near, dist, verts, len: bl };
+  healCache.set(key, out); return out;
+}
+function rimAt(B, a) { // point on the fixed rim at angle a (linear between the two rim vertices around it)
+  const R = B.rim, m = R.length; let lo = 0, hi = m;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (R[mid].a < a) lo = mid + 1; else hi = mid; }
+  const r1 = R[lo % m], r0 = R[(lo - 1 + m) % m];
+  let a0 = r0.a, a1 = r1.a; if (lo === 0) a0 -= 2 * Math.PI; if (lo === m) a1 += 2 * Math.PI;
+  const t = a1 - a0 > 1e-9 ? (a - a0) / (a1 - a0) : 0;
+  return r0.p.clone().lerp(r1.p, Math.min(1, Math.max(0, t)));
+}
+const healDefault = (i) => { const B = healBase(i); return B ? +Math.max(1, Math.min(15, B.len / (2 * Math.PI) * 0.2)).toFixed(1) : 5; };
+// Per-vertex pull for part i under its current transform: { near, w (weight per vertex), d (pull per loop vertex) }.
+function healField(i) {
+  const p = S.parts[i]; if (!p?.heal || hasRep(p)) return null;
+  const M = xfMatrix(p); if (!M) return null;
+  const B = healBase(i); if (!B) return null;
+  const r = Math.max(0.1, +p.heal.r || healDefault(i));
+  const d = B.pts.map((q) => {
+    const m = q.clone().applyMatrix4(M), e = m.clone().sub(B.J);
+    return rimAt(B, Math.atan2(e.dot(B.v), e.dot(B.u))).sub(m);
+  });
+  const w = new Float32Array(S.nV);
+  for (const vi of B.verts) { const s = B.dist[vi]; if (s < r) w[vi] = 0.5 * (1 + Math.cos(Math.PI * s / r)); }
+  return { near: B.near, w, d };
+}
+// Heal a triangle soup given in the part's original coordinates (already transformed into `out`).
+function healSoup(i, orig, out) {
+  const h = healField(i); if (!h) return out;
+  const B = healBase(i), r = Math.max(0.1, +S.parts[i].heal.r || healDefault(i));
+  for (let o = 0; o < orig.length; o += 3) {
+    const x = orig[o], y = orig[o+1], z = orig[o+2];
+    let bk = 0, bd = Infinity; for (let k = 0; k < B.pts.length; k++) { const q = B.pts[k], dd = (x-q.x)**2 + (y-q.y)**2 + (z-q.z)**2; if (dd < bd) { bd = dd; bk = k; } }
+    const s = Math.sqrt(bd); if (s >= r) continue;
+    const w = 0.5 * (1 + Math.cos(Math.PI * s / r)), dv = h.d[bk];
+    out[o] += w * dv.x; out[o+1] += w * dv.y; out[o+2] += w * dv.z;
+  }
+  return out;
 }
 
 let orcaFil = null; // OrcaSlicer's filament colors by slot (plugin), used by the filament view
@@ -2047,6 +2126,8 @@ function refreshXfPanel() {
   }
   $("clrAllSeeds").disabled = !S.G || !S.parts.some((q) => q.seeds.length);
   $("xfReset").disabled = !ok || isIdXf(p?.xf);
+  $("healRow").classList.toggle("hide", !ok || !!p?.rep);
+  if (ok && !p.rep) { $("healOn").checked = !!p.heal; if (document.activeElement !== $("healR")) $("healR").value = p.heal?.r ?? ""; $("healR").placeholder = "auto"; $("healR").disabled = !p.heal; }
   const x = (ok && p.xf) || { s: [1, 1, 1], r: [0, 0, 0], t: [0, 0, 0] };
   for (let k = 0; k < 3; k++) {
     xfIn("S", k).value = +(x.s[k] * 100).toFixed(2); xfIn("R", k).value = +x.r[k].toFixed(2); xfIn("T", k).value = +x.t[k].toFixed(3);
@@ -2085,6 +2166,18 @@ $("xfPanel").addEventListener("change", () => {
   xfSnap = snapshot();
   refreshUI(); autosave();
 });
+$("healOn").onchange = () => {
+  const i = S.active, p = S.parts[i]; if (!S.G || i <= 0 || !p) return;
+  if ($("healOn").checked && !healBase(i)) { $("healOn").checked = false; status(`${p.name} has no cut to heal`); return; }
+  pushUndo();
+  if ($("healOn").checked) p.heal = { r: healDefault(i) }; else delete p.heal;
+  afterEdit($("healOn").checked ? `Heal joint on ${p.name}: blends ${p.heal.r} mm from the cut` : `Heal joint off on ${p.name}`);
+};
+$("healR").onchange = () => {
+  const i = S.active, p = S.parts[i]; if (!S.G || i <= 0 || !p?.heal) return;
+  const r = +$("healR").value; if (!(r > 0)) { refreshUI(); return; }
+  pushUndo(); p.heal = { r }; afterEdit(`Heal blend on ${p.name}: ${r} mm`);
+};
 $("xfReset").onclick = () => {
   const p = S.parts[S.active]; if (!S.G || S.active <= 0 || !p.xf) return;
   pushUndo(); delete p.xf; afterEdit(`Transform reset on ${p.name}`);
@@ -2656,7 +2749,7 @@ function partSoup(i) {
   const p = S.parts[i];
   if (hasRep(p)) { const M = repMatrix(i); return M ? xformSoup(REPS.get(p.rep.id).pos, M) : null; }
   const m = partMesh(i); if (!m) return null;
-  const M = xfMatrix(p); return M ? xformSoup(m.verts, M) : Float32Array.from(m.verts);
+  const M = xfMatrix(p); return M ? healSoup(i, m.verts, xformSoup(m.verts, M)) : Float32Array.from(m.verts);
 }
 // Whole model as one triangle soup + filament per triangle. Unchanged parts keep their faces with the holes left by
 // moved/replaced parts capped; each moved/replaced part is its own closed shell overlapping the rest (slicers union them).
@@ -2921,7 +3014,7 @@ if (ORCA.on) {
   });
   orcaSend({ cmd: "objects", auto: true });
 }
-window.app = { S, ORCA, gizmo, gzProxy, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, xfMatrix, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, ORCA, gizmo, gzProxy, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
 </script>
 </body>
 </html>

@@ -84,6 +84,19 @@ const jt = await page.evaluate(() => {
 console.log("joint:", JSON.stringify(jt));
 if (jt.err || jt.dJ > 1e-3 || jt.dot < 0.9999 || jt.r.every((v) => v === 0) || jt.undo !== 1 || jt.ring.x || !jt.ring.y) errors.push("rotate on joint moved the joint: " + JSON.stringify(jt));
 if (shot) await page.screenshot({ path: shot.replace(/\.png$/, "_joint.png") });
+// Heal joint: shift the cap 3 mm sideways, heal it, expect its cut edge back on the body's rim and a closed part.
+const hl = await page.evaluate(() => {
+  const { S } = app, i = S.active, x = app.ensureXf(i); x.t = [x.t[0] + 3, x.t[1], x.t[2]]; app.applyXf();
+  document.getElementById("healOn").click();
+  const B = app.healBase(i), h = app.healField(i), M = app.xfMatrix(S.parts[i]);
+  let mx = 0; B.pts.forEach((q, k) => { const p = q.clone().applyMatrix4(M).add(h.d[k]); let bd = Infinity; B.pts.forEach((r, j) => { const r2 = B.pts[(j+1) % B.pts.length], e = r2.clone().sub(r), t = Math.min(1, Math.max(0, p.clone().sub(r).dot(e) / e.lengthSq())); bd = Math.min(bd, r.clone().addScaledVector(e, t).distanceTo(p)); }); mx = Math.max(mx, bd); });
+  const v = app.partSoup(i), edges = new Map(), key = (o) => [v[o], v[o+1], v[o+2]].map((t) => t.toFixed(4)).join(",");
+  for (let o = 0; o < v.length; o += 9) for (let e = 0; e < 3; e++) { const a = key(o + 3*e), b = key(o + 3*((e+1)%3)), k2 = a < b ? a + "|" + b : b + "|" + a; edges.set(k2, (edges.get(k2) || 0) + 1); }
+  return { heal: S.parts[i].heal, maxGap: +mx.toFixed(3), open: [...edges.values()].filter((c) => c !== 2).length };
+});
+console.log("heal:", JSON.stringify(hl));
+if (!hl.heal || hl.maxGap > 0.05 || hl.open) errors.push("heal joint failed: " + JSON.stringify(hl));
+await page.keyboard.press("Control+z");
 await page.keyboard.press("Control+z");
 await page.evaluate(() => app.setGizmoJoint(false));
 if (shot) await page.screenshot({ path: shot });
