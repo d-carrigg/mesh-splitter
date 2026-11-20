@@ -1,0 +1,20 @@
+[project]
+name = "mesh-splitter"
+version = "0.3.2"
+description = "Split a single-shell mesh into printable, multi-filament parts. Runs in the browser or as an OrcaSlicer plugin."
+requires-python = ">=3.10"
+dependencies = [
+    "trimesh>=4.0",
+    "numpy>=1.24",
+]
+
+[project.scripts]
+mesh-splitter = "serve:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = { "" = "tools" }
+py-modules = ["serve", "llm_review"]
