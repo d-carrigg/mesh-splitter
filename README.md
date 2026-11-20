@@ -15,7 +15,7 @@ Split one solid mesh into separate, color-coded parts for multi-color or multi-p
 
 ## Install in OrcaSlicer
 
-1. Download `mesh_splitter_any.py` from the [latest release](https://github.com/d-carrigg/mesh-splitter/releases/tag/orca-plugin).
+1. Download `mesh_splitter_any.py` from the [latest release](https://github.com/d-carrigg/mesh-splitter/releases/latest).
 2. In OrcaSlicer 2.5, open **Plugins**, click the arrow next to **Browse plugins**, then **Install local plugin** and pick the file.
 3. Tick **Activate** and allow writing to Downloads. A **Mesh Splitter** tab appears next to Prepare / Preview.
 

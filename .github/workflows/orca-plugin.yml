@@ -52,6 +52,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view orca-plugin >/dev/null 2>&1 || gh release create orca-plugin --title "Mesh Splitter for OrcaSlicer" \
-            --notes "Latest build. Download mesh_splitter_any.py, then OrcaSlicer > Plugins > Install local plugin."
+          notes="Development build from main. Download mesh_splitter_any.py, then OrcaSlicer > Plugins > Install local plugin. Versioned releases are on the Releases page and the OrcaCloud Plugin Hub."
+          gh release view orca-plugin >/dev/null 2>&1 || gh release create orca-plugin --title "Mesh Splitter dev build" --notes "$notes" --prerelease
+          # Keep vX.Y.Z as "Latest"; this rolling build is a pre-release.
+          gh release edit orca-plugin --title "Mesh Splitter dev build" --notes "$notes" --prerelease --latest=false
           gh release upload orca-plugin dist/mesh_splitter_any.py --clobber
