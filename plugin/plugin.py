@@ -24,6 +24,7 @@ import base64
 import os
 import re
 import tempfile
+import zlib
 
 import orca
 
@@ -32,13 +33,12 @@ try:
 except Exception:  # numpy is declared above; uv installs it when the plugin loads
     np = None
 
-# The bundled page (app/index.html with three.js inlined), as plain text, filled in by build.py.
-PAGE = "__PAGE__"
+PAGE_Z = "__PAGE_Z__"  # zlib + base64 of the bundled page, filled in by build.py
 CHUNK = 512 * 1024
 
 
 def page_html():
-    return PAGE
+    return zlib.decompress(base64.b64decode(PAGE_Z)).decode("utf-8")
 
 
 def downloads_dir():
