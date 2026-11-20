@@ -12,10 +12,10 @@ Fix, swap, view and name parts after a split. Every edit can be undone with Ctrl
 
 ## Fill
 
-Floods the clicked region into the selected part, stopping at creases sharper than **Fill stop**.
+Floods the clicked region into the selected part, stopping at creases sharper than **Fill stop angle**.
 
 1. Select the part that should grow (click it with the select tool, **V**).
-2. Press **F**, then click the region to add.
+2. Press **F** (or pick **Paint** in the Split panel, then the fill tool), then click the region to add.
 
 ![Fill: the eye joins the selected body](img/fill.png)
 
@@ -25,8 +25,8 @@ Right-click also offers **Fill area into …** and **Fill all unassigned**.
 
 Paints faces into the selected part.
 
-1. Select the part, then press **B**.
-2. Set **Radius** (mm) and drag over the model. Hold **Shift** to erase. Right-drag still rotates the view.
+1. Select the part, then press **B** (or pick **Paint** in the Split panel). The panel's numbered swatches pick which part you paint into.
+2. Set **Pen size** (mm) and drag over the model. Hold **Shift** to erase. Right-drag still rotates the view.
 
 ![Brushing faces into the handle's part](img/brush.png)
 
@@ -50,7 +50,7 @@ Swaps a part for another STL or 3MF. The replacement keeps the part's name and f
 
 ### How to use it
 
-1. Right-click the part > **Replace with…** (or select it and click **Replace…** on the part card).
+1. Right-click the part > **Replace with…** (or select it and click **Replace…** in the sidebar's **Part** section).
 2. Pick the file.
 
 ### Where it goes
@@ -58,7 +58,7 @@ Swaps a part for another STL or 3MF. The replacement keeps the part's name and f
 - **In place:** if the replacement was made from this same model (for example, the same eyes edited in another program), it has the same position and size as the old part. Mesh Splitter detects that and leaves it where it is, with **in place** ticked.
 - **On the joint:** otherwise it is lined up on the old part's cut: one end of its long axis sits on the joint and its long axis follows the old part's. **fit** scales it to the old part's length, and **embed** sinks it into the rest by a few mm so the slicer fuses them.
 
-![Replace options on the part card](img/replace-panel.png)
+![Replace options in the Part section](img/replace-panel.png)
 
 ### Adjusting it
 
@@ -77,7 +77,7 @@ Hides every part except one, so you can check its shape and cut.
 
 ### How to use it
 
-- Right-click the part in the view or in the parts list > **Show only this**, or select it and click the **Show only this part** button on the part card.
+- Right-click the part in the view or in the parts list > **Show only this**, or select it and click **Solo** in the sidebar's **Part** section.
 - Do the same again (**Show all again**) to bring the other parts back as they were.
 - The eye button at the top of the parts list shows all parts. The eye on each row hides or shows one part.
 
@@ -96,7 +96,7 @@ Parts start as `Part 1`, `Part 2`, … (or `Shell 1`, … after a shell split). 
 
 ### How to use it
 
-- Select the part and type in the name field at the top of the part card, then press **Enter**.
+- Select the part and type in the **Name** field of the sidebar's **Part** section, then press **Enter**.
 - Or double-click the name in the parts list, or right-click the row > **Rename**. **Enter** saves and **Esc** cancels.
 
 [AI part naming](#ai-part-naming) can suggest names for all parts at once.
@@ -120,7 +120,7 @@ The key stays in the local server and is never sent to the page.
 ### How to use it
 
 1. Open and split a model.
-2. Click the sparkle button in the toolbar to open the panel.
+2. Click **AI names** in the Parts header to open the panel.
 3. Optionally change the model, and type a hint about what the object is.
 4. Click **Name parts**, read the suggested names and issues, then click **Apply names** to keep the names.
 
