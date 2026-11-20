@@ -1,0 +1,57 @@
+name: OrcaSlicer plugin
+
+# Builds the Mesh Splitter plugin for OrcaSlicer (tools/orca_plugin) from tools/segment.html, tests it,
+# and uploads dist/mesh_splitter.py. On main it also refreshes the "orca-plugin" release so the
+# latest build has a stable download link.
+on:
+  push:
+    branches: [main]
+    paths: ["tools/segment.html", "tools/orca_plugin/**", ".github/workflows/orca-plugin.yml"]
+  pull_request:
+    paths: ["tools/segment.html", "tools/orca_plugin/**", ".github/workflows/orca-plugin.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/orca_plugin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tools/orca_plugin/package-lock.json
+      - uses: astral-sh/setup-uv@v6
+      - name: Python deps (numpy, trimesh)
+        run: uv sync
+      - run: npm ci
+      - name: Build
+        run: uv run python build.py --version "0.1.${{ github.run_number }}" --page-out build/page.html
+      - name: Unit tests
+        run: uv run python test_plugin.py
+      - name: End-to-end (page + plugin bridge + multi-part 3MF)
+        run: |
+          npm i --no-save playwright@1.49.1
+          npx playwright install --with-deps chromium
+          uv run python -c "import trimesh; a=trimesh.creation.icosphere(3,20); b=trimesh.creation.icosphere(3,13); b.apply_translation([0,0,30]); trimesh.util.concatenate([a,b]).export('build/snowman.stl')"
+          mkdir -p build/out
+          PYTHON="$(uv run which python)" node e2e.mjs build/snowman.stl build/out
+          uv run python verify_3mf.py build/out/snowman_parts.3mf
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mesh_splitter-0.1.${{ github.run_number }}
+          path: tools/orca_plugin/dist/mesh_splitter.py
+      - name: Publish to the orca-plugin release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view orca-plugin >/dev/null 2>&1 || gh release create orca-plugin --title "Mesh Splitter for OrcaSlicer" \
+            --notes "Latest build of tools/orca_plugin. Download mesh_splitter.py, then OrcaSlicer > Plugins > Install local plugin."
+          gh release upload orca-plugin dist/mesh_splitter.py --clobber

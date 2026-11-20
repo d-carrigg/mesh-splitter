@@ -54,6 +54,10 @@
   .menu button { justify-content:flex-start; background:none; border-color:transparent; padding:6px 8px; }
   .menu button:hover { background:#2b3038; }
   .menu .meta { margin-left:auto; padding-left:12px; color:var(--mute); font-size:11px; }
+  #dropOrca { display:flex; flex-direction:column; gap:2px; min-width:280px; }
+  #dropOrca button { justify-content:flex-start; background:none; border-color:transparent; font-size:13px; padding:5px 8px; }
+  #dropOrca button:hover { background:#2b3038; }
+  #dropOrca .meta { margin-left:auto; padding-left:12px; color:var(--mute); font-size:11px; }
   #dropRecent { display:flex; flex-direction:column; gap:2px; min-width:280px; }
   #dropRecent button { justify-content:flex-start; background:none; border-color:transparent; font-size:13px; padding:5px 8px; }
   #dropRecent button:hover { background:#2b3038; }
@@ -114,6 +118,7 @@
 <header id="top">
   <h1>Mesh Splitter</h1>
   <button id="openBtn" data-icon="open" title="Open STL / 3MF"></button>
+  <span class="menuWrap orcaOnly" hidden><button id="orcaBtn" data-icon="open" title="Open an object from the OrcaSlicer plate">Plate</button><div id="orcaMenu" class="menu left" hidden></div></span>
   <span class="menuWrap"><button id="recentBtn" data-icon="clock" title="Recent files"></button><div id="recentMenu" class="menu left" hidden></div></span>
   <button id="saveSess" class="needMesh" data-icon="save" title="Save session (.json)"></button>
   <button id="loadSess" class="needMesh" data-icon="load" title="Load session (.json)"></button>
@@ -121,8 +126,10 @@
   <button id="undoBtn" disabled data-icon="undo" title="Undo (Ctrl+Z)"></button>
   <button id="redoBtn" disabled data-icon="redo" title="Redo (Ctrl+Y)"></button>
   <span id="fileInfo"></span>
+  <button id="orcaSend" class="pri needMesh orcaOnly" data-icon="download" title="Write a multi-part 3MF (each part keeps its filament slot), then import it in OrcaSlicer with Ctrl+I" hidden>Send to Orca</button>
   <span class="menuWrap needMesh"><button id="expBtn" class="pri" data-icon="download">Export<svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="m6 9 6 6 6-6"/></svg></button>
     <div id="expMenu" class="menu" hidden>
+      <button id="expParts" data-icon="package" title="One object, each part a separate part with its filament slot set (opens as parts in OrcaSlicer / Bambu Studio)">Multi-part 3MF</button>
       <button id="exp3mf" data-icon="palette" title="Same mesh, each triangle painted with its part's filament slot (Bambu/Orca color painting)">Painted 3MF</button>
       <button id="expStl" data-icon="package" title="One closed STL per part, cut faces capped (.zip)">Part STLs (.zip)</button>
       <button id="expMerged" data-icon="merge" title="Whole model as one STL, with moved/replaced parts in place">Merged STL</button>
@@ -142,7 +149,7 @@
 </aside>
 
 <div id="view">
-  <div id="drop"><span>Drop an STL or 3MF here</span><button id="dropOpen" data-icon="open">Open…</button><div id="dropRecent"></div></div>
+  <div id="drop"><span>Drop an STL or 3MF here</span><div id="dropOrca"></div><button id="dropOpen" data-icon="open">Open…</button><div id="dropRecent"></div></div>
 
   <div id="toolbar" class="float">
     <div class="grp" data-tools="orbit"></div>
@@ -378,6 +385,10 @@ async function loadArrayBuffer(name, buf) {
   } else if (ext === "3mf") {
     raw = parse3MF(buf);
   } else throw new Error("Unsupported file type: " + ext);
+  loadRaw(name, raw);
+}
+// raw = { pos, tri, source }: also the entry point for meshes handed over by the OrcaSlicer plugin
+function loadRaw(name, raw) {
   S.name = name.replace(/\.[^.]+$/, "");
   S.source = raw.source;
   const w = weld(raw.pos, raw.tri);
@@ -2265,6 +2276,7 @@ $("aiChk").onclick = () => { if (S.G) { showAi(true); runChecks(); } };
 
 // ---------------------------------------------------------------- export
 function download(name, data, type = "application/octet-stream") {
+  if (ORCA.on) return ORCA.save(name, data);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([data], { type }));
   a.download = name; document.body.appendChild(a); a.click(); a.remove();
@@ -2439,6 +2451,71 @@ function mergedSoup() {
   return { v, fil };
 }
 
+// One object whose parts are the split parts (closed, transforms applied), each with its filament slot.
+// Plain 3MF components + Metadata/model_settings.config: OrcaSlicer/Bambu Studio load every component
+// as a part (volume) of the object and read each part's name and extruder from the config.
+const xmlEsc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const num = (x) => String(Math.round(x * 1e5) / 1e5);
+function buildParts3MF() {
+  const cnt = partCounts(), parts = [];
+  S.parts.forEach((p, i) => {
+    if (!cnt[i] && !hasRep(p)) return;
+    const v = partSoup(i); if (!v || !v.length) return;
+    const w = weld(v, Uint32Array.from({ length: v.length / 3 }, (_, k) => k));
+    parts.push({ name: p.name, filament: p.filament, pos: w.pos, tri: w.tri });
+  });
+  if (!parts.length) throw new Error("No parts to export.");
+  const objs = [], comps = [], cfg = [], parent = parts.length + 1;
+  parts.forEach((p, k) => {
+    const id = k + 1, v = [], t = [];
+    for (let i = 0; i < p.pos.length; i += 3) v.push(`<vertex x="${num(p.pos[i])}" y="${num(p.pos[i+1])}" z="${num(p.pos[i+2])}"/>`);
+    for (let i = 0; i < p.tri.length; i += 3) if (p.tri[i] !== p.tri[i+1] && p.tri[i+1] !== p.tri[i+2] && p.tri[i] !== p.tri[i+2])
+      t.push(`<triangle v1="${p.tri[i]}" v2="${p.tri[i+1]}" v3="${p.tri[i+2]}"/>`);
+    objs.push(`  <object id="${id}" type="model" name="${xmlEsc(p.name)}">\n   <mesh>\n    <vertices>\n${v.join("\n")}\n    </vertices>\n    <triangles>\n${t.join("\n")}\n    </triangles>\n   </mesh>\n  </object>`);
+    comps.push(`    <component objectid="${id}"/>`);
+    cfg.push(`    <part id="${id}" subtype="normal_part">\n      <metadata key="name" value="${xmlEsc(p.name)}"/>\n      <metadata key="extruder" value="${p.filament}"/>\n    </part>`);
+  });
+  const model = `<?xml version="1.0" encoding="UTF-8"?>
+<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
+ <metadata name="Application">MeshSplitter</metadata>
+ <resources>
+${objs.join("\n")}
+  <object id="${parent}" type="model" name="${xmlEsc(S.name)}">
+   <components>
+${comps.join("\n")}
+   </components>
+  </object>
+ </resources>
+ <build>
+  <item objectid="${parent}"/>
+ </build>
+</model>`;
+  const config = `<?xml version="1.0" encoding="UTF-8"?>
+<config>
+  <object id="${parent}">
+    <metadata key="name" value="${xmlEsc(S.name)}"/>
+    <metadata key="extruder" value="${parts[0].filament}"/>
+${cfg.join("\n")}
+  </object>
+</config>`;
+  const out = zipSync({
+    "[Content_Types].xml": strToU8(`<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/><Default Extension="config" ContentType="text/xml"/></Types>`),
+    "_rels/.rels": strToU8(`<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>`),
+    "3D/3dmodel.model": strToU8(model),
+    "Metadata/model_settings.config": strToU8(config),
+  }, { level: 6 });
+  return { out, parts };
+}
+function exportParts3MF() {
+  if (!S.G) return;
+  const { out, parts } = buildParts3MF();
+  download(`${S.name}_parts.3mf`, out, "model/3mf");
+  const fils = [...new Set(parts.map((p) => p.filament))].sort((a, b) => a - b);
+  status(`Multi-part 3MF written: ${parts.length} part(s), filament slot(s) ${fils.join(", ")}.`);
+}
+
 function exportSTLs() {
   if (!S.G) return;
   const files = {}, cnt = partCounts(), names = new Set();
@@ -2502,6 +2579,7 @@ function restoreAutosave() {
   try { applySession(txt); afterEdit("Restored previous session"); return true; } catch (e) { console.warn("autosave ignored:", e.message); return false; }
 }
 $("exp3mf").onclick = () => { closeMenus(); later(exportPainted3MF); };
+$("expParts").onclick = () => { closeMenus(); later(exportParts3MF); };
 $("expStl").onclick = () => { closeMenus(); later(exportSTLs); };
 $("expMerged").onclick = () => { closeMenus(); later(exportMergedSTL); };
 $("saveSess").onclick = saveSession;
@@ -2519,7 +2597,73 @@ if (qp) {
   fetch("/" + qp.replace(/^\/+/, "")).then((r) => { if (!r.ok) throw new Error(`${qp}: HTTP ${r.status}`); return r.arrayBuffer(); })
     .then((buf) => openBuf(qp.split("/").pop(), buf)).catch((e) => alert(e.message)).finally(() => busy(false));
 }
-window.app = { S, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForReview, runReview, applyXf, ensureXf, xfMatrix, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+
+// ---------------------------------------------------------------- OrcaSlicer plugin bridge
+// Inside OrcaSlicer the host injects window.orca (postMessage/onMessage). The plugin sends plate meshes
+// in base64 chunks and writes files the page exports (OrcaSlicer plugins cannot add objects to the plate,
+// so the result is a 3MF to import with Ctrl+I). Outside OrcaSlicer none of this runs.
+const ORCA = { on: !!(window.orca && window.orca.postMessage), objects: [], rx: null, saves: new Map(), seq: 0 };
+const CHUNK = 512 * 1024; // base64 chars per message
+function orcaSend(msg) { window.orca.postMessage(msg); }
+function u8ToB64(b) { let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }
+ORCA.save = (name, data) => {
+  const b = data instanceof Uint8Array ? data : new Uint8Array(data);
+  const t = u8ToB64(b), id = ++ORCA.seq, n = Math.max(1, Math.ceil(t.length / CHUNK));
+  return new Promise((res, rej) => {
+    ORCA.saves.set(id, { res, rej, name });
+    for (let i = 0; i < n; i++) orcaSend({ cmd: "save", id, name, part: i, of: n, data: t.slice(i * CHUNK, (i + 1) * CHUNK) });
+    status(`Saving ${name}…`);
+  }).then((path) => { status(`Saved ${path} · import it in OrcaSlicer with Ctrl+I`); return path; })
+    .catch((e) => { status(`Save failed: ${e.message}`); alert(`Save failed: ${e.message}`); });
+};
+function orcaRenderObjects() {
+  for (const box of [$("orcaMenu"), $("dropOrca")]) {
+    box.innerHTML = "";
+    if (box === $("dropOrca") && ORCA.objects.length) box.insertAdjacentHTML("beforeend", `<div class="small" style="margin:8px 0 4px">From the plate:</div>`);
+    for (const o of ORCA.objects) {
+      const b = document.createElement("button"); b.title = o.name;
+      b.innerHTML = `${icon("open")}<span style="overflow:hidden;text-overflow:ellipsis;max-width:320px">${esc(o.name)}</span><span class="meta">${o.faces.toLocaleString()} faces${o.parts > 1 ? ` · ${o.parts} parts` : ""}</span>`;
+      b.onclick = () => { closeMenus(); orcaSend({ cmd: "mesh", index: o.index }); busy(true); status(`Loading ${o.name} from the plate…`); };
+      box.appendChild(b);
+    }
+    if (!ORCA.objects.length) box.insertAdjacentHTML("beforeend", `<div class="small" style="padding:6px 8px">No objects on the plate.</div>`);
+  }
+}
+function orcaMesh(m) {
+  if (m.part === 0) ORCA.rx = { name: m.name, nV: m.nV, nF: m.nF, parts: [] };
+  const R = ORCA.rx; if (!R) return;
+  R.parts[m.part] = m.data;
+  if (R.parts.filter((x) => x != null).length < m.of) return;
+  ORCA.rx = null;
+  try {
+    const bin = atob(R.parts.join("")), b = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
+    const pos = new Float32Array(b.buffer, 0, R.nV * 3), tri = new Uint32Array(b.buffer, R.nV * 12, R.nF * 3);
+    loadRaw(R.name, { pos: Float32Array.from(pos), tri: Uint32Array.from(tri), source: { type: "orca" } });
+    status(`Loaded ${R.name} from the plate`);
+  } catch (e) { console.error(e); alert(e.message); }
+  finally { busy(false); }
+}
+if (ORCA.on) {
+  document.body.classList.add("inOrca");
+  document.querySelectorAll(".orcaOnly").forEach((e) => (e.hidden = false));
+  $("orcaBtn").onclick = (e) => { e.stopPropagation(); orcaSend({ cmd: "objects" }); toggleMenu("orcaMenu"); };
+  $("orcaSend").onclick = () => later(() => { const { out, parts } = buildParts3MF(); download(`${S.name}_parts.3mf`, out, "model/3mf"); status(`Sending ${parts.length} part(s)…`); });
+  $("aiBtn").disabled = true; $("aiBtn").title = "AI review needs the standalone splitter (uv run splitter); Check still works here";
+  window.orca.onMessage((m) => {
+    if (!m || typeof m !== "object") return;
+    if (m.cmd === "objects") {
+      ORCA.objects = m.objects || []; orcaRenderObjects();
+      if (m.auto && !S.G && ORCA.objects.length === 1) { orcaSend({ cmd: "mesh", index: ORCA.objects[0].index }); busy(true); }
+    } else if (m.cmd === "mesh") orcaMesh(m);
+    else if (m.cmd === "saved" || m.cmd === "save_error") {
+      const P = ORCA.saves.get(m.id); if (!P) return; ORCA.saves.delete(m.id);
+      m.cmd === "saved" ? P.res(m.path) : P.rej(new Error(m.message || "unknown error"));
+    } else if (m.cmd === "error") { busy(false); status(m.message); alert(m.message); }
+  });
+  orcaSend({ cmd: "objects", auto: true });
+}
+window.app = { S, ORCA, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForReview, runReview, applyXf, ensureXf, xfMatrix, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
 </script>
 </body>
 </html>
