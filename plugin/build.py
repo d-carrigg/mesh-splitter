@@ -8,10 +8,12 @@ the page's module script (three, three-mesh-bvh, fflate from node_modules, versi
 package.json to match the importmap).
 """
 import argparse
+import base64
 import json
 import re
 import subprocess
 import sys
+import zlib
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -37,7 +39,7 @@ def bundle(js):
     entry.write_text(js, encoding="utf-8")
     esbuild = HERE / "node_modules" / ".bin" / ("esbuild.cmd" if sys.platform == "win32" else "esbuild")
     out = subprocess.run(
-        [str(esbuild), str(entry), "--bundle", "--format=esm", "--target=es2020",
+        [str(esbuild), str(entry), "--bundle", "--minify", "--format=esm", "--target=es2020",
          "--legal-comments=none", "--log-level=warning"],
         cwd=HERE, check=True, capture_output=True, text=True, encoding="utf-8")
     if out.stderr.strip():
@@ -78,8 +80,8 @@ def main():
     if size > MAX_PAGE:
         sys.exit(f"bundled page is {size:,} bytes; OrcaSlicer's webview limit is about 2 MB")
     src = (HERE / "plugin.py").read_text(encoding="utf-8")
-    lit = "(\n" + "".join(f"    {line!r}\n" for line in page.splitlines(keepends=True)) + ")"
-    for key, val in (("__VERSION__", a.version), ('"__PAGE__"', lit)):
+    z = base64.b64encode(zlib.compress(page.encode("utf-8"), 9)).decode("ascii")
+    for key, val in (("__VERSION__", a.version), ("__PAGE_Z__", z)):
         if src.count(key) != 1:
             sys.exit(f"plugin.py: expected one {key}")
         src = src.replace(key, val)
