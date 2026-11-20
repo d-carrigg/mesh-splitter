@@ -11,7 +11,7 @@ Split a mesh without opening the app: for batch jobs, scripts, or a quick split 
 
 ## Setup
 
-You need [uv](https://docs.astral.sh/uv/getting-started/installation/) and [Node.js](https://nodejs.org/) 18 or newer. From the repo folder:
+You need [uv](https://docs.astral.sh/uv/getting-started/installation/) and [Node.js](https://nodejs.org/) 20 or newer. From the repo folder:
 
 ```
 uv run mesh-splitter split --help

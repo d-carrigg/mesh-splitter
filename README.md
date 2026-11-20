@@ -38,7 +38,7 @@ It opens at `http://127.0.0.1:8766/app/`. Everything runs locally, and nothing i
 
 ## Command line
 
-Split and export from a terminal or script. It needs [Node.js](https://nodejs.org/) 18+ as well as uv, and runs the same splitting code as the app:
+Split and export from a terminal or script. It needs [Node.js](https://nodejs.org/) 20+ as well as uv, and runs the same splitting code as the app:
 
 ```
 uv run mesh-splitter split figure.stl --auto 6 -o figure.3mf --stl parts/

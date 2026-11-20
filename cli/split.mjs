@@ -87,16 +87,15 @@ export function main(argv) {
   for (const [p, i] of used) log(`  ${p.name.padEnd(16)} filament ${String(p.filament).padStart(2)}  ${cnt[i].toLocaleString()} faces`);
 
   const outs = ["out", "painted", "stl", "merged", "save-session"].some((k) => o[k] !== undefined);
-  const base = path.join(path.dirname(file), core.safeName(S.name));
+  const base = path.join(path.dirname(file), S.name);
   write(o.out ?? (outs ? null : `${base}_parts.3mf`), () => core.parts3MF(S.name, soups(S, used)).out, log);
   write(o.painted, () => core.painted3MF(S.name, S, (f) => S.parts[S.labels[f]].filament, S.tri === S.mesh0[1] ? S.source : null), log);
   write(o.merged, () => core.stlBinary(concat(soups(S, used).map((p) => p.soup))), log);
-  write(o["save-session"], () => core.encodeSession(S), log);
+  write(o["save-session"], () => core.encodeSession(S, S.reps), log);
   if (o.stl) {
-    fs.mkdirSync(o.stl, { recursive: true });
     const names = new Set();
     for (const p of soups(S, used)) {
-      let nm = `${core.safeName(S.name)}_${core.safeName(p.name)}`; while (names.has(nm)) nm += "_"; names.add(nm);
+      let nm = `${core.safeName(S.name)}_${core.safeName(p.name)}`; while (names.has(nm.toLowerCase())) nm += "_"; names.add(nm.toLowerCase()); // case-insensitive file systems
       write(path.join(o.stl, `${nm}.stl`), () => core.stlBinary(p.soup), log);
     }
   }
@@ -124,6 +123,7 @@ function nearestFace(S, [x, y, z]) {
 function seedSplit(S, spec, opts) {
   const list = Array.isArray(spec) ? spec : spec?.parts;
   if (!Array.isArray(list) || !list.length) throw new Error("seeds file: expected a list of parts");
+  const taken = new Set(list.map((q) => q.filament).filter((f) => f !== undefined)); // explicit slots first
   for (const [n, q] of list.entries()) {
     const seeds = [];
     for (const pt of q.points || []) {
@@ -140,6 +140,9 @@ function seedSplit(S, spec, opts) {
     if (q.filament !== undefined) {
       if (!Number.isInteger(q.filament) || q.filament < 1 || q.filament > 16) throw new Error(`seeds file, part ${n + 1}: filament must be 1-16`);
       o.filament = q.filament;
+    } else {
+      let f = 2; while (f < 16 && (taken.has(f) || S.parts.some((p, i) => i > 0 && p.filament === f))) f++;
+      o.filament = f;
     }
     S.parts.push(core.newPart(S, o));
   }
@@ -149,7 +152,7 @@ function seedSplit(S, spec, opts) {
 
 function applySession(S, txt, log) {
   const d = core.decodeSession(txt, S.mesh0[1].length / 3);
-  S.labels = d.labels; S.parts = d.parts;
+  S.labels = d.labels; S.parts = d.parts; S.reps = Object.fromEntries(d.reps.map((r) => [r.id, r]));
   if (d.mesh) core.setMesh(S, d.mesh.pos, d.mesh.tri);
   const moved = S.parts.filter((p, i) => i > 0 && (p.rep || (p.xf && !(p.xf.s.every((v) => v === 1) && p.xf.r.every((v) => v === 0) && p.xf.t.every((v) => v === 0)))));
   if (moved.length) log(`Note: ${moved.map((p) => p.name).join(", ")} moved or replaced in the app; written here in the original position and shape.`);
@@ -163,10 +166,11 @@ function concat(arrs) { const v = new Float32Array(arrs.reduce((n, a) => n + a.l
 
 function write(file, make, log) {
   if (!file) return;
-  let data;
-  try { data = make(); } catch (e) { fail(e.message); }
-  fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
-  fs.writeFileSync(file, data);
+  try {
+    const data = make();
+    fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
+    fs.writeFileSync(file, data);
+  } catch (e) { fail(`${file}: ${e.message}`); }
   log(`Wrote ${file}`);
 }
 

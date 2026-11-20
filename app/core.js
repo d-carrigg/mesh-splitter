@@ -14,16 +14,17 @@ export const UNASSIGNED_COLOR = "#9aa0a8";
 export const DEFAULTS = { step: 2, smooth: 4 };
 
 // ---------------------------------------------------------------- reading files
-// Binary or ASCII STL -> triangle soup (9 floats per triangle).
+// Binary or ASCII STL -> triangle soup (9 floats per triangle). Binary unless the size doesn't fit the face count
+// and "solid" starts the file (within a byte-order mark), as three.js's STLLoader decides: some exporters pad binaries.
 export function parseSTL(buf) {
   const u8 = new Uint8Array(buf), dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
-  if (u8.length >= 84) {
-    const n = dv.getUint32(80, true);
-    if (84 + n * 50 === u8.length) {
-      const out = new Float32Array(n * 9);
-      for (let t = 0; t < n; t++) for (let k = 0; k < 9; k++) out[9*t+k] = dv.getFloat32(84 + 50*t + 12 + 4*k, true);
-      return out;
-    }
+  const n = u8.length >= 84 ? dv.getUint32(80, true) : -1;
+  const ascii = 84 + n * 50 !== u8.length && [0, 1, 2, 3, 4].some((o) => strFromU8(u8.subarray(o, o + 5)) === "solid");
+  if (n >= 0 && !ascii) {
+    if (84 + n * 50 > u8.length) throw new Error("Not a valid STL file (truncated)");
+    const out = new Float32Array(n * 9);
+    for (let t = 0; t < n; t++) for (let k = 0; k < 9; k++) out[9*t+k] = dv.getFloat32(84 + 50*t + 12 + 4*k, true);
+    return out;
   }
   const txt = strFromU8(u8), out = [], re = /vertex\s+(\S+)\s+(\S+)\s+(\S+)/g;
   for (let m; (m = re.exec(txt));) out.push(+m[1], +m[2], +m[3]);

@@ -29,6 +29,9 @@ PORT = 8766
 
 
 class Handler(SimpleHTTPRequestHandler):
+    # Windows takes types from the registry, where .js can be text/plain; browsers refuse modules served as that.
+    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, ".js": "text/javascript", ".mjs": "text/javascript"}
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT), **kwargs)
 
@@ -80,7 +83,7 @@ def split(argv: list[str]) -> int:
     """Run the command-line splitter (cli/split.mjs) with Node, installing its two npm packages on first use."""
     node, npm = shutil.which("node"), shutil.which("npm")
     if not node:
-        print("mesh-splitter split needs Node.js 18 or newer: https://nodejs.org", file=sys.stderr)
+        print("mesh-splitter split needs Node.js 20 or newer: https://nodejs.org", file=sys.stderr)
         return 1
     if not (ROOT / "node_modules" / "fflate").is_dir() or not (ROOT / "node_modules" / "@xmldom").is_dir():
         if not npm:

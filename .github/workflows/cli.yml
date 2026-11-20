@@ -37,6 +37,7 @@ jobs:
           uv run mesh-splitter split build/snowman.stl --auto -o build/auto.3mf
           uv run mesh-splitter split build/snowman.stl --auto 4 -o build/auto4.3mf
           test "$(ls build/stl/*.stl | wc -l)" = 2
+          uv run mesh-splitter split build/shells.3mf --shells -o build/from3mf.3mf
       - name: Check the 3MFs
         working-directory: plugin
         run: |
@@ -45,3 +46,4 @@ jobs:
           uv run python verify_3mf.py ../build/session.3mf --parts 2
           uv run python verify_3mf.py ../build/auto.3mf
           uv run python verify_3mf.py ../build/auto4.3mf
+          uv run python verify_3mf.py ../build/from3mf.3mf --parts 2

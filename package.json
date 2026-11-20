@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Command line for Mesh Splitter: runs app/core.js, the splitting code the browser app and OrcaSlicer plugin use",
   "bin": { "mesh-splitter": "cli/split.mjs" },
-  "engines": { "node": ">=18" },
+  "engines": { "node": ">=20" },
   "dependencies": {
     "@xmldom/xmldom": "0.9.12",
     "fflate": "0.8.2"

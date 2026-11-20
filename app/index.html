@@ -571,38 +571,6 @@ function deletePart(i) {
   S.active = into > i ? into - 1 : into;
   afterEdit(into > 0 ? `Deleted ${p.name}, merged into ${S.parts[S.active].name}` : `Deleted ${p.name}`);
 }
-
-// Graph edges incident to each mesh vertex (CSR), for counting label changes around a vertex.
-function vertexEdges(G) {
-  if (G.vS) return;
-  const shared = (e, out) => {
-    const a = G.ea[e], b = G.eb[e];
-    for (let i = 0; i < 3; i++) { const v = S.tri[3*a+i]; for (let j = 0; j < 3; j++) if (S.tri[3*b+j] === v) { out(v); break; } }
-  };
-  const vS = new Int32Array(S.nV + 1);
-  for (let e = 0; e < G.nE; e++) shared(e, (v) => vS[v + 1]++);
-  for (let v = 0; v < S.nV; v++) vS[v + 1] += vS[v];
-  const vE = new Int32Array(vS[S.nV]), fill = vS.slice(0, S.nV);
-  for (let e = 0; e < G.nE; e++) shared(e, (v) => { vE[fill[v]++] = e; });
-  G.vS = vS; G.vE = vE;
-}
-// True if relabelling face f to `to` adds a second arc of `to` or of f's label around one of its vertices.
-function pinches(f, to) {
-  const G = S.G, from = S.labels[f], lab = (g) => (g === f ? to : S.labels[g]);
-  for (let c = 0; c < 3; c++) {
-    const v = S.tri[3*f+c];
-    for (const L of [from, to]) {
-      let pre = 0, post = 0;
-      for (let k = G.vS[v]; k < G.vS[v + 1]; k++) {
-        const a = G.ea[G.vE[k]], b = G.eb[G.vE[k]];
-        if ((S.labels[a] === L) !== (S.labels[b] === L)) pre++;
-        if ((lab(a) === L) !== (lab(b) === L)) post++;
-      }
-      if (post > Math.max(2, pre)) return true;
-    }
-  }
-  return false;
-}
 // Crease snapping and boundary anti-aliasing: see core.js.
 const snapCreases = (mask = null) => core.snapCreases(S, mask, smoothIters());
 function smoothCut(mask = null) { const tri0 = S.tri, n = core.smoothCut(S, mask); meshChanged(tri0); return n; }
