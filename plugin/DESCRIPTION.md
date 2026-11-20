@@ -2,7 +2,7 @@ Split one solid mesh into separate, color-coded parts for multi-color or multi-p
 
 ![A curling-stone figure split into 10 color-coded parts](https://raw.githubusercontent.com/d-carrigg/mesh-splitter/main/docs/screenshot.png)
 
-**Note:** For anyone seeing the "Medium Security Risk": when I upload the plugin, the AI review refuses to look at the numpy lib because 1.5MB is too large for it, so it just skips it and flags as medium. If I compress it, then it reviews just fine as low risk. The github repo is open source (linked below) if you would like to review yourself. This plugin system is new, so still trying to understand the quirks.
+**Note** For anyone seeing the "Medium Security Risk": when I upload the plugin, the AI review refuses to look at the numpy lib because 1.5MB is too large for it, so it just skips it and flags as medium. If I compress it, then it reviews just fine as low risk. The github repo is open source (linked below) if you would like to review yourself. This plugin system is new so still trying to understand the quirks.
 
 ## Features
 
