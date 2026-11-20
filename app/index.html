@@ -120,7 +120,9 @@
   .xf input[type=number] { width:100%; }
   .xf .ax { font-size:10px; text-align:center; color:var(--mute); }
   .xf svg.i { width:14px; height:14px; }
-  #repOpts.hide, #healRow.hide { display:none; }
+  #repOpts.hide, #healRow.hide, #followRow:empty { display:none; }
+  #followRow .chip { display:inline-flex; align-items:center; gap:4px; padding:1px 6px; border:1px solid var(--line); border-radius:10px; }
+  #followRow .chip button { padding:0 4px; min-width:0; border:0; background:none; color:var(--mute); }
   #aiModel, #aiNote { width:100%; background:#14161a; color:var(--fg); border:1px solid #3a404a; border-radius:4px; padding:3px 5px; font:inherit; }
   #aiOut { margin-top:6px; }
   #aiOut .sec { color:var(--mute); font-size:11px; text-transform:uppercase; letter-spacing:.06em; margin:8px 0 3px; }
@@ -254,6 +256,7 @@
         <label class="small"><input id="healOn" type="checkbox"> heal joint</label>
         <input id="healR" type="number" min="0.5" step="0.5" style="width:64px"> <span class="small">mm blend</span>
       </div>
+      <div class="row small" id="followRow" title="Parts that move with this one keep their place relative to it (right-click a part > Move with…)"></div>
       <div class="sub">
         <h2>Replace</h2>
         <button id="repDel" data-icon="trash" title="Remove the replacement (old part comes back)"></button>
@@ -362,6 +365,8 @@ const ICONS = {
   text: '<path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   scale: '<path d="M21 3h-6M21 3v6M21 3l-7 7"/><path d="M3 21h6M3 21v-6M3 21l7-7"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+  unlink: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/><path d="M3 3l18 18"/>',
   rotate: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
   joint: '<path d="M12 2v20" stroke-dasharray="2 2"/><path d="M17 11.5c2.5.6 4 1.5 4 2.5 0 2.2-4 4-9 4s-9-1.8-9-4c0-1.5 1.8-2.8 4.5-3.5"/><path d="m14 9 3 2.5-3 2.5"/>',
   move: '<path d="M12 2v20M2 12h20"/><path d="m9 5 3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3M19 9l3 3-3 3"/>',
@@ -718,6 +723,63 @@ function healField(i) {
   for (const vi of B.verts) { const s = B.dist[vi]; if (s < r) w[vi] = 0.5 * (1 + Math.cos(Math.PI * s / r)); }
   return { near: B.near, w, d };
 }
+
+// ---------------------------------------------------------------- move with
+// part.follow = { to: leader uid, rel: Matrix4 array } keeps a part rigidly attached to another part: its matrix is
+// leader matrix x rel. Moving/rotating the leader carries its followers (and theirs); moving a follower itself
+// updates rel. Part uids are lazy and survive part deletes/merges that shift indices.
+let uidSeq = 1;
+const uidOf = (i) => (S.parts[i].uid ||= `u${Date.now().toString(36)}${uidSeq++}`);
+const partMat = (i) => xfMatrix(S.parts[i]) || new THREE.Matrix4();
+function leaderOf(i) { const f = S.parts[i]?.follow; return f ? S.parts.findIndex((q, j) => j > 0 && q.uid === f.to) : -1; }
+function followersOf(i) { const u = S.parts[i]?.uid; return u ? S.parts.map((q, j) => (j > 0 && q.follow?.to === u ? j : -1)).filter((j) => j > 0) : []; }
+function setXfMatrix(j, M) {
+  const x = ensureXf(j), pos = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+  M.decompose(pos, q, sc);
+  const e = new THREE.Euler().setFromQuaternion(q, "XYZ"), c = new THREE.Vector3(...x.c), w = c.clone().applyMatrix4(M);
+  x.s = sc.toArray().map((v) => +v.toFixed(5)); x.r = [e.x, e.y, e.z].map((v) => +(v * 180 / Math.PI).toFixed(3));
+  x.t = [0, 1, 2].map((k) => +(w.getComponent(k) - c.getComponent(k)).toFixed(4));
+}
+// Call after part i's own transform changed: refresh its offset to its leader, then carry its followers.
+function xfEdited(i) {
+  const l = leaderOf(i);
+  if (l > 0) S.parts[i].follow.rel = partMat(l).invert().multiply(partMat(i)).toArray();
+  carry(i, new Set([i]));
+}
+function carry(i, seen) {
+  const M = partMat(i);
+  for (const j of followersOf(i)) {
+    if (seen.has(j)) continue; seen.add(j);
+    setXfMatrix(j, M.clone().multiply(new THREE.Matrix4().fromArray(S.parts[j].follow.rel)));
+    carry(j, seen);
+  }
+}
+function setFollow(js, l) { // js follow part l (null: stop following)
+  js = js.filter((j) => j > 0 && j !== l);
+  if (l > 0) { // no loops: l must not (indirectly) follow any of js
+    for (let k = l, n = 0; k > 0 && n < 100; k = leaderOf(k), n++) if (js.includes(k)) { status(`${S.parts[k].name} already carries ${S.parts[l].name}`); return; }
+  }
+  if (!js.length) return;
+  pushUndo();
+  for (const j of js) {
+    if (l > 0) S.parts[j].follow = { to: uidOf(l), rel: partMat(l).invert().multiply(partMat(j)).toArray() };
+    else delete S.parts[j].follow;
+  }
+  const names = js.map((j) => S.parts[j].name).join(", ");
+  afterEdit(l > 0 ? `${names} now move${js.length > 1 ? "" : "s"} with ${S.parts[l].name}` : `${names} move${js.length > 1 ? "" : "s"} on ${js.length > 1 ? "their" : "its"} own again`);
+}
+function renderFollowRow(i) {
+  const row = $("followRow"); row.innerHTML = "";
+  if (!S.G || i <= 0 || !S.parts[i]) return;
+  const chip = (j, label) => {
+    const c = document.createElement("span"); c.className = "chip"; c.innerHTML = `<span class="sw" style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${S.parts[j].color}"></span>${esc(label)}`;
+    const x = document.createElement("button"); x.textContent = "×"; x.title = "Stop moving together";
+    x.onclick = () => setFollow([j === leaderOf(i) ? i : j], null); c.appendChild(x); return c;
+  };
+  const l = leaderOf(i), fs = followersOf(i);
+  if (l > 0) { row.append("Moves with "); row.appendChild(chip(l, S.parts[l].name)); }
+  if (fs.length) { if (l > 0) row.append(" · "); row.append("Carries "); for (const j of fs) row.appendChild(chip(j, S.parts[j].name)); }
+}
 // Heal a triangle soup given in the part's original coordinates (already transformed into `out`).
 function healSoup(i, orig, out) {
   const h = healField(i); if (!h) return out;
@@ -1009,6 +1071,8 @@ function openCtx(ev) {
     it("plus", "New part here", () => { placing = { part: -1, from: 0 }; placeAt(h); });
     it("solo", isSolo(l) ? "Show all again" : "Show only this", () => toggleSolo(l));
     it("eyeOff", "Hide", () => { p.visible = false; afterEdit(); });
+    if (act) leaderOf(l) === S.active ? it("unlink", `Stop moving with ${act.name}`, () => setFollow([l], null))
+      : it("link", `Move with ${act.name}`, () => setFollow([l], S.active));
     it("replace", p.rep ? "Replace with another…" : "Replace with…", () => replaceWith(l));
     if (p.rep) it("reset", "Remove replacement", () => { selectPart(l); $("repDel").click(); });
     it("trash", "Delete (merge into neighbor)", () => deletePart(l), "danger");
@@ -1044,6 +1108,7 @@ function openPartMenu(ev, i) {
     const main = S.parts[S.active];
     it("merge", `Merge ${sel.length} parts into ${main.name}`, mergeSelected);
     it("droplet", `Same filament as ${main.name} (F${main.filament})`, () => { pushUndo(); sel.forEach((j) => (S.parts[j].filament = main.filament)); afterEdit(`F${main.filament} on ${sel.length} parts`); });
+    it("link", `Move with ${main.name}`, () => setFollow(sel.filter((j) => j !== S.active), S.active));
     it("solo", "Show only these", () => { S.parts.forEach((q, j) => (q.visible = sel.includes(j))); afterEdit(); });
     it("eyeOff", "Hide these", () => { sel.forEach((j) => (S.parts[j].visible = false)); afterEdit(); });
     items.push("-");
@@ -1470,6 +1535,7 @@ function refreshXfPanel() {
   $("repName").title = r ? r.name : "";
   if (r) { $("repKeep").checked = !!r.inPlace; for (const id of ["repFlip", "repRoll", "repPick", "repFitL", "repEmbedL"]) $(id).style.display = r.inPlace ? "none" : "";
     $("repFit").checked = !!r.fit; $("repEmbed").value = r.embed; $("repFlip").classList.toggle("on", !!r.flip && !r.joint); $("repPick").classList.toggle("on", pickingJoint || !!r.joint); }
+  renderFollowRow(i);
   showXfDims();
   syncGizmo();
 }
@@ -1488,7 +1554,7 @@ $("xfPanel").addEventListener("input", (ev) => {
     let s = num(xfIn("S", k), 100) / 100; if (Math.abs(s) < 0.01) s = s < 0 ? -0.01 : 0.01;
     x.s[k] = s; x.r[k] = num(xfIn("R", k), 0); x.t[k] = num(xfIn("T", k), 0);
   }
-  applyXf(); syncReps(); drawSeeds(); showXfDims();
+  xfEdited(i); applyXf(); syncReps(); drawSeeds(); showXfDims();
 });
 $("xfPanel").addEventListener("change", () => {
   if (!S.G || S.active <= 0) return;
@@ -1510,7 +1576,7 @@ $("healR").onchange = () => {
 };
 $("xfReset").onclick = () => {
   const p = S.parts[S.active]; if (!S.G || S.active <= 0 || !p.xf) return;
-  pushUndo(); delete p.xf; afterEdit(`Transform reset on ${p.name}`);
+  pushUndo(); delete p.xf; xfEdited(S.active); afterEdit(`Transform reset on ${p.name}`);
 };
 
 // ---------------------------------------------------------------- transform gizmo
@@ -1611,7 +1677,7 @@ gizmo.addEventListener("objectChange", () => {
     x.r = [e.x, e.y, e.z].map((v) => +(v * r2d).toFixed(2));
     x.t = [0, 1, 2].map((k) => +(p.getComponent(k) - x.c[k]).toFixed(3));
     gzSync = true; gzProxy.quaternion.copy(tw.multiply(gzJoint.q0)); gzProxy.position.copy(gzJoint.J); gzSync = false;
-    applyXf(); syncReps(); drawSeeds(); showXfDims();
+    xfEdited(i); applyXf(); syncReps(); drawSeeds(); showXfDims();
     for (let k = 0; k < 3; k++) { xfIn("R", k).value = +x.r[k].toFixed(2); xfIn("T", k).value = +x.t[k].toFixed(3); }
     return;
   }
@@ -1624,7 +1690,7 @@ gizmo.addEventListener("objectChange", () => {
   x.s = sc.map((v) => +v.toFixed(4));
   x.r = [gzProxy.rotation.x, gzProxy.rotation.y, gzProxy.rotation.z].map((v) => +(v * r2d).toFixed(2));
   x.t = [0, 1, 2].map((k) => +(gzProxy.position.getComponent(k) - x.c[k]).toFixed(3));
-  applyXf(); syncReps(); drawSeeds(); showXfDims();
+  xfEdited(i); applyXf(); syncReps(); drawSeeds(); showXfDims();
   for (let k = 0; k < 3; k++) { xfIn("S", k).value = +(x.s[k] * 100).toFixed(2); xfIn("R", k).value = +x.r[k].toFixed(2); xfIn("T", k).value = +x.t[k].toFixed(3); }
 });
 function gizmoSnap(on) {
@@ -2168,7 +2234,7 @@ if (ORCA.on) {
   });
   orcaSend({ cmd: "objects", auto: true });
 }
-window.app = { S, ORCA, gizmo, gzProxy, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, ORCA, gizmo, gzProxy, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
 </script>
 </body>
 </html>

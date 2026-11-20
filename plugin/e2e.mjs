@@ -84,6 +84,24 @@ const jt = await page.evaluate(() => {
 console.log("joint:", JSON.stringify(jt));
 if (jt.err || jt.dJ > 1e-3 || jt.dot < 0.9999 || jt.r.every((v) => v === 0) || jt.undo !== 1 || jt.ring.x || !jt.ring.y) errors.push("rotate on joint moved the joint: " + JSON.stringify(jt));
 if (shot) await page.screenshot({ path: shot.replace(/\.png$/, "_joint.png") });
+// Move with: the head follows the cap; spinning the cap on its joint carries the head rigidly, and undo puts it back.
+const mw = await page.evaluate(() => {
+  const { S, gizmo, gzProxy } = app, cap = S.active, head = S.parts.findIndex((_, j) => j > 0 && j !== cap && j !== S.labels[0]);
+  const before = S.hist.past.length;
+  app.setFollow([head], cap);
+  const rel0 = app.partMat(cap).invert().multiply(app.partMat(head)).toArray(), Q = gzProxy.quaternion.constructor;
+  gizmo.dispatchEvent({ type: "dragging-changed", value: true });
+  gzProxy.quaternion.multiply(new Q().setFromAxisAngle(gzProxy.up.clone().set(0, 1, 0), Math.PI / 6));
+  gizmo.dispatchEvent({ type: "objectChange" });
+  gizmo.dispatchEvent({ type: "dragging-changed", value: false });
+  const rel1 = app.partMat(cap).invert().multiply(app.partMat(head)).toArray();
+  const out = { head, leader: app.leaderOf(head), moved: !!app.xfMatrix(S.parts[head]), relErr: Math.max(...rel0.map((v, k) => Math.abs(v - rel1[k]))), undo: S.hist.past.length - before };
+  app.undo(); app.undo();
+  out.after = { follow: !!S.parts[head].follow, moved: !!app.xfMatrix(S.parts[head]) };
+  return out;
+});
+console.log("move with:", JSON.stringify(mw));
+if (mw.leader <= 0 || !mw.moved || mw.relErr > 5e-3 || mw.undo !== 2 || mw.after.follow || mw.after.moved) errors.push("move with failed: " + JSON.stringify(mw));
 // Heal joint: shift the cap 3 mm sideways, heal it, expect its cut edge back on the body's rim and a closed part.
 const hl = await page.evaluate(() => {
   const { S } = app, i = S.active, x = app.ensureXf(i); x.t = [x.t[0] + 3, x.t[1], x.t[2]]; app.applyXf();
