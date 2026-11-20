@@ -65,7 +65,7 @@ It currently uses [OpenRouter](https://openrouter.ai/) (OpenAI-compatible API, a
 1. Get an API key from OpenRouter.
 2. Put `OPENROUTER_API_KEY=sk-or-...` in a `.env` file in the repo root. Optionally add `OPENROUTER_MODEL=...` to pick the model.
 3. Run `uv run mesh-splitter`, open a mesh and split it.
-4. Open the AI panel (sparkle button) and click **Review**.
+4. Open the AI panel (sparkle button) and click **Name parts**.
 5. Read the suggested names and issues, then click **Apply names** to keep the names.
 
 The key stays in the local server and is never sent to the page.
@@ -78,7 +78,7 @@ The key stays in the local server and is never sent to the page.
 
 The OrcaCloud listing description lives in `plugin/DESCRIPTION.md`. OrcaCloud's GitHub publishing only takes the version, changelog and files, so paste it into **Edit plugin** when it changes.
 
-CI builds and tests the plugin on every push, and publishes it to the release from `main`. Releasing: bump `version` in `pyproject.toml` (the only place it lives), merge, then publish a GitHub release tagged `vX.Y.Z` with the changelog as its notes. That builds the plugin, attaches it to the release, and publishes it to the [OrcaCloud Plugin Hub](https://cloud.orcaslicer.com/app/plugins/plugin-hub) (`publish-orcacloud.yml`).
+CI builds and tests the plugin on every push, and publishes it to the release from `main`. Releasing uses [Release Please](https://github.com/googleapis/release-please). Title PRs as [Conventional Commits](https://www.conventionalcommits.org/) (`feat: ...`, `fix: ...`); they land in the changelog. Each merge to `main` updates an open `chore(main): release X.Y.Z` PR that bumps `pyproject.toml` and `CHANGELOG.md`. Merge that PR whenever you want to ship: it creates the `vX.Y.Z` GitHub release, and the workflow builds the plugin, attaches it, and publishes it to the [OrcaCloud Plugin Hub](https://cloud.orcaslicer.com/app/plugins/plugin-hub) with the changelog.
 
 ## License
 
