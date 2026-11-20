@@ -39,6 +39,7 @@
   button:has(svg:only-child) { padding:4px 6px; }
   svg.i { width:16px; height:16px; flex:none; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
   html button:hover { border-color:#56606e; filter:none; }
+  .nmEdit { width:100%; box-sizing:border-box; padding:1px 4px; font:inherit; }
   button.on { background:var(--acc); border-color:var(--acc); color:#06121f; font-weight:600; }
   button.pri { background:#1d4f86; border-color:#2d6cb0; }
   button.pri:hover { border-color:var(--acc); }
@@ -1547,6 +1548,8 @@ function refreshUI() {
       openPartMenu(ev, i);
     };
     tr.querySelector(".eye").onclick = () => { p.visible = !p.visible; updateVisibility(); drawSeeds(); refreshUI(); };
+    if (i) tr.querySelector(".nm").ondblclick = (ev) => { ev.stopPropagation(); startRename(i); };
+    tr.dataset.part = i;
     body.appendChild(tr);
   });
   if (lastActive !== S.active) { lastActive = S.active; updateColors(); }
@@ -1555,6 +1558,26 @@ function refreshUI() {
   refreshXfPanel();
   $("undoBtn").disabled = !S.hist.past.length;
   $("redoBtn").disabled = !S.hist.future.length;
+}
+
+// Inline rename in the parts list (double-click a name, or right-click > Rename).
+function renamePart(i, name) {
+  const p = S.parts[i]; name = (name || "").trim();
+  if (!p || !name || name === p.name) return false;
+  pushUndo(); p.name = name; autosave(); return true;
+}
+function startRename(i) {
+  if (S.active !== i) selectPart(i);
+  const td = document.querySelector(`#partsBody tr[data-part="${i}"] .nm`);
+  if (!td) { $("pcName").focus(); $("pcName").select(); return; }
+  const inp = document.createElement("input"); inp.type = "text"; inp.value = S.parts[i].name; inp.className = "nmEdit";
+  td.textContent = ""; td.appendChild(inp);
+  let done = false;
+  const finish = (ok) => { if (done) return; done = true; if (ok) renamePart(i, inp.value); refreshUI(); };
+  inp.onkeydown = (e) => { e.stopPropagation(); if (e.key === "Enter") finish(true); else if (e.key === "Escape") finish(false); };
+  inp.onblur = () => finish(true);
+  inp.onclick = inp.ondblclick = inp.onpointerdown = (e) => e.stopPropagation();
+  inp.focus(); inp.select();
 }
 
 // ---------------------------------------------------------------- right-click menu
@@ -1615,7 +1638,7 @@ function openPartMenu(ev, i) {
     it("trash", `Delete ${sel.length} parts (merge into neighbours)`, () => { const ps = sel.map((j) => S.parts[j]); mergeSel.clear(); for (const q of ps) { const j = S.parts.indexOf(q); if (j > 0) deletePart(j); } }, "danger");
     showMenu(ev, `${sel.length} parts selected`, items); return;
   }
-  it("text", "Rename", () => { selectPart(i); $("pcName").focus(); $("pcName").select(); });
+  it("text", "Rename", () => startRename(i));
   it("frame", "Zoom to part", () => { selectPart(i); frameBox(partWorldBox(i)); });
   it("solo", isSolo(i) ? "Show all again" : "Show only this", () => toggleSolo(i));
   it(p.visible ? "eyeOff" : "eye", p.visible ? "Hide" : "Show", () => { p.visible = !p.visible; afterEdit(); });
@@ -1738,7 +1761,12 @@ $("openBtn").onclick = $("dropOpen").onclick = () => { closeMenus(); $("fileIn")
 const act = () => (S.G && S.active > 0 ? S.parts[S.active] : null);
 $("pcColor").oninput = () => { const p = act(); if (p) { p.color = $("pcColor").value; updateColors(); drawSeeds(); syncReps(); } };
 $("pcColor").onchange = () => refreshUI() || autosave();
-$("pcName").onchange = () => { const p = act(); if (p) { p.name = $("pcName").value.trim() || p.name; refreshUI(); autosave(); } };
+// Commit as you type (some hosts never fire "change"), Enter/Esc leave the field.
+let nameSnap = null; // undo snapshot taken on focus, pushed on the first real change
+$("pcName").oninput = () => { const p = act(); const v = $("pcName").value.trim(); if (p && v && v !== p.name) { if (nameSnap) { pushUndo(nameSnap); nameSnap = null; } p.name = v; refreshUI(); autosave(); } };
+$("pcName").onfocus = () => { nameSnap = act() ? snapshot() : null; };
+$("pcName").onkeydown = (e) => { e.stopPropagation(); if (e.key === "Enter" || e.key === "Escape") $("pcName").blur(); };
+$("pcName").onblur = () => { const p = act(); if (p) $("pcName").value = p.name; };
 $("pcFil").onchange = () => { const p = act(); if (p) { p.filament = Math.max(1, Math.min(32, Math.round(+$("pcFil").value || 1))); refreshUI(); autosave(); } };
 $("pcClose").onclick = () => selectPart(0);
 $("pcDel").onclick = () => S.active > 0 && deletePart(S.active);
