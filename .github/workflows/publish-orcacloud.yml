@@ -1,13 +1,13 @@
 name: Publish to OrcaCloud
 
-# Pushing a vX.Y.Z tag (git tag -a v1.2.3 -m "notes" && git push origin v1.2.3) builds the plugin at that
-# version, creates the GitHub release with the file attached, and publishes it to the OrcaCloud Plugin Hub
-# with the tag message as the changelog. Auth is GitHub OIDC (no secrets): the plugin on OrcaCloud
+# Publishing a GitHub release with a vX.Y.Z tag (Releases > Draft a new release) builds the plugin at that
+# version, attaches the file to the release, and publishes it to the OrcaCloud Plugin Hub with the release
+# notes as the changelog. Auth is GitHub OIDC (no secrets): the plugin on OrcaCloud
 # must have this repository connected under Edit plugin > GitHub publishing.
 # Steps from https://cloud.orcaslicer.com/wiki/#publish-from-github
 on:
-  push:
-    tags: ["v*"]
+  release:
+    types: [published]
 
 permissions:
   id-token: write
@@ -23,8 +23,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Changelog from the tag message
-        run: git for-each-ref "refs/tags/$GITHUB_REF_NAME" --format='%(contents)' | head -c 4000 > ../changelog.txt
+      - name: Changelog from the release notes
+        run: jq -r '.release.body // ""' "$GITHUB_EVENT_PATH" | head -c 4000 > ../changelog.txt
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -40,13 +40,10 @@ jobs:
           uv run python build.py
       - name: Unit tests
         run: uv run python test_plugin.py
-      - name: GitHub release
+      - name: Attach the plugin to the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" \
-            --title "Mesh Splitter $GITHUB_REF_NAME" --notes-file ../changelog.txt
-          gh release upload "$GITHUB_REF_NAME" dist/mesh_splitter_any.py --clobber
+        run: gh release upload "$GITHUB_REF_NAME" dist/mesh_splitter_any.py --clobber
       - name: Publish release to OrcaCloud
         run: |
           set -euo pipefail
