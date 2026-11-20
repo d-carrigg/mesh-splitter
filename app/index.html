@@ -145,7 +145,7 @@
   #flowPop { z-index:4; padding:8px 10px; width:max-content; }
   #flowPop .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
   #aiModel, #aiNote { width:100%; background:var(--in); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:3px 5px; font:inherit; }
-  #followRow:empty { display:none; }
+  #followRow:empty, #hitRow:empty, #stretchRow.hide, #stretchGapRow.hide { display:none !important; }
   #followRow .chip { display:inline-flex; align-items:center; gap:4px; padding:1px 6px; border:1px solid var(--line); border-radius:10px; }
   #followRow .chip button { padding:0 4px; min-width:0; min-height:0; border:0; background:none; color:var(--mute); }
   #aiOut { margin-top:6px; }
@@ -193,6 +193,7 @@
     <div class="sc">
       <div class="pr"><span class="lbl">Name</span><input id="pcColor" type="color" title="Display color"><input id="pcName" type="text"></div>
       <div class="pr"><span class="lbl">Filament slot</span><input id="pcFil" type="number" min="1" max="32" title="Filament slot"></div>
+      <div class="row small" id="hitRow" style="color:#f0a030" title="This part now passes through another part it didn't touch before. Move, rotate or stretch one of them."></div>
       <div class="row small" id="followRow" title="Parts that move with this one keep their place relative to it (right-click a part > Move with…)"></div>
       <div class="pr"><span class="lbl">Replace with file</span><button id="repDel" data-icon="trash" title="Remove the replacement (old part comes back)"></button><button id="repBtn" data-icon="replace" title="Swap this part for another STL/3MF, lined up on the old part's joint">Replace…</button></div>
       <input id="repIn" type="file" accept=".stl,.3mf" hidden>
@@ -287,6 +288,10 @@
     <label class="lbl" title="Scale X/Y/Z together"><input id="xfLock" type="checkbox" checked> Uniform scale</label>
     <div class="row" style="margin:0;justify-content:space-between"><span class="lbl">Rotate around</span>
       <span class="seg"><button id="gzCenter" title="Rotate about the part's center">Part center</button><button id="gzJoint" title="Rotate on joint (J): one ring spins the part about its cut's axis, pivoting at the cut's center, so it stays seated on the part it joins. Shift snaps to 15°">Joint</button></span></div>
+    <div id="stretchRow" style="display:flex;flex-direction:column;gap:6px" title="Stretch: lengthen (over 100%) or shorten this part along its length, from its joint with the rest, e.g. an arm from the shoulder. What it holds or carries moves out with its end. Applies to all selected parts.">
+      <div class="row" style="margin:0"><span class="lbl" style="flex:1">Stretch</span><label class="lbl" title="Auto: the smallest stretch that keeps what this part holds or carries at least the gap away from other parts"><input id="stretchAuto" type="checkbox"> Auto</label><input id="stretchPct" type="number" min="20" max="500" step="5"><span class="small">%</span></div>
+      <div class="row" id="stretchGapRow" style="margin:0"><span class="lbl" style="flex:1">Gap</span><input id="stretchGap" type="number" min="0" step="0.5"><span class="small">mm</span></div>
+    </div>
     <div id="healRow" style="display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--sep);padding-top:9px" title="Heal joint: after a move or rotate, stretch or squeeze this part near its cut so the cut's edge lands back on the neighbor's edge. Only faces within the blend distance of the cut change shape.">
       <div class="row" style="margin:0"><label class="lbl" style="flex:1"><input id="healOn" type="checkbox"> Heal joint</label><span class="lbl">Blend</span><input id="healR" type="number" min="0.5" step="0.5"><span class="small">mm</span></div>
       <span class="small">Stretches the part near its cut so it stays flush with its neighbor.</span>
@@ -644,9 +649,15 @@ function buildMesh() {
 // ---------------------------------------------------------------- per-part transforms
 // part.xf = { s:[sx,sy,sz], r:[rx,ry,rz] deg (XYZ euler), t:[tx,ty,tz] mm, c:[pivot] }. Display and Part STLs only:
 // the painted 3MF is one mesh, so it keeps the original geometry.
-const isIdXf = (x) => !x || (!x.m && x.s.every((v) => v === 1) && x.r.every((v) => v === 0) && x.t.every((v) => v === 0));
+// x.st = { k: factor, p: pivot, a: unit axis (original coords) } stretches the part along its length from its joint
+// before the rest of the transform (see Stretch below).
+const isIdXf = (x) => !x || (!x.m && !(x.st && x.st.k !== 1) && x.s.every((v) => v === 1) && x.r.every((v) => v === 0) && x.t.every((v) => v === 0));
 function xfMatrix(p) {
   const x = p?.xf; if (isIdXf(x)) return null;
+  const B = baseMatrix(x);
+  return x.st && x.st.k !== 1 ? B.multiply(stretchMatrix(x.st)) : B;
+}
+function baseMatrix(x) { // the transform without the stretch: Reach's matrix, or scale/rotate/move about the pivot
   if (x.m) return new THREE.Matrix4().fromArray(x.m); // set by Reach (rotation + stretch along the arm)
   const c = new THREE.Vector3(...x.c);
   const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(...x.r.map((d) => d * Math.PI / 180), "XYZ"));
@@ -689,6 +700,64 @@ function applyXf() {
   geo.computeBoundingBox(); geo.computeBoundingSphere();
   geo.disposeBoundsTree?.(); geo.computeBoundsTree();
   render();
+  scheduleHits();
+}
+
+// ---------------------------------------------------------------- collisions
+// After a transform, parts that weren't touching in the original model but now pass through each other (a broom
+// stick through the stone's handle) are listed on the part card, in the status bar and in Check. Parts that share a
+// cut are skipped: they always touch at the cut (heal joint handles those).
+let hits = [], hitTimer = 0, nbCache = { key: null, set: null };
+function neighborPairs() {
+  const key = `${S.nF}|${fullHash()}`;
+  if (nbCache.key === key) return nbCache.set;
+  const first = new Int32Array(S.nV).fill(-1), set = new Set();
+  for (let f = 0; f < S.nF; f++) for (let c = 0; c < 3; c++) {
+    const v = S.tri[3*f+c], l = S.labels[f];
+    if (first[v] < 0) first[v] = l; else if (first[v] !== l) set.add(Math.min(l, first[v]) + "|" + Math.max(l, first[v]));
+  }
+  nbCache = { key, set }; return set;
+}
+// opts.only: check only pairs with a part in this set; opts.gap: also count parts closer than gap mm;
+// opts.cache: geometries of parts not in opts.live (or only), which don't change between calls (kept, not disposed).
+function findHits(opts = {}) {
+  if (!S.G) return [];
+  const ch = changedParts(); if (!ch.size) return [];
+  const nb = neighborPairs(), G = new Map(), cnt = partCounts(), gap = opts.gap || 0, only = opts.only;
+  const geoOf = (i) => {
+    if (opts.cache?.has(i) && !(opts.live || only)?.has(i)) return opts.cache.get(i);
+    if (!G.has(i)) {
+      const v = partSoup(i); let g = null;
+      if (v?.length) { g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(v, 3)); g.computeBoundingBox(); g.computeBoundsTree(); }
+      if (opts.cache && !(opts.live || only)?.has(i)) { opts.cache.set(i, g); return g; }
+      G.set(i, g);
+    }
+    return G.get(i);
+  };
+  const ids = S.parts.map((p, i) => i).filter((i) => i > 0 && S.parts[i].visible !== false && (cnt[i] > 0 || hasRep(S.parts[i])));
+  const out = [], I = new THREE.Matrix4();
+  for (const a of ids) for (const b of ids) {
+    if (b <= a || (!ch.has(a) && !ch.has(b)) || nb.has(a + "|" + b) || (only && !only.has(a) && !only.has(b))) continue;
+    const ga = geoOf(a), gb = geoOf(b);
+    if (!ga || !gb || !ga.boundingBox.clone().expandByScalar(gap).intersectsBox(gb.boundingBox)) continue;
+    if (ga.boundsTree.intersectsGeometry(gb, I) || (gap > 0 && ga.boundsTree.closestPointToGeometry(gb, I, {}, {}, 0, gap))) out.push([a, b]);
+  }
+  for (const g of G.values()) g?.disposeBoundsTree();
+  return out;
+}
+const hitText = (h) => `${S.parts[h[0]].name} goes through ${S.parts[h[1]].name}`;
+function scheduleHits() {
+  clearTimeout(hitTimer);
+  hitTimer = setTimeout(() => {
+    try { const k = autoKey(); if (k && k !== lastAutoKey) { solveAutoStretch(); lastAutoKey = autoKey(); applyXf(); syncReps(); drawSeeds(); refreshUI(); autosave(); return; } } catch (e) { console.warn("auto stretch failed", e); }
+    try { hits = findHits(); } catch (e) { console.warn("collision check failed", e); hits = []; }
+    renderHitRow(S.active);
+    if (hits.length) status(`${$("status").textContent.replace(/ · ⚠.*$/, "")} · ⚠ ${hits.map(hitText).join("; ")}`);
+  }, 250);
+}
+function renderHitRow(i) {
+  const row = $("hitRow"), mine = hits.filter((h) => h.includes(i));
+  row.textContent = mine.length ? `⚠ Goes through ${mine.map((h) => S.parts[h[0] === i ? h[1] : h[0]].name).join(", ")}` : "";
 }
 
 // ---------------------------------------------------------------- heal joint
@@ -774,9 +843,15 @@ function healField(i) {
 let uidSeq = 1;
 const uidOf = (i) => (S.parts[i].uid ||= `u${Date.now().toString(36)}${uidSeq++}`);
 const partMat = (i) => xfMatrix(S.parts[i]) || new THREE.Matrix4();
-// Frame that followers ride on: the part's matrix without any Reach/Hold stretch (xf.rig), so a broom head attached
-// to a stretched stick moves with it but keeps its shape.
-const frameMat = (i) => (S.parts[i]?.xf?.rig ? new THREE.Matrix4().fromArray(S.parts[i].xf.rig) : partMat(i));
+const baseMat = (i) => (isIdXf(S.parts[i].xf) ? new THREE.Matrix4() : baseMatrix(S.parts[i].xf));
+// What part j rides on when it moves with / is carried by part l: l's transform without its stretch, shifted by how
+// far the stretch moves j's center (a hand carried by a stretched arm moves out with the arm's end, unstretched).
+function carryMat(l, j) {
+  const x = S.parts[l]?.xf, st = x?.st, M = x?.rig ? new THREE.Matrix4().fromArray(x.rig) : baseMat(l); // rig: Reach/Hold matrix without its own stretch
+  if (!st || st.k === 1) return M;
+  const c = new THREE.Vector3(...ensureXf(j).c), d = c.clone().applyMatrix4(stretchMatrix(st)).sub(c);
+  return M.multiply(new THREE.Matrix4().makeTranslation(d.x, d.y, d.z));
+}
 function leaderOf(i) { const f = S.parts[i]?.follow; return f ? S.parts.findIndex((q, j) => j > 0 && q.uid === f.to) : -1; }
 function followersOf(i) { const u = S.parts[i]?.uid; return u ? S.parts.map((q, j) => (j > 0 && q.follow?.to === u ? j : -1)).filter((j) => j > 0) : []; }
 function setXfMatrix(j, M) {
@@ -791,15 +866,14 @@ function setXfMatrix(j, M) {
 function xfEdited(i) {
   if (S.parts[i].xf?.m) { delete S.parts[i].xf.m; delete S.parts[i].xf.rig; }
   const l = leaderOf(i);
-  if (l > 0) S.parts[i].follow.rel = frameMat(l).invert().multiply(partMat(i)).toArray();
+  if (l > 0) S.parts[i].follow.rel = carryMat(l, i).invert().multiply(baseMat(i)).toArray();
   carry(i, new Set([i]));
   updateReach();
 }
 function carry(i, seen) {
-  const M = frameMat(i);
   for (const j of followersOf(i)) {
     if (seen.has(j)) continue; seen.add(j);
-    setXfMatrix(j, M.clone().multiply(new THREE.Matrix4().fromArray(S.parts[j].follow.rel)));
+    setXfMatrix(j, carryMat(i, j).multiply(new THREE.Matrix4().fromArray(S.parts[j].follow.rel)));
     carry(j, seen);
   }
 }
@@ -811,7 +885,7 @@ function setFollow(js, l) { // js follow part l (null: stop following)
   if (!js.length) return;
   pushUndo();
   for (const j of js) {
-    if (l > 0) S.parts[j].follow = { to: uidOf(l), rel: frameMat(l).invert().multiply(partMat(j)).toArray() };
+    if (l > 0) S.parts[j].follow = { to: uidOf(l), rel: carryMat(l, j).invert().multiply(baseMat(j)).toArray() };
     else delete S.parts[j].follow;
   }
   const names = js.map((j) => S.parts[j].name).join(", ");
@@ -898,6 +972,115 @@ function setReach(j, k) { // part j reaches for part k (k <= 0: stop)
   if (k > 0) { q.reach = { to: uidOf(k), ...reachPoints(j, k) }; delete q.follow; updateReach(); }
   else { delete q.reach; if (q.xf) { delete q.xf.m; delete q.xf.rig; } }
   afterEdit(k > 0 ? `${q.name} now reaches for ${S.parts[k].name}: it turns at its joint and stretches to stay on it` : `${q.name} stopped reaching`);
+}
+// ---------------------------------------------------------------- stretch
+// part.xf.st = { k, p, a }: the part is lengthened (k > 1) or shortened along its own length, from its joint with the
+// rest (e.g. an arm from the shoulder), before its other transform. The joint stays put, so heal keeps it seated;
+// what it holds, or carries, moves out with its end, and Hold / Reach re-solve on the new grip points.
+function stretchMatrix(st) {
+  const k = st.k, a = new THREE.Vector3(...st.a), P = new THREE.Vector3(...st.p);
+  return new THREE.Matrix4().makeTranslation(P.x, P.y, P.z).multiply(new THREE.Matrix4().set(
+    1 + (k-1)*a.x*a.x, (k-1)*a.x*a.y, (k-1)*a.x*a.z, 0,
+    (k-1)*a.y*a.x, 1 + (k-1)*a.y*a.y, (k-1)*a.y*a.z, 0,
+    (k-1)*a.z*a.x, (k-1)*a.z*a.y, 1 + (k-1)*a.z*a.z, 0, 0, 0, 0, 1)).multiply(new THREE.Matrix4().makeTranslation(-P.x, -P.y, -P.z));
+}
+// Pivot: the boundary shared with the neighbor it is attached to (the most shared vertices), skipping parts that
+// hang off it (what it carries, holds or reaches for). Axis: from the pivot to its far end (the farthest 10%).
+function stretchFrame(i) {
+  const u = S.parts[i].uid, skip = new Set([0, i, ...followersOf(i)]);
+  if (u) S.parts.forEach((q, j) => { if (j > 0 && (q.hold?.a === u || q.hold?.b === u)) skip.add(j); });
+  if (reachOf(i) > 0) skip.add(reachOf(i));
+  const A = new Set(); for (let f = 0; f < S.nF; f++) if (S.labels[f] === i) for (let c = 0; c < 3; c++) A.add(S.tri[3*f+c]);
+  if (!A.size) return null;
+  const V = (v) => new THREE.Vector3(S.pos[3*v], S.pos[3*v+1], S.pos[3*v+2]);
+  const cnt = new Map();
+  for (let f = 0; f < S.nF; f++) { const l = S.labels[f]; if (skip.has(l)) continue; for (let c = 0; c < 3; c++) { const v = S.tri[3*f+c]; if (A.has(v)) { if (!cnt.has(l)) cnt.set(l, new Set()); cnt.get(l).add(v); } } }
+  const best = [...cnt].sort((x, y) => y[1].size - x[1].size)[0];
+  const P = new THREE.Vector3();
+  if (best) { for (const v of best[1]) P.add(V(v)); P.divideScalar(best[1].size); }
+  else { const b = partBox(i); P.set((b[0]+b[3])/2, (b[1]+b[4])/2, b[2]); } // separate shell: from its bottom
+  const ds = [...A].map((v) => [P.distanceTo(V(v)), v]).sort((x, y) => y[0] - x[0]);
+  const far = new THREE.Vector3(), nFar = Math.max(1, Math.ceil(ds.length * 0.1));
+  for (let k = 0; k < nFar; k++) far.add(V(ds[k][1]));
+  const a = far.divideScalar(nFar).sub(P); if (a.lengthSq() < 1e-9) return null;
+  return { p: P.toArray().map((v) => +v.toFixed(4)), a: a.normalize().toArray().map((v) => +v.toFixed(6)) };
+}
+// Stretch parts js to pct % of their length (100 = off). One undo step.
+function setStretch(js, pct) {
+  js = js.filter((j) => j > 0 && S.parts[j] && !hasRep(S.parts[j]));
+  const k = Math.max(0.2, Math.min(5, (+pct || 100) / 100));
+  if (!js.length) return;
+  pushUndo();
+  const done = [];
+  for (const j of js) {
+    const x = ensureXf(j);
+    if (k === 1) { delete x.st; done.push(j); continue; }
+    const fr = x.st ? { p: x.st.p, a: x.st.a } : stretchFrame(j);
+    if (!fr) continue;
+    x.st = { k: +k.toFixed(4), ...fr }; done.push(j);
+  }
+  for (const j of done) xfEdited(j);
+  const names = done.map((j) => S.parts[j].name).join(", ");
+  afterEdit(done.length ? (k === 1 ? `Stretch off on ${names}` : `${names} stretched to ${Math.round(k * 1000) / 10}% from ${done.length > 1 ? "their joints" : "its joint"}`) : "Nothing to stretch");
+}
+// Auto stretch: st.auto parts get the smallest stretch (same for all of them, e.g. both arms) that keeps every part
+// they move (what they hold or carry) at least st.gap mm from parts it didn't touch before. Re-solved whenever
+// another transform, link or the model changes.
+const autoParts = () => S.parts.map((q, i) => (i > 0 && q.xf?.st?.auto ? i : -1)).filter((i) => i > 0);
+let lastAutoKey = null;
+function autoKey() { // everything the solve depends on, minus what it sets
+  const A = autoParts(); if (!A.length || !S.G) return "";
+  const D = autoMoved(A);
+  return JSON.stringify(S.parts.map((q, i) => {
+    if (A.includes(i)) { const { k, ...st } = q.xf.st; return [{ ...q.xf, m: 0, rig: 0, st }, q.follow, q.hold, q.reach, q.heal]; }
+    return [D.has(i) ? 0 : q.xf || 0, q.follow, q.hold, q.reach, q.heal, q.visible];
+  })) + "|" + fullHash();
+}
+function autoMoved(A) { // auto parts plus everything that moves because they do
+  const set = new Set(A);
+  for (let grow = true, n = 0; grow && n < 50; n++) {
+    grow = false;
+    S.parts.forEach((q, j) => {
+      if (j <= 0 || set.has(j)) return;
+      const hb = holdersOf(j), l = leaderOf(j), r = reachOf(j);
+      if ((l > 0 && set.has(l)) || (hb && hb.some((h) => set.has(h))) || (r > 0 && set.has(r))) { set.add(j); grow = true; }
+    });
+  }
+  return set;
+}
+function solveAutoStretch() {
+  const A = autoParts(); if (!A.length) return;
+  // checked: what the auto parts move (the broom they hold, a hand they carry); the auto parts themselves only if they move nothing
+  const moved = autoMoved(A), carried = new Set([...moved].filter((i) => !A.includes(i))), only = carried.size ? carried : moved;
+  const gap = Math.max(...A.map((i) => +S.parts[i].xf.st.gap || 0)), cache = new Map();
+  const test = (k) => { for (const i of A) { S.parts[i].xf.st.k = k; xfEdited(i); } return findHits({ only, gap, cache, live: moved }).length; };
+  let k = 1, n = test(1), best = { k: 1, n };
+  if (n) {
+    let lo = 1, hi = 0;
+    for (let t = 1.1; t <= 3.0001; t += 0.1) { const c = test(+t.toFixed(2)); if (c < best.n) best = { k: +t.toFixed(2), n: c }; if (!c) { hi = +t.toFixed(2); break; } lo = +t.toFixed(2); }
+    if (hi) { for (let it = 0; it < 6; it++) { const m = (lo + hi) / 2; if (test(m)) lo = m; else hi = m; } k = +hi.toFixed(3); }
+    else k = best.k;
+  }
+  const left = test(k);
+  for (const g of cache.values()) g?.disposeBoundsTree();
+  const names = A.map((i) => S.parts[i].name).join(", ");
+  status(left ? `Auto stretch: ${names} at ${+(k * 100).toFixed(1)}%, still within ${gap} mm of another part (limit 300%)`
+    : k === 1 ? `Auto stretch: ${names} need no stretch (${gap} mm gap)` : `Auto stretch: ${names} at ${+(k * 100).toFixed(1)}% to clear by ${gap} mm`);
+}
+function setAutoStretch(js, on, gap) {
+  js = js.filter((j) => j > 0 && S.parts[j] && !hasRep(S.parts[j]));
+  if (!js.length) return;
+  pushUndo();
+  for (const j of js) {
+    const x = ensureXf(j);
+    if (on) {
+      const fr = x.st ? { p: x.st.p, a: x.st.a } : stretchFrame(j); if (!fr) continue;
+      x.st = { k: x.st?.k ?? 1, ...fr, auto: true, gap: gap ?? x.st?.gap ?? 1 };
+    } else if (x.st) { delete x.st.auto; delete x.st.gap; if (x.st.k === 1) delete x.st; }
+    xfEdited(j);
+  }
+  lastAutoKey = null;
+  afterEdit(on ? "Auto stretch on: finding the smallest stretch that clears…" : "Auto stretch off");
 }
 function renderFollowRow(i) {
   const row = $("followRow"); row.innerHTML = "";
@@ -1717,6 +1900,11 @@ function refreshXfPanel() {
   $("xfReset").disabled = !ok || isIdXf(p?.xf);
   $("gzCenter").classList.toggle("on", !gzJointOn);
   $("healRow").classList.toggle("hide", !ok || !!p?.rep);
+  $("stretchRow").classList.toggle("hide", !ok || !!p?.rep);
+  const au = ok && !!p.xf?.st?.auto;
+  if (ok && document.activeElement !== $("stretchPct")) $("stretchPct").value = +((p.xf?.st?.k ?? 1) * 100).toFixed(au ? 0 : 1);
+  $("stretchAuto").checked = au; $("stretchPct").disabled = au; $("stretchGapRow").classList.toggle("hide", !au);
+  if (au && document.activeElement !== $("stretchGap")) $("stretchGap").value = p.xf.st.gap ?? 1;
   if (ok && !p.rep) { $("healOn").checked = !!p.heal; if (document.activeElement !== $("healR")) $("healR").value = p.heal?.r ?? ""; $("healR").placeholder = "auto"; $("healR").disabled = !p.heal; }
   const x = (ok && p.xf) || { s: [1, 1, 1], r: [0, 0, 0], t: [0, 0, 0] };
   for (let k = 0; k < 3; k++) {
@@ -1730,7 +1918,7 @@ function refreshXfPanel() {
   $("repName").title = r ? r.name : "";
   if (r) { $("repKeep").checked = !!r.inPlace; for (const id of ["repFlip", "repRoll", "repPick", "repFitL", "repEmbedL"]) $(id).style.display = r.inPlace ? "none" : "";
     $("repFit").checked = !!r.fit; $("repEmbed").value = r.embed; $("repFlip").classList.toggle("on", !!r.flip && !r.joint); $("repPick").classList.toggle("on", pickingJoint || !!r.joint); }
-  renderFollowRow(i);
+  renderFollowRow(i); renderHitRow(i);
   showXfDims();
   syncGizmo();
   renderPaintSw();
@@ -1772,6 +1960,16 @@ $("healR").onchange = () => {
   const i = S.active, p = S.parts[i]; if (!S.G || i <= 0 || !p?.heal) return;
   const r = +$("healR").value; if (!(r > 0)) { refreshUI(); return; }
   pushUndo(); p.heal = { r }; afterEdit(`Heal blend on ${p.name}: ${r} mm`);
+};
+$("stretchAuto").onchange = () => { if (S.G && S.active > 0) setAutoStretch(selected(), $("stretchAuto").checked); };
+$("stretchGap").onchange = () => {
+  const g = +$("stretchGap").value; if (!S.G || S.active <= 0 || !(g >= 0)) { refreshUI(); return; }
+  setAutoStretch(selected(), true, g);
+};
+$("stretchPct").onchange = () => {
+  if (!S.G || S.active <= 0) return;
+  const v = +$("stretchPct").value; if (!(v > 0)) { refreshUI(); return; }
+  setStretch(selected(), v);
 };
 $("xfReset").onclick = () => {
   const p = S.parts[S.active]; if (!S.G || S.active <= 0 || !p.xf) return;
@@ -2105,6 +2303,8 @@ function localChecks(st) {
     if (p.area_pct < 0.2) out.push({ severity: "low", parts: [p.id], problem: `#${p.id} ${p.name} is a sliver (${p.area_pct}% of area, ${p.faces} faces)`,
       fix: "Merge it into its neighbor unless it is a real detail" });
   }
+  for (const h of hits) if (S.parts[h[0]] && S.parts[h[1]]) out.push({ severity: "high", parts: h, problem: hitText(h),
+    fix: "Move, rotate or stretch one of them (e.g. stretch the arms that hold it) until the warning clears" });
   return out;
 }
 
@@ -2440,7 +2640,7 @@ if (ORCA.on) {
   });
   orcaSend({ cmd: "objects", auto: true });
 }
-window.app = { S, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
 </script>
 </body>
 </html>

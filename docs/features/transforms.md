@@ -5,6 +5,8 @@ Change a part's position, angle and size, and keep it joined to its neighbor.
 - [Move, rotate, scale and undo](#move-rotate-scale-and-undo)
 - [Rotate on joint](#rotate-on-joint)
 - [Heal joint](#heal-joint)
+- [Stretch](#stretch)
+- [Collision warning](#collision-warning)
 
 ## Move, rotate, scale and undo
 
@@ -72,3 +74,31 @@ After you move or rotate a part, its cut edge may no longer line up with its nei
 - It works with any move or rotate. [Rotate on joint](#rotate-on-joint) plus heal joint is the usual pair for turning a part in place.
 - Replaced parts can't be healed; the option hides for them.
 - Undo turns it off like any other edit.
+
+## Stretch
+
+Lengthens (over 100%) or shortens a part along its own length, from its joint with the rest. Use it to lengthen raised arms so the broom they hold clears the stone's handle.
+
+![Before: the stick goes through the handle. After: both arms stretched to 115% and the stick clears it](img/stretch.png)
+
+### How to use it
+
+1. Select the part (Ctrl+click to select more, e.g. both arms).
+2. Open the Transform panel (move, rotate or scale in the toolbar) and type a **Stretch** %. It applies to every selected part. 100 turns it off.
+
+### Auto stretch
+
+Tick **Auto** next to the stretch % to let it pick the amount: the smallest stretch (the same for every selected part, so both arms match) that keeps what the parts hold or carry at least **Gap** mm (default 1 mm) from every other part. It re-solves whenever you move, rotate or relink parts. Typing a % turns Auto off.
+
+![Auto stretch with a 1 mm gap: both arms at 119.7%, the stick clears the handle](img/stretch-auto.png)
+
+### Tips
+
+- The joint stays put, so [heal joint](#heal-joint) keeps it seated.
+- Parts that move with it move out with its end without stretching, and a part it holds re-solves onto the new grips.
+- It works on top of move, rotate and rotate on joint. Reset clears it.
+
+## Collision warning
+
+After a transform, a part that passes through another part it didn't touch before (the broom stick through the handle) shows **⚠ Goes through …** in its Part section, in the status bar and in Check. Parts that share a cut are skipped, since they always touch there.
+

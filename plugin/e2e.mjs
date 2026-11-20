@@ -131,6 +131,32 @@ const hd = await page.evaluate(() => {
 });
 console.log("hold:", JSON.stringify(hd));
 if (!hd.held || hd.err > 1e-3 || hd.gripErr > 1e-3 || hd.after) errors.push("hold failed: " + JSON.stringify(hd));
+// Stretch: the cap (holding the head with the body) is stretched 130% from its joint: the joint stays put, the held
+// part's grips follow the stretched cap, and undo removes it.
+const st = await page.evaluate(() => {
+  const { S } = app, cap = S.active, body = S.labels[0], head = S.parts.findIndex((_, j) => j > 0 && j !== cap && j !== body), V = app.gzProxy.position.constructor;
+  app.setHold(head, cap, body);
+  app.setStretch([cap], 130);
+  const x = S.parts[cap].xf, P = new V(...x.st.p), h = S.parts[head].hold;
+  const A0 = new V(...h.ga), B0 = new V(...h.gb), m0 = A0.clone().add(B0).multiplyScalar(0.5);
+  const m1 = A0.clone().applyMatrix4(app.partMat(cap)).add(B0.clone().applyMatrix4(app.partMat(body))).multiplyScalar(0.5);
+  const out = { k: x.st.k, pivotErr: P.clone().applyMatrix4(app.partMat(cap)).distanceTo(P), holdErr: m0.applyMatrix4(app.partMat(head)).distanceTo(m1), hits: Array.isArray(app.findHits()) };
+  app.undo(); out.after = !!S.parts[cap].xf?.st; app.undo();
+  return out;
+});
+console.log("stretch:", JSON.stringify(st));
+// Auto stretch: turn it on for the cap (still holding the head), solve, expect a solved factor and nothing within the gap.
+const as = await page.evaluate(() => {
+  const { S } = app, cap = S.active, body = S.labels[0], head = S.parts.findIndex((_, j) => j > 0 && j !== cap && j !== body);
+  app.setHold(head, cap, body);
+  app.setAutoStretch([cap], true, 1); app.solveAutoStretch();
+  const st = S.parts[cap].xf.st, out = { auto: !!st.auto, gap: st.gap, k: st.k, near: app.findHits({ only: new Set([head]), gap: 1 }).length };
+  app.undo(); out.after = !!S.parts[cap].xf?.st?.auto; app.undo();
+  return out;
+});
+console.log("auto stretch:", JSON.stringify(as));
+if (!as.auto || as.gap !== 1 || !(as.k >= 1) || as.after) errors.push("auto stretch failed: " + JSON.stringify(as));
+if (st.k !== 1.3 || st.pivotErr > 1e-3 || st.holdErr > 1e-3 || !st.hits || st.after) errors.push("stretch failed: " + JSON.stringify(st));
 if (rc.reach <= 0 || !rc.moved || rc.err > 1e-3 || rc.after) errors.push("reach failed: " + JSON.stringify(rc));
 if (mw.leader <= 0 || !mw.moved || mw.relErr > 5e-3 || mw.undo !== 2 || mw.after.follow || mw.after.moved) errors.push("move with failed: " + JSON.stringify(mw));
 // Heal joint: shift the cap 3 mm sideways, heal it, expect its cut edge back on the body's rim and a closed part.
