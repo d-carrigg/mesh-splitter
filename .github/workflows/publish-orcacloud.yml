@@ -1,0 +1,62 @@
+name: Publish to OrcaCloud
+
+# Pushing a vX.Y.Z tag (git tag -a v1.2.3 -m "notes" && git push origin v1.2.3) builds the plugin at that
+# version, creates the GitHub release with the file attached, and publishes it to the OrcaCloud Plugin Hub
+# with the tag message as the changelog. Auth is GitHub OIDC (no secrets): the plugin on OrcaCloud
+# must have this repository connected under Edit plugin > GitHub publishing.
+# Steps from https://cloud.orcaslicer.com/wiki/#publish-from-github
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugin
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Changelog from the tag message
+        run: git for-each-ref "refs/tags/$GITHUB_REF_NAME" --format='%(contents)' | head -c 4000 > ../changelog.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: plugin/package-lock.json
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync
+      - run: npm ci
+      - name: Build
+        run: uv run python build.py --version "${GITHUB_REF_NAME#v}"
+      - name: Unit tests
+        run: uv run python test_plugin.py
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" \
+            --title "Mesh Splitter $GITHUB_REF_NAME" --notes-file ../changelog.txt
+          gh release upload "$GITHUB_REF_NAME" dist/mesh_splitter_any.py --clobber
+      - name: Publish release to OrcaCloud
+        run: |
+          set -euo pipefail
+          oidc_token="$(curl -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=orcacloud" | jq -r .value)"
+          version="${GITHUB_REF_NAME#v}"
+          changelog="$(cat ../changelog.txt)"
+          metadata="$(jq -cn --arg version "$version" --arg changelog "$changelog" \
+            '{version: $version} + (if $changelog == "" then {} else {changelog: $changelog} end)')"
+          status="$(curl -sS -o response.json -w '%{http_code}' \
+            -H "Authorization: Bearer $oidc_token" \
+            -F "metadata=$metadata" -F "files=@dist/mesh_splitter_any.py" \
+            https://api.orcaslicer.com/api/v1/plugin-publish/releases)"
+          cat response.json
+          echo
+          [ "$status" = "201" ]
