@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.6](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.5...v0.3.6) (2026-11-20)
+
+
+### Bug Fixes
+
+* keep versioned releases as Latest; mark the main build as a pre-release ([#15](https://github.com/d-carrigg/mesh-splitter/issues/15)) ([62225da](https://github.com/d-carrigg/mesh-splitter/commit/62225da3c9d7b9744d85cc6262c7eebb2c18fd0d))
+
 ## [0.3.5](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.4...v0.3.5) (2026-11-20)
 
 
