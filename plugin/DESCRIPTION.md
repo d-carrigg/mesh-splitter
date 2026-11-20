@@ -2,6 +2,8 @@ Split one solid mesh into separate, color-coded parts for multi-color or multi-p
 
 ![A curling-stone figure split into 10 color-coded parts](https://raw.githubusercontent.com/d-carrigg/mesh-splitter/main/docs/screenshot.png)
 
+**Note on the "Medium risk" rating:** OrcaCloud's automated AI review can't fully read this plugin. Its web interface is bundled in compressed form, because uncompressed (about 1.5 MB) it's too large for the review. Because of that, the same file has been rated Low on one upload and Medium on another. The plugin is open source on [GitHub](https://github.com/d-carrigg/mesh-splitter) if you'd like to review it yourself. The plugin system is new, so I'm still learning its quirks.
+
 ## Features
 
 - **Split in a few clicks:** auto split, split by shells, or click a seed per part. Cuts follow the model's creases.
