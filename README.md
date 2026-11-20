@@ -2,14 +2,14 @@
 
 Split one solid mesh into separate, color-coded parts for multi-color or multi-piece printing, right inside OrcaSlicer. You can also scale, rotate, transform, or replace subsections of a mesh. For the example photo, I made the eyes 1 part, then replaced them with a flipped version to change where the figure looked. It also runs in **any browser**.
 
-![A curling-stone figure split into 10 color-coded parts](docs/screenshot.png)
+![Splitting a curling-stone figure, picking the eyes as a part, and replacing them with a flipped version](docs/demo.gif)
 
 ## Features
 
 - **Split in a few clicks:** auto split, split by shells, or click a seed per part. Cuts follow the model's creases.
 - **One color per part:** each part gets its own filament slot. Rename, hide, or show only one part.
 - **Move, rotate, scale:** drag handles in the view (W / E / R, Shift to snap), with undo.
-- **Replace with…:** right-click a part and swap in another STL. It snaps onto the joint and keeps the part's name and filament.
+- **Replace with…:** right-click a part and swap in another STL. It snaps onto the joint and keeps the part's name and filament. A replacement made from the same model, such as edited eyes, stays in place.
 - **Send to Orca:** one multi-part 3MF, every part on its filament. Painted 3MF, merged STL and per-part STLs are also available.
 - **Optional AI part naming:** suggests part names and flags bad cuts (browser version).
 
@@ -75,6 +75,7 @@ The key stays in the local server and is never sent to the page.
 - `app/index.html`: the whole app, a single HTML file.
 - `plugin/`: OrcaSlicer plugin. `npm ci && uv run python build.py` writes `dist/mesh_splitter_any.py`. Tests: `uv run python test_plugin.py`.
 - `server/`: local server behind `uv run mesh-splitter` and the AI naming proxy.
+- `docs/demo/`: script that records `docs/demo.gif` with headless Chromium and ffmpeg: `node docs/demo/record.mjs` (needs `npm ci` in `plugin/`). Steps, timing, camera and size are in `docs/demo/demo.config.json`. The meshes come from `prep_curling.py` and aren't in the repo.
 
 The OrcaCloud listing description lives in `plugin/DESCRIPTION.md`. OrcaCloud's GitHub publishing only takes the version, changelog and files, so paste it into **Edit plugin** when it changes.
 
@@ -84,4 +85,4 @@ CI builds and tests the plugin on every push, and publishes it to the release fr
 
 MIT, see [LICENSE](LICENSE).
 
-The figure in the screenshot is a model created with [Meshy](https://www.meshy.ai/) under the [CC BY 4.0 License](https://creativecommons.org/licenses/by/4.0/). The model is not included in this repo.
+The figure in the demo is a model created with [Meshy](https://www.meshy.ai/) under the [CC BY 4.0 License](https://creativecommons.org/licenses/by/4.0/). The model is not included in this repo.
