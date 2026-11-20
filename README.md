@@ -9,6 +9,7 @@ Split one solid mesh into separate, color-coded parts for multi-color or multi-p
 - **Split in a few clicks:** auto split, split by shells, or click a seed per part. Cuts follow the model's creases.
 - **One color per part:** each part gets its own filament slot. Rename, hide, or show only one part.
 - **Move, rotate, scale:** drag handles in the view (W / E / R, Shift to snap), with undo.
+- **Rotate on joint:** spin a part about its cut's axis (J), so a part on an angled surface stays seated on it.
 - **Replace with…:** right-click a part and swap in another STL. It snaps onto the joint and keeps the part's name and filament. A replacement made from the same model, such as edited eyes, stays in place.
 - **Send to Orca:** one multi-part 3MF, every part on its filament. Painted 3MF, merged STL and per-part STLs are also available.
 - **Optional AI part naming:** suggests part names and flags bad cuts (browser version).
@@ -36,6 +37,7 @@ It opens at `http://127.0.0.1:8766/app/`. Everything runs locally, and nothing i
 | Key | Action |
 | --- | --- |
 | W / E / R / Q | Move / rotate / scale handles, then hide them |
+| J | Rotate on joint: one ring about the part's cut axis, pivoting at the cut's center |
 | Shift (while dragging) | Snap to 1 mm, 15° or 5% |
 | C | Toggle part colors / filament colors |
 | Home | Frame the model |
