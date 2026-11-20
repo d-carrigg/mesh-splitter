@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.8](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.7...v0.3.8) (2026-11-20)
+
+
+### Features
+
+* demo GIF recorder and in-place Replace ([#22](https://github.com/d-carrigg/mesh-splitter/issues/22)) ([6095364](https://github.com/d-carrigg/mesh-splitter/commit/60953647de1637a8316a34c76af5bb5bf9ca4c04))
+* heal joint, stretch a moved part near its cut so it stays flush ([#24](https://github.com/d-carrigg/mesh-splitter/issues/24)) ([64555c7](https://github.com/d-carrigg/mesh-splitter/commit/64555c7cf1534ece8b2a719435365c0d372d7b70))
+* rotate a part on its joint so it stays seated ([#23](https://github.com/d-carrigg/mesh-splitter/issues/23)) ([f05f71c](https://github.com/d-carrigg/mesh-splitter/commit/f05f71cda81802002230c2f4ba286134552cad84))
+
+
+### Bug Fixes
+
+* send OrcaCloud a plain-text changelog instead of release-please markdown ([#21](https://github.com/d-carrigg/mesh-splitter/issues/21)) ([1b10abc](https://github.com/d-carrigg/mesh-splitter/commit/1b10abc4358aafd0e32e548e157c937d7d5a1baa))
+
+
+### Documentation
+
+* feature docs with screenshots, before/after images and GIFs ([#25](https://github.com/d-carrigg/mesh-splitter/issues/25)) ([d8bfe10](https://github.com/d-carrigg/mesh-splitter/commit/d8bfe10f2b1dab40520bea4e019ed36791a3cde3))
+* link the feature docs from the plugin description ([#26](https://github.com/d-carrigg/mesh-splitter/issues/26)) ([9fb2193](https://github.com/d-carrigg/mesh-splitter/commit/9fb219390b9c3c239aaa5bc4943551178c68a922))
+* update plugin description ([#19](https://github.com/d-carrigg/mesh-splitter/issues/19)) ([01fbd42](https://github.com/d-carrigg/mesh-splitter/commit/01fbd4295688ff3fb8967a19c9c1df10efaf2e14))
+
 ## [0.3.7](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.6...v0.3.7) (2026-11-20)
 
 
