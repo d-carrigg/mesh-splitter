@@ -1,7 +1,7 @@
 name: OrcaSlicer plugin
 
 # Builds the Mesh Splitter plugin for OrcaSlicer (plugin/) from app/index.html, tests it,
-# and uploads dist/mesh_splitter_any.py. On main it also refreshes the "orca-plugin" release so the
+# and uploads dist/mesh_splitter_any.py (version: pyproject.toml [project].version). On main it also refreshes the "orca-plugin" release so the
 # latest build has a stable download link.
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
         run: uv sync
       - run: npm ci
       - name: Build
-        run: uv run python build.py --version "0.1.${{ github.run_number }}" --page-out build/page.html
+        run: uv run python build.py --page-out build/page.html   # version from pyproject.toml
       - name: Unit tests
         run: |
           uv run python test_plugin.py
@@ -45,7 +45,7 @@ jobs:
           uv run python verify_3mf.py build/out/snowman_parts.3mf
       - uses: actions/upload-artifact@v4
         with:
-          name: mesh_splitter-0.1.${{ github.run_number }}
+          name: mesh_splitter-${{ github.run_number }}
           path: plugin/dist/mesh_splitter_any.py
       - name: Publish to the orca-plugin release
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

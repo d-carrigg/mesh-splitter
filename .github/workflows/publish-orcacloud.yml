@@ -33,8 +33,11 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv sync
       - run: npm ci
-      - name: Build
-        run: uv run python build.py --version "${GITHUB_REF_NAME#v}"
+      - name: Build (tag must match pyproject.toml)
+        run: |
+          want="$(grep -m1 '^version' ../pyproject.toml | cut -d'"' -f2)"
+          [ "${GITHUB_REF_NAME#v}" = "$want" ] || { echo "::error::tag $GITHUB_REF_NAME != pyproject version $want"; exit 1; }
+          uv run python build.py
       - name: Unit tests
         run: uv run python test_plugin.py
       - name: GitHub release

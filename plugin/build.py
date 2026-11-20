@@ -61,9 +61,17 @@ def build_page():
     return page
 
 
+def project_version():
+    """The single source of the version: [project].version in the repo's pyproject.toml."""
+    m = re.search(r'^version\s*=\s*"([^"]+)"', (HERE.parent / "pyproject.toml").read_text(encoding="utf-8"), re.M)
+    if not m:
+        sys.exit("pyproject.toml: no [project] version")
+    return m.group(1)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--version", default="0.1.0")
+    ap.add_argument("--version", default=project_version(), help="defaults to [project].version in pyproject.toml")
     ap.add_argument("--out", default=str(HERE / "dist" / "mesh_splitter_any.py"))
     ap.add_argument("--page-out", help="also write the bundled page here (for testing in a browser)")
     a = ap.parse_args()
