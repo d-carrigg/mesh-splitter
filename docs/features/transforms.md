@@ -23,11 +23,11 @@ Each part can be moved, rotated and scaled on its own. The change shows in the v
    - **R:** scale handles (corner box = all axes, arrow = one axis). Shift snaps to 5%.
    - **J:** [rotate on joint](#rotate-on-joint).
    - **Q:** hide the handles.
-3. Or type values on the part card: scale %, rotation ° and move mm for X / Y / Z. **uniform** scales all three axes together. The reset button clears the part's transform.
+3. Or type values in the **Transform** panel that opens at the right of the view with the move / rotate / scale tools: position mm, rotation ° and scale % for X / Y / Z. **Uniform scale** scales all three axes together. **Reset** clears the part's transform and **Done** closes the panel.
 
 ### Undo
 
-**Ctrl+Z** undoes and **Ctrl+Y** redoes edits: transforms, splits, fills, merges and replacements. Each handle drag is one undo step. The undo and redo buttons are in the top bar.
+**Ctrl+Z** undoes and **Ctrl+Y** redoes edits: transforms, splits, fills, merges and replacements. Each handle drag is one undo step. The undo and redo buttons are at the top right of the view.
 
 ### Tips
 
@@ -43,7 +43,7 @@ Spins a part about its cut instead of the world axes. The axis is the cut's norm
 ### How to use it
 
 1. Select the part.
-2. Press **J** (or the joint button next to the move / rotate / scale buttons on the part card). One ring appears, with a dashed line showing the joint's axis and the cut outlined in green.
+2. Press **J** (or set **Rotate around** to **Joint** in the Transform panel). One ring appears, with a dashed line showing the joint's axis and the cut outlined in green.
 3. Drag the ring. Hold **Shift** to snap to 15°.
 
 ![Rotate on joint on the handle: one ring, the axis and the cut](img/rotate-joint-ui.png)
@@ -53,7 +53,7 @@ Spins a part about its cut instead of the world axes. The axis is the cut's norm
 ### Tips
 
 - A part with no cut (a separate shell) rotates on the world axes instead, and the status bar says so.
-- The rotation is stored as a normal rotation plus move, so the values on the part card stay editable.
+- The rotation is stored as a normal rotation plus move, so its values stay editable in the Transform panel.
 - If a rotated part still doesn't meet its neighbor exactly (an oval cut, for example), turn on [heal joint](#heal-joint).
 
 ## Heal joint
@@ -65,7 +65,7 @@ After you move or rotate a part, its cut edge may no longer line up with its nei
 ### How to use it
 
 1. Move or rotate a part (see [transforms](#move-rotate-scale-and-undo)).
-2. On the part card, tick **heal joint**.
+2. In the Transform panel, tick **Heal joint**.
 3. Optionally set the **mm blend**: how far from the cut the shape may change. It starts at 20% of the cut's radius (1 to 15 mm); the rest of the part keeps its exact shape.
 
 ### Tips
@@ -84,7 +84,7 @@ Lengthens (over 100%) or shortens a part along its own length, from its joint wi
 ### How to use it
 
 1. Select the part (Ctrl+click to select more, e.g. both arms).
-2. On the part card, type a **stretch %**. It applies to every selected part. 100 turns it off.
+2. Open the Transform panel (move, rotate or scale in the toolbar) and type a **Stretch** %. It applies to every selected part. 100 turns it off.
 
 ### Tips
 
@@ -94,5 +94,5 @@ Lengthens (over 100%) or shortens a part along its own length, from its joint wi
 
 ## Collision warning
 
-After a transform, a part that passes through another part it didn't touch before (the broom stick through the handle) shows **⚠ Goes through …** on its part card, in the status bar and in Check. Parts that share a cut are skipped, since they always touch there.
+After a transform, a part that passes through another part it didn't touch before (the broom stick through the handle) shows **⚠ Goes through …** in its Part section, in the status bar and in Check. Parts that share a cut are skipped, since they always touch there.
 

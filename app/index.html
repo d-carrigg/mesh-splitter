@@ -5,172 +5,209 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mesh Splitter</title>
 <style>
-  :root { color-scheme:dark; accent-color:var(--acc); --bg:#16181c; --panel:#1f2228; --line:#2e323a; --fg:#e6e8eb; --mute:#8b919c; --acc:#4da3ff; --glass:#1f2228f0; }
+  /* OrcaSlicer dark theme (StateColor.cpp, ImGuiWrapper.cpp, and a screenshot of Orca's Scale tool) */
+  :root { color-scheme:dark; accent-color:var(--acc);
+    --bg:#2D2D31; --head:#36363C; --canvas:#5C5C63; --tb:#42454B; --gp:#39393D; --in:#404046; --btn:#3E3E45; --btn2:#46464E;
+    --line:#4A4A51; --sep:#4C4C55; --fg:#EFEFF0; --lbl:#B2B3B5; --mute:#909090; --acc:#009688; --acch:#26A69A; --sel:#223C3C; --hov:#323236; }
   * { box-sizing:border-box; }
   [hidden] { display:none !important; }
-  html:root, html body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:13px/1.35 system-ui,Segoe UI,sans-serif; }
+  html:root, html body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:12.5px/1.35 system-ui,"Segoe UI",sans-serif; }
   body { display:grid; grid-template-rows:auto 1fr; grid-template-columns:auto 1fr; }
-  #top { grid-column:1 / -1; display:flex; align-items:center; gap:6px; padding:6px 10px; background:var(--panel); border-bottom:1px solid var(--line); min-width:0; }
-  #top h1 { font-size:14px; margin:0 6px 0 0; white-space:nowrap; }
-  #fileBtn { max-width:min(46vw, 560px); min-width:0; }
-  #fileName { font-weight:600; overflow:hidden; text-overflow:ellipsis; }
-  #fileInfo { color:var(--mute); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
-  #fileInfo:empty { display:none; }
-  @media (max-width:1100px) { #fileInfo { display:none; } }
-  .caretI { width:14px !important; height:14px !important; opacity:.7; }
+  #top { grid-column:1 / -1; display:flex; align-items:center; gap:8px; height:32px; padding:0 12px; background:#2D2D30; border-bottom:1px solid #242428; }
+  #top h1 { font-size:13px; font-weight:600; margin:0; white-space:nowrap; }
+  body.inOrca { grid-template-rows:1fr; }
+  body.inOrca #top { display:none; }
   .spacer { flex:1; }
-  #toast { position:absolute; left:50%; bottom:34px; transform:translateX(-50%); max-width:min(640px, 90%); background:#3a1f22; border:1px solid #ff5d5d; color:var(--fg); padding:8px 12px; border-radius:8px; z-index:20; cursor:pointer; box-shadow:0 6px 20px #0008; }
-  .split { display:inline-flex; }
-  .split > .pri:first-child { border-radius:5px 0 0 5px; }
-  .split > .caret { border-radius:0 5px 5px 0; border-left-color:#0005; padding:4px 5px; }
+  .caretI { width:14px !important; height:14px !important; opacity:.7; }
+  #toast { position:absolute; left:50%; bottom:34px; transform:translateX(-50%); max-width:min(640px, 90%); background:var(--gp); border-left:3px solid #ff5d5d; color:var(--fg); padding:8px 12px; border-radius:3px; z-index:20; cursor:pointer; box-shadow:0 3px 12px #0008; }
   .mh { color:var(--mute); font-size:11px; text-transform:uppercase; letter-spacing:.06em; padding:6px 8px 2px; }
-  .msep { height:1px; background:var(--line); margin:4px 2px; }
+  .msep { height:1px; background:var(--sep); margin:4px 2px; }
   .menu .sub { display:flex; flex-direction:column; }
   .menu .sub:empty { display:none; }
-  body.inOrca #top { padding:3px 8px; }
-  body.inOrca #top h1 { display:none; }
-  .sep { width:1px; align-self:stretch; background:var(--line); margin:2px 4px; }
-  #side { width:280px; overflow-y:auto; background:var(--panel); border-right:1px solid var(--line); padding:8px 10px 40px; }
-  #view { position:relative; min-width:0; min-height:0; overflow:hidden; }
-  #view canvas { display:block; }
-  html h2 { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--mute); margin:0 auto 0 0; }
+  .sep { width:1px; align-self:stretch; background:#5c5f66; margin:4px 6px; }
+  html h2 { font-size:13px; font-weight:600; color:var(--fg); margin:0 auto 0 0; letter-spacing:0; text-transform:none; }
   /* "html " prefixes outrank the element defaults OrcaSlicer injects into plugin pages (orca-plugin-defaults) */
-  html button { background:#2b3038; color:var(--fg); border:1px solid #3a404a; border-radius:5px; padding:4px 8px; font:inherit; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px; white-space:nowrap; }
-  button:has(svg:only-child) { padding:4px 6px; }
-  svg.i { width:16px; height:16px; flex:none; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
-  html button:hover { border-color:#56606e; filter:none; }
-  .nmEdit { width:100%; box-sizing:border-box; padding:1px 4px; font:inherit; }
-  button.on { background:var(--acc); border-color:var(--acc); color:#06121f; font-weight:600; }
-  button.pri { background:#1d4f86; border-color:#2d6cb0; }
-  button.pri:hover { border-color:var(--acc); }
+  html button { background:var(--btn); color:var(--fg); border:1px solid var(--line); border-radius:4px; padding:3px 9px; min-height:24px; font:inherit; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px; white-space:nowrap; }
+  button:has(svg:only-child) { padding:3px 5px; }
+  svg.i { width:16px; height:16px; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  html button:hover { border-color:#65656A; background:#4D4D54; filter:none; }
+  html button:focus-visible { outline:1px solid var(--acch); outline-offset:1px; }
+  button.on { background:var(--acc) !important; border-color:var(--acc) !important; color:#fff; }
+  html button.pri { background:var(--acc); border-color:var(--acc); color:#fff; font-weight:600; }
+  html button.pri:hover { background:var(--acch); border-color:var(--acch); }
   button.danger:hover { border-color:#ff5d5d; color:#ff8a8a; }
   html button:disabled { opacity:.45; cursor:default; }
+  .nmEdit { width:100%; box-sizing:border-box; padding:1px 4px; font:inherit; }
   .row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:4px 0; }
   .grp { display:flex; gap:2px; align-items:center; }
-  label.sl { display:inline-grid; grid-template-columns:auto 110px 34px; gap:6px; align-items:center; color:var(--mute); }
-  label.sl output { color:var(--fg); text-align:right; }
-  input[type=number] { width:48px; background:#14161a; color:var(--fg); border:1px solid #3a404a; border-radius:4px; padding:2px 4px; font:inherit; }
-  input[type=text] { background:transparent; color:var(--fg); border:1px solid transparent; border-radius:4px; padding:2px 4px; font:inherit; width:100%; }
-  input[type=text]:focus { border-color:#3a404a; background:#14161a; outline:none; }
+  label.sl { display:grid; grid-template-columns:96px 1fr 44px; gap:8px; align-items:center; color:var(--lbl); }
+  label.sl output { color:var(--fg); text-align:right; background:var(--in); border:1px solid var(--line); border-radius:3px; padding:1px 5px; font-variant-numeric:tabular-nums; }
+  input[type=range] { accent-color:var(--acc); width:100%; }
+  input[type=number] { width:56px; background:var(--in); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:2px 5px; font:inherit; text-align:right; font-variant-numeric:tabular-nums; }
+  input[type=text] { background:transparent; color:var(--fg); border:1px solid transparent; border-radius:3px; padding:2px 5px; font:inherit; width:100%; }
+  input[type=text]:focus, input[type=number]:focus { border-color:var(--acc); outline:none; }
+  input[type=checkbox] { accent-color:var(--acc); }
   input[type=color] { width:22px; height:20px; padding:0; border:none; background:none; cursor:pointer; flex:none; }
-  /* floating viewport chrome */
-  .float { position:absolute; background:var(--glass); border:1px solid var(--line); border-radius:8px; box-shadow:0 4px 16px #0006; }
-  #toolbar { top:10px; left:10px; display:flex; gap:4px; align-items:center; padding:4px; z-index:3; }
-  #toolbar button { padding:6px 7px; border-color:transparent; background:transparent; }
-  #toolbar button:hover { background:#2b3038; border-color:#3a404a; }
-  #toolbar button.on { background:var(--acc); color:#06121f; }
-  #opts { top:58px; left:10px; max-width:calc(100% - 330px); display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:6px 10px; z-index:2; white-space:nowrap; }
-  #opts:empty, #opts.hide { display:none; }
-  #opts > [data-for] { display:none; gap:10px; align-items:center; }
-  #opts > [data-for].show { display:flex; flex-wrap:wrap; }
+  .small { font-size:11px; color:var(--mute); }
+  .lbl { color:var(--lbl); }
+
+  /* sidebar, like Orca's Prepare sidebar */
+  #side { width:340px; overflow-y:auto; background:var(--bg); border-right:1px solid #242428; display:flex; flex-direction:column; }
+  .sh { display:flex; align-items:center; gap:6px; min-height:34px; padding:0 10px 0 12px; background:var(--head); border-top:1px solid #242428; border-bottom:1px solid var(--sep); font-weight:600; font-size:13px; flex:none; }
+  .sh > svg.i { color:var(--acch); }
+  .sh button { min-height:22px; padding:2px 7px; font-weight:400; font-size:12px; }
+  .sc { padding:8px 12px; display:flex; flex-direction:column; gap:6px; }
+  #fileName { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #fileInfo { color:var(--mute); font-size:12px; }
+  #fileInfo:empty { display:none; }
+  table.parts { width:100%; border-collapse:collapse; }
+  table.parts td { padding:4px 3px; vertical-align:middle; height:26px; }
+  table.parts td:first-child { padding-left:12px; }
+  table.parts td:last-child { padding-right:10px; }
+  table.parts tr { cursor:pointer; }
+  table.parts tr:hover td { background:var(--hov); }
+  table.parts tr.active td { background:var(--sel); }
+  table.parts tr.msel td { background:#2b3a2e; }
+  table.parts td.nm { width:100%; max-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  table.parts .sw { width:12px; height:12px; border:1.5px solid var(--lbl); border-radius:2px; display:inline-block; vertical-align:-1px; }
+  table.parts .n { color:var(--mute); font-size:11px; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  table.parts .fil { display:inline-grid; place-items:center; min-width:18px; height:18px; padding:0 3px; border-radius:3px; font-size:10px; font-weight:600; color:#fff; text-shadow:0 0 2px #000; }
+  table.parts button { background:none; border:none; padding:2px; color:var(--mute); min-height:0; }
+  table.parts button:hover { color:var(--fg); background:none; }
+  #partCard .pr { display:flex; align-items:center; gap:8px; min-height:26px; }
+  #partCard .pr > .lbl { flex:1; }
+  #partCard input[type=text] { border-color:var(--line); background:var(--bg); width:190px; }
+  #repName { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #repOpts.hide, #healRow.hide { display:none; }
+
+  /* canvas */
+  #view { position:relative; min-width:0; min-height:0; overflow:hidden; background:var(--canvas); }
+  #view canvas { display:block; }
+  .float { position:absolute; background:var(--gp); border-radius:3px; box-shadow:0 3px 12px #0006; }
+  #toolbar { top:0; left:50%; transform:translateX(-50%); display:flex; gap:2px; align-items:center; padding:3px 8px; z-index:3; background:var(--tb); border-radius:0 0 3px 3px; box-shadow:0 -3px 0 #39393C, 0 2px 6px #0004; }
+  #toolbar button { width:38px; height:38px; padding:0; border-color:transparent; background:transparent; color:#B6B6B6; }
+  #toolbar button svg.i { width:22px; height:22px; stroke-width:1.5; }
+  #toolbar button:hover { background:#4D4D54; border-color:transparent; }
+  #toolbar button.on { background:transparent !important; border-color:transparent !important; color:var(--acch); }
+  #acts { top:8px; right:12px; display:flex; gap:6px; align-items:center; background:none; box-shadow:none; z-index:3; }
+  #acts > button { background:var(--tb); border-color:var(--tb); }
+  .split { display:inline-flex; }
+  .split > .pri:first-child { border-radius:4px 0 0 4px; padding:4px 14px; min-height:30px; font-size:13px; }
+  .split > .caret { border-radius:0 4px 4px 0; border-left-color:#0003; padding:4px 6px; }
   .menuWrap { position:relative; }
-  .menu { position:absolute; top:calc(100% + 4px); right:0; min-width:220px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 6px 20px #0008; padding:4px; z-index:10; display:flex; flex-direction:column; }
+  .menu { position:absolute; top:calc(100% + 4px); right:0; min-width:220px; background:var(--gp); border:1px solid var(--line); border-radius:4px; box-shadow:0 6px 20px #0008; padding:4px; z-index:10; display:flex; flex-direction:column; }
   .menu.left { right:auto; left:0; }
   #ctxMenu { position:fixed; top:auto; right:auto; min-width:200px; }
   #ctxMenu .sw { width:10px; height:10px; border-radius:3px; display:inline-block; }
-  #ctxMenu .hd { display:flex; align-items:center; gap:6px; padding:4px 8px 6px; color:var(--mute); font-size:11px; border-bottom:1px solid var(--line); margin-bottom:2px; }
+  #ctxMenu .hd { display:flex; align-items:center; gap:6px; padding:4px 8px 6px; color:var(--mute); font-size:11px; border-bottom:1px solid var(--sep); margin-bottom:2px; }
   .menu button { width:100%; justify-content:flex-start; background:none; border-color:transparent; padding:6px 8px; }
-  .menu button:hover { background:#2b3038; }
+  .menu button:hover { background:#4D4D54; border-color:transparent; }
   .menu .meta { margin-left:auto; padding-left:12px; color:var(--mute); font-size:11px; }
-  #dropOrca { display:flex; flex-direction:column; gap:2px; min-width:280px; }
-  #dropOrca button { justify-content:flex-start; background:none; border-color:transparent; font-size:13px; padding:5px 8px; }
-  #dropOrca button:hover { background:#2b3038; }
-  #dropOrca .meta { margin-left:auto; padding-left:12px; color:var(--mute); font-size:11px; }
-  #dropRecent { display:flex; flex-direction:column; gap:2px; min-width:280px; }
-  #dropRecent button { justify-content:flex-start; background:none; border-color:transparent; font-size:13px; padding:5px 8px; }
-  #dropRecent button:hover { background:#2b3038; }
-  #dropRecent .meta { margin-left:auto; padding-left:12px; color:var(--mute); font-size:11px; }
-  #rightCol { position:absolute; top:10px; right:10px; bottom:34px; width:290px; display:flex; flex-direction:column; gap:8px; pointer-events:none; z-index:2; }
-  #rightCol > .card { pointer-events:auto; position:static; padding:8px 10px; overflow-y:auto; min-height:0; flex:none; max-height:100%; }
-  #rightCol > .card.grow { flex:0 1 auto; }
-  .card[hidden] { display:none; }
+  #dropOrca, #dropRecent { display:flex; flex-direction:column; gap:2px; min-width:280px; }
+  #dropOrca button, #dropRecent button { justify-content:flex-start; background:none; border-color:transparent; font-size:13px; padding:5px 8px; }
+  #dropOrca button:hover, #dropRecent button:hover { background:#4D4D54; }
+  #dropOrca .meta, #dropRecent .meta { margin-left:auto; padding-left:12px; color:var(--mute); font-size:11px; }
+  /* tool panels hang under their toolbar icon, like Orca's gizmo panels */
+  .gp { top:48px; right:12px; max-height:calc(100% - 140px); overflow:auto; z-index:4; padding:12px 16px 10px; display:flex; flex-direction:column; gap:8px; width:320px; }
+  .gp h3 { margin:0; font-size:13.5px; font-weight:600; }
+  .gp .ft { display:flex; align-items:center; gap:8px; border-top:1px solid var(--sep); padding-top:9px; margin-top:2px; }
+  .gp button { background:var(--btn2); border-color:var(--btn2); }
+  .gp button.pri { background:var(--acc); border-color:var(--acc); }
+  .seg { display:inline-flex; background:#2D2D31; border-radius:12px; padding:2px; }
+  html .seg button { background:transparent; border:none; border-radius:10px; color:var(--lbl); padding:2px 11px; min-height:22px; }
+  html .seg button:hover { background:#4D4D54; color:var(--fg); }
+  html .seg button.on { background:var(--acc) !important; color:#fff; font-weight:400; }
+  #splitPanel [data-m] { display:none; flex-direction:column; gap:8px; }
+  #splitPanel [data-m].show { display:flex; }
+  #paintSw { display:flex; flex-wrap:wrap; gap:5px; }
+  html #paintSw button { width:26px; height:26px; min-height:0; padding:0; border:none; border-radius:4px; color:#fff; font-size:11px; font-weight:600; text-shadow:0 0 2px #000; }
+  html #paintSw button.on { box-shadow:0 0 0 2px var(--gp), 0 0 0 4px var(--fg); }
+  #paintTools button { width:36px; height:36px; padding:0; background:var(--in); }
+  .xf { display:grid; grid-template-columns:1fr repeat(3, 66px) 22px; gap:5px 6px; align-items:center; color:var(--lbl); }
+  .xf input[type=number] { width:100%; }
+  .xf .ax { font-size:11px; text-align:center; }
+  .xf .u { color:var(--mute); font-size:11px; }
+  #rightCol { position:absolute; top:52px; right:12px; bottom:90px; width:300px; display:flex; flex-direction:column; gap:8px; pointer-events:none; z-index:2; }
+  #rightCol > .card { pointer-events:auto; position:static; padding:12px 14px; overflow-y:auto; min-height:0; flex:0 1 auto; max-height:100%; }
   .cardHead { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
-  .cardHead input[type=text] { font-weight:600; }
   .cardHead button { background:none; border-color:transparent; color:var(--mute); }
   .cardHead button:hover { color:var(--fg); }
-  .sub { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:10px 0 4px; }
-  #status { position:absolute; left:10px; bottom:8px; color:var(--mute); font-size:12px; pointer-events:none; }
+  #info { right:0; bottom:0; border-radius:0; border-left:3px solid #05A394; padding:7px 14px 7px 10px; line-height:1.55; font-variant-numeric:tabular-nums; z-index:2; pointer-events:none; }
+  #status { position:absolute; left:12px; bottom:8px; color:#D0D0D3; font-size:12px; pointer-events:none; text-shadow:0 1px 2px #0008; }
   #busy { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:#0008; font-size:15px; z-index:5; }
-  #drop { position:absolute; inset:20px; pointer-events:none; border:2px dashed #4b5360; border-radius:12px; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; color:var(--mute); font-size:16px; }
+  #drop { position:absolute; inset:20px; pointer-events:none; border:2px dashed #7a7a82; border-radius:8px; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; color:#D0D0D3; font-size:16px; }
   #drop button, #drop #dropRecent { pointer-events:auto; }
   #drop > button { font-size:14px; padding:8px 14px; }
-  body.empty #side, body.empty #toolbar, body.empty #opts, body.empty #rightCol { display:none; }
+  body.empty #side, body.empty #toolbar, body.empty #acts, body.empty #rightCol, body.empty .gp, body.empty #info { display:none !important; }
   body.empty #view { grid-column:1 / -1; }
-  body.empty #top .needMesh { opacity:.45; pointer-events:none; }
   #placeHint { pointer-events:none; padding:3px 8px; font-size:12px; z-index:6; transform:translate(14px, 14px); white-space:nowrap; }
   #view.placing canvas { cursor:crosshair; }
   #flowPop { z-index:4; padding:8px 10px; width:max-content; }
   #flowPop .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
-  #flowPop::before { content:""; position:absolute; left:-6px; top:16px; border:6px solid transparent; border-left:0; border-right-color:var(--line); }
-  #autoPop { top:58px; z-index:4; padding:6px 10px; display:flex; gap:8px; align-items:center; white-space:nowrap; }
-  #autoPop[hidden] { display:none; }
-  table.parts { width:100%; border-collapse:collapse; margin-top:6px; }
-  table.parts td { padding:3px 2px; border-bottom:1px solid var(--line); vertical-align:middle; }
-  table.parts tr { cursor:pointer; }
-  table.parts tr:hover td { background:#242a32; }
-  table.parts tr.active td { background:#27313d; }
-  table.parts tr.msel td { background:#2a2f22; }
-  table.parts td.nm { width:100%; max-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  table.parts .sw { width:12px; height:12px; border-radius:3px; display:inline-block; vertical-align:-1px; }
-  table.parts .n { color:var(--mute); font-size:11px; text-align:right; white-space:nowrap; }
-  table.parts button { background:none; border:none; padding:2px; color:var(--mute); }
-  table.parts button:hover { color:var(--fg); }
-  .small { font-size:11px; color:var(--mute); }
-  .xf { display:grid; grid-template-columns:24px repeat(3, 1fr); gap:4px 6px; align-items:center; color:var(--mute); }
-  .xf input[type=number] { width:100%; }
-  .xf .ax { font-size:10px; text-align:center; color:var(--mute); }
-  .xf svg.i { width:14px; height:14px; }
-  #repOpts.hide, #healRow.hide, #stretchRow.hide, #followRow:empty, #hitRow:empty { display:none; }
+  #aiModel, #aiNote { width:100%; background:var(--in); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:3px 5px; font:inherit; }
+  #followRow:empty, #hitRow:empty, #stretchRow.hide { display:none; }
   #followRow .chip { display:inline-flex; align-items:center; gap:4px; padding:1px 6px; border:1px solid var(--line); border-radius:10px; }
-  #followRow .chip button { padding:0 4px; min-width:0; border:0; background:none; color:var(--mute); }
-  #aiModel, #aiNote { width:100%; background:#14161a; color:var(--fg); border:1px solid #3a404a; border-radius:4px; padding:3px 5px; font:inherit; }
+  #followRow .chip button { padding:0 4px; min-width:0; min-height:0; border:0; background:none; color:var(--mute); }
   #aiOut { margin-top:6px; }
   #aiOut .sec { color:var(--mute); font-size:11px; text-transform:uppercase; letter-spacing:.06em; margin:8px 0 3px; }
   #aiOut .nm { display:grid; grid-template-columns:18px 44px 1fr; gap:4px; align-items:center; padding:1px 0; }
   #aiOut .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
-  #aiOut .iss { padding:4px 6px; border-left:3px solid var(--mute); margin:3px 0; background:#191c21; cursor:pointer; border-radius:0 4px 4px 0; }
-  #aiOut .iss:hover { background:#232831; }
+  #aiOut .iss { padding:4px 6px; border-left:3px solid var(--mute); margin:3px 0; background:#323236; cursor:pointer; border-radius:0 3px 3px 0; }
+  #aiOut .iss:hover { background:#3a3a3f; }
   #aiOut .iss.high { border-color:#ff5d5d; } #aiOut .iss.medium { border-color:#f5a623; } #aiOut .iss.low { border-color:#6fa8ff; }
   #aiOut .fix { color:var(--mute); font-size:11px; }
 </style>
 </head>
 <body class="empty">
-<header id="top">
-  <h1>Mesh Splitter</h1>
-  <span class="menuWrap"><button id="fileBtn" data-icon="open" title="Open a model, recent files, sessions"><span id="fileName">Open a model</span><span id="fileInfo"></span><svg class="i caretI" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
-    <div id="fileMenu" class="menu left" hidden>
-      <div class="orcaOnly mh" hidden>From the plate</div>
-      <div id="orcaMenu" class="orcaOnly sub" hidden></div>
-      <button id="openBtn" data-icon="open" title="Open STL / 3MF">Open file…<span class="meta">Ctrl+O</span></button>
-      <div id="recentHd" class="mh">Recent</div>
-      <div id="recentMenu" class="sub"></div>
-      <div class="msep"></div>
-      <button id="saveSess" class="needMesh" data-icon="save" title="Save the split (labels, part names, transforms) as .json">Save session</button>
-      <button id="loadSess" class="needMesh" data-icon="load" title="Load a saved .json session for this mesh">Load session…</button>
-    </div></span>
-  <span class="sep"></span>
-  <button id="undoBtn" disabled data-icon="undo" title="Undo (Ctrl+Z)"></button>
-  <button id="redoBtn" disabled data-icon="redo" title="Redo (Ctrl+Y)"></button>
-  <span class="spacer"></span>
-  <span class="menuWrap needMesh split"><button id="expMain" class="pri" data-icon="download" title="One object, each part a separate part with its filament slot set (opens as parts in OrcaSlicer / Bambu Studio)">Export 3MF</button><button id="expBtn" class="pri caret" title="More export formats"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="m6 9 6 6 6-6"/></svg></button>
-    <div id="expMenu" class="menu" hidden>
-      <button id="expParts" data-icon="package" title="One object, each part a separate part with its filament slot set (opens as parts in OrcaSlicer / Bambu Studio)">Multi-part 3MF</button>
-      <button id="exp3mf" data-icon="palette" title="Same mesh, each triangle painted with its part's filament slot (Bambu/Orca color painting)">Painted 3MF</button>
-      <button id="expStl" data-icon="package" title="One closed STL per part, cut faces capped (.zip)">Part STLs (.zip)</button>
-      <button id="expMerged" data-icon="merge" title="Whole model as one STL, with moved/replaced parts in place">Merged STL</button>
-    </div></span>
-  <input id="fileIn" type="file" accept=".stl,.3mf" hidden>
-  <input id="sessIn" type="file" accept=".json" hidden>
-</header>
+<header id="top"><h1>Mesh Splitter</h1></header>
 
 <aside id="side">
-  <div class="row">
-    <h2>Parts</h2>
-    <button id="mergeBtn" data-icon="merge" title="Merge the selected parts" hidden></button>
+  <div class="sh"><svg class="i" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>Model<span class="spacer"></span>
+    <span class="menuWrap"><button id="fileBtn" title="Open a model, recent files, sessions"><span id="fileBtnLbl">Open</span><svg class="i caretI" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div id="fileMenu" class="menu" hidden>
+        <div class="orcaOnly mh" hidden>From the plate</div>
+        <div id="orcaMenu" class="orcaOnly sub" hidden></div>
+        <button id="openBtn" data-icon="open" title="Open STL / 3MF">Open file…<span class="meta">Ctrl+O</span></button>
+        <div id="recentHd" class="mh">Recent</div>
+        <div id="recentMenu" class="sub"></div>
+        <div class="msep"></div>
+        <button id="saveSess" class="needMesh" data-icon="save" title="Save the split (labels, part names, transforms) as .json">Save session</button>
+        <button id="loadSess" class="needMesh" data-icon="load" title="Load a saved .json session for this mesh">Load session…</button>
+      </div></span>
+  </div>
+  <div class="sc"><div id="fileName">Open a model</div><div id="fileInfo"></div></div>
+  <div class="sh"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>Parts<span class="spacer"></span>
+    <button id="mergeBtn" data-icon="merge" title="Merge the selected parts" hidden>Merge</button>
     <button id="showAll" data-icon="eye" title="Show all parts"></button>
-    <button id="addPart" data-icon="plus" title="New part: click it on the model"></button>
+    <button id="addPart" data-icon="plus" title="New part: click it on the model">Add</button>
+    <button id="aiToggle" data-icon="sparkle" title="Name parts with AI, and check parts">AI names</button>
   </div>
   <table class="parts"><tbody id="partsBody"></tbody></table>
+  <div id="partCard" hidden>
+    <div class="sh">Part<span class="spacer"></span>
+      <button id="soloBtn" data-icon="solo" title="Show only this part">Solo</button>
+      <button id="clrSeeds" data-icon="eraser" title="Clear this part's seeds"></button>
+      <button id="pcDel" class="danger" data-icon="trash" title="Delete part, its faces join the neighboring part (Del)">Delete</button>
+      <button id="pcClose" data-icon="x" title="Deselect (Esc)"></button>
+    </div>
+    <div class="sc">
+      <div class="pr"><span class="lbl">Name</span><input id="pcColor" type="color" title="Display color"><input id="pcName" type="text"></div>
+      <div class="pr"><span class="lbl">Filament slot</span><input id="pcFil" type="number" min="1" max="32" title="Filament slot"></div>
+      <div class="row small" id="hitRow" style="color:#f0a030" title="This part now passes through another part it didn't touch before. Move, rotate or stretch one of them."></div>
+      <div class="row small" id="followRow" title="Parts that move with this one keep their place relative to it (right-click a part > Move with…)"></div>
+      <div class="pr"><span class="lbl">Replace with file</span><button id="repDel" data-icon="trash" title="Remove the replacement (old part comes back)"></button><button id="repBtn" data-icon="replace" title="Swap this part for another STL/3MF, lined up on the old part's joint">Replace…</button></div>
+      <input id="repIn" type="file" accept=".stl,.3mf" hidden>
+      <div id="repName" class="small"></div>
+      <div class="row" id="repOpts">
+        <button id="repFlip" title="Attach by the other end of the replacement">Flip</button>
+        <button id="repRoll" title="Roll 90° about the joint axis">Roll 90°</button>
+        <button id="repPick" title="Then click the spot on the replacement that attaches. When a picked joint is set, this button goes back to auto">Pick joint</button>
+        <label class="small" title="Keep the replacement where it sits in its file (for a part edited from this same model) instead of lining it up on the joint"><input id="repKeep" type="checkbox"> in place</label>
+        <label id="repFitL" class="small" title="Scale the replacement so its longest dimension matches the old part's"><input id="repFit" type="checkbox"> fit</label>
+        <label id="repEmbedL" class="small" title="How far the replacement sinks into the rest so the slicer fuses them">embed <input id="repEmbed" type="number" step="0.5" min="0" style="width:48px"> mm</label>
+      </div>
+    </div>
+  </div>
 </aside>
 
 <div id="view">
@@ -179,106 +216,88 @@
 
   <div id="toolbar" class="float">
     <div class="grp" data-tools="orbit"></div>
+    <button id="autoBtn" data-icon="auto" title="Split (A): auto, seeds, paint or shells"></button>
     <span class="sep"></span>
-    <div class="grp" data-tools="seed">
-      <button id="autoBtn" data-icon="auto" title="Auto split into N parts"></button>
-      <button id="shellBtn" data-icon="shells" title="One part per disconnected shell"></button>
-    </div>
+    <span class="grp" id="gzModes">
+      <button data-gz="translate" data-icon="move" title="Move (W). Shift snaps to 1 mm"></button>
+      <button data-gz="rotate" data-icon="rotate" title="Rotate (E). Shift snaps to 15°"></button>
+      <button data-gz="scale" data-icon="scale" title="Scale (R): corner box = all axes, arrows = one axis. Shift snaps to 5%"></button>
+    </span>
     <span class="sep"></span>
-    <div class="grp" data-tools="fill,brush">
-      <button id="smoothBtn" data-icon="smooth" title="Smooth part boundaries: split the triangles along a smoothed boundary line (also runs after every segment)"></button>
-    </div>
-    <span class="sep"></span>
-    <div class="grp">
-      <button id="aiChk" data-icon="check" title="Check parts: fragments, slivers, unassigned faces"></button>
-      <button id="aiToggle" data-icon="sparkle" title="AI part naming"></button>
-    </div>
-    <span class="sep"></span>
-    <div class="grp">
-      <button id="colorMode" data-icon="droplet" title="Filament colors (C): parts on the same filament slot show one color"></button>
-      <button id="frameBtn" data-icon="frame" title="Frame view (Home)"></button>
-    </div>
+    <button id="aiChk" data-icon="check" title="Check parts: fragments, slivers, unassigned faces"></button>
+    <button id="colorMode" data-icon="droplet" title="Filament colors (C): parts on the same filament slot show one color"></button>
+    <button id="frameBtn" data-icon="frame" title="Frame view (Home)"></button>
   </div>
 
-  <div id="autoPop" class="float" hidden>
-    <span class="small">Parts</span><input id="autoK" type="number" min="2" max="32" placeholder="auto" title="Leave empty to pick the number automatically">
-    <label class="small" title="Split only the selected part"><input id="autoScope" type="checkbox"> selected only</label>
-    <button id="autoRun" class="pri" data-icon="auto">Split</button>
+  <div id="acts" class="float">
+    <button id="undoBtn" disabled data-icon="undo" title="Undo (Ctrl+Z)"></button>
+    <button id="redoBtn" disabled data-icon="redo" title="Redo (Ctrl+Y)"></button>
+    <span class="menuWrap needMesh split"><button id="expMain" class="pri" data-icon="download" title="One object, each part a separate part with its filament slot set (opens as parts in OrcaSlicer / Bambu Studio)">Export 3MF</button><button id="expBtn" class="pri caret" title="More export formats"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div id="expMenu" class="menu" hidden>
+        <button id="expParts" data-icon="package" title="One object, each part a separate part with its filament slot set (opens as parts in OrcaSlicer / Bambu Studio)">Multi-part 3MF</button>
+        <button id="exp3mf" data-icon="palette" title="Same mesh, each triangle painted with its part's filament slot (Bambu/Orca color painting)">Painted 3MF</button>
+        <button id="expStl" data-icon="package" title="One closed STL per part, cut faces capped (.zip)">Part STLs (.zip)</button>
+        <button id="expMerged" data-icon="merge" title="Whole model as one STL, with moved/replaced parts in place">Merged STL</button>
+      </div></span>
+    <input id="fileIn" type="file" accept=".stl,.3mf" hidden>
+    <input id="sessIn" type="file" accept=".json" hidden>
   </div>
 
-  <div id="opts" class="float">
-    <div data-for="seed">
-      <label class="sl" title="Concave creases sharper than this separate parts; lower = more sensitive, 0 = pure distance">Crease<input id="lambda" type="range" min="0" max="20" step="0.5" value="2"><output id="lambdaOut"></output></label>
-      <label class="sl" title="Neighbor-averaging passes on the concavity map; more = ignores small dents">Denoise<input id="smooth" type="range" min="0" max="20" step="1" value="4"><output id="smoothOut"></output></label>
-      <button id="clrAllSeeds" data-icon="eraser" title="Clear all seeds"></button>
-      <button id="segBtn" class="pri" data-icon="segment" title="Grow every seeded part from its seeds; boundaries settle on concave creases">Segment</button>
+  <div id="splitPanel" class="float gp" hidden>
+    <h3>Split</h3>
+    <div class="row" style="margin:0;justify-content:space-between"><span class="lbl">Method</span>
+      <span class="seg" id="splitMethods"><button data-method="auto">Auto</button><button data-method="seeds">Seeds</button><button data-method="paint">Paint</button><button data-method="shells">Shells</button></span></div>
+    <div data-m="auto">
+      <label class="sl" title="Leave empty to pick the number automatically">Parts<input id="autoK" type="number" min="2" max="32" placeholder="auto" style="width:100%;text-align:left"><span></span></label>
     </div>
-    <div data-for="fill">
-      <label class="sl" title="Fill stops at concave creases sharper than this">Fill stop<input id="fillAng" type="range" min="2" max="90" step="1" value="25"><output id="fillAngOut"></output></label>
+    <div data-m="auto seeds">
+      <label class="sl" title="Concave creases sharper than this separate parts; lower = more sensitive, 0 = pure distance">Crease step<input id="lambda" type="range" min="0" max="20" step="0.5" value="2"><output id="lambdaOut"></output></label>
+      <label class="sl" title="Neighbor-averaging passes on the concavity map; more = ignores small dents">Smoothing<input id="smooth" type="range" min="0" max="20" step="1" value="4"><output id="smoothOut"></output></label>
     </div>
-    <div data-for="brush">
-      <label class="sl" title="Brush radius (mm). Shift erases">Radius<input id="brushR" type="range" min="0.2" max="30" step="0.1" value="3"><output id="brushROut"></output></label>
+    <div data-m="auto">
+      <label class="lbl" title="Split only the selected part"><input id="autoScope" type="checkbox"> Only inside the selected part</label>
+      <div class="row" style="margin:0"><button id="autoRun" class="pri" data-icon="auto">Split</button></div>
     </div>
+    <div data-m="seeds">
+      <span class="small">Click the model to drop a seed for the selected part. Alt+click removes the nearest seed.</span>
+      <div class="row" style="margin:0"><button id="segBtn" class="pri" data-icon="segment" title="Grow every seeded part from its seeds; boundaries settle on concave creases">Grow from seeds</button><button id="clrAllSeeds" data-icon="eraser" title="Clear all seeds">Clear seeds</button></div>
+    </div>
+    <div data-m="paint">
+      <span class="lbl">Paint into part</span>
+      <div id="paintSw"></div>
+      <div class="grp" id="paintTools" data-tools="brush,fill"></div>
+      <label class="sl" title="Brush radius (mm). Shift erases">Pen size<input id="brushR" type="range" min="0.2" max="30" step="0.1" value="3"><output id="brushROut"></output></label>
+      <label class="sl" title="Fill stops at concave creases sharper than this">Fill stop angle<input id="fillAng" type="range" min="2" max="90" step="1" value="25"><output id="fillAngOut"></output></label>
+      <span class="small">Left mouse paints, Shift erases, right-drag rotates the view.</span>
+    </div>
+    <div data-m="shells">
+      <span class="small">One part per disconnected shell of the mesh.</span>
+      <div class="row" style="margin:0"><button id="shellBtn" class="pri" data-icon="shells" title="One part per disconnected shell">Split by shells</button></div>
+    </div>
+    <div class="ft"><button id="smoothBtn" data-icon="smooth" title="Smooth part boundaries: split the triangles along a smoothed boundary line (also runs after every segment)">Smooth boundaries</button><span class="spacer"></span><button id="splitDone">Done</button></div>
+  </div>
+
+  <div id="xfCard" class="float gp" hidden>
+    <h3>Transform</h3>
+    <div id="xfPanel" class="xf" title="Applies to this part: view, Part STLs, Merged STL and AI part naming.">
+      <span></span><span class="ax" style="color:#E04040">X</span><span class="ax" style="color:#3FBF4F">Y</span><span class="ax" style="color:#3B6CF0">Z</span><span></span>
+      <span>Position</span><input id="xfT0" type="number" step="0.5"><input id="xfT1" type="number" step="0.5"><input id="xfT2" type="number" step="0.5"><span class="u">mm</span>
+      <span>Rotation</span><input id="xfR0" type="number" step="5"><input id="xfR1" type="number" step="5"><input id="xfR2" type="number" step="5"><span class="u">°</span>
+      <span>Scale</span><input id="xfS0" type="number" step="1"><input id="xfS1" type="number" step="1"><input id="xfS2" type="number" step="1"><span class="u">%</span>
+    </div>
+    <label class="lbl" title="Scale X/Y/Z together"><input id="xfLock" type="checkbox" checked> Uniform scale</label>
+    <div class="row" style="margin:0;justify-content:space-between"><span class="lbl">Rotate around</span>
+      <span class="seg"><button id="gzCenter" title="Rotate about the part's center">Part center</button><button id="gzJoint" title="Rotate on joint (J): one ring spins the part about its cut's axis, pivoting at the cut's center, so it stays seated on the part it joins. Shift snaps to 15°">Joint</button></span></div>
+    <div class="row" id="stretchRow" style="margin:0" title="Stretch: lengthen (over 100%) or shorten this part along its length, from its joint with the rest, e.g. an arm from the shoulder. What it holds or carries moves out with its end. Applies to all selected parts."><span class="lbl" style="flex:1">Stretch</span><input id="stretchPct" type="number" min="20" max="500" step="5"><span class="small">%</span></div>
+    <div id="healRow" style="display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--sep);padding-top:9px" title="Heal joint: after a move or rotate, stretch or squeeze this part near its cut so the cut's edge lands back on the neighbor's edge. Only faces within the blend distance of the cut change shape.">
+      <div class="row" style="margin:0"><label class="lbl" style="flex:1"><input id="healOn" type="checkbox"> Heal joint</label><span class="lbl">Blend</span><input id="healR" type="number" min="0.5" step="0.5"><span class="small">mm</span></div>
+      <span class="small">Stretches the part near its cut so it stays flush with its neighbor.</span>
+    </div>
+    <div class="ft"><span class="spacer"></span><button id="xfReset" data-icon="reset" title="Reset this part's transform">Reset</button><button id="xfDone">Done</button></div>
   </div>
 
   <div id="rightCol">
-    <div id="partCard" class="float card" hidden>
-      <div class="cardHead">
-        <input id="pcColor" type="color" title="Display color">
-        <input id="pcName" type="text">
-        <span class="small" title="Filament slot">F</span><input id="pcFil" type="number" min="1" max="32" style="width:40px" title="Filament slot">
-        <button id="pcClose" data-icon="x" title="Deselect (Esc)"></button>
-      </div>
-      <div class="row">
-        <span id="xfDims" class="small" style="margin-right:auto"></span>
-        <button id="soloBtn" data-icon="solo" title="Show only this part"></button>
-        <button id="clrSeeds" data-icon="eraser" title="Clear this part's seeds"></button>
-        <button id="pcDel" class="danger" data-icon="trash" title="Delete part, its faces join the neighboring part (Del)"></button>
-      </div>
-      <div class="sub">
-        <h2>Transform</h2>
-        <span class="grp" id="gzModes">
-          <button data-gz="translate" data-icon="move" title="Move handles in the view (W). Shift snaps to 1 mm"></button>
-          <button data-gz="rotate" data-icon="rotate" title="Rotate rings in the view (E). Shift snaps to 15°"></button>
-          <button data-gz="scale" data-icon="scale" title="Scale handles in the view (R): corner box = all axes, arrows = one axis. Shift snaps to 5%"></button>
-          <button id="gzJoint" data-icon="joint" title="Rotate on joint (J): one ring spins the part about its cut's axis (the cut's normal), pivoting at the cut's center, so it stays seated on the part it joins. Shift snaps to 15°"></button>
-        </span>
-        <label class="small" title="Scale X/Y/Z together"><input id="xfLock" type="checkbox" checked> uniform</label>
-        <button id="xfReset" data-icon="reset" title="Reset this part's transform"></button>
-      </div>
-      <div id="xfPanel" class="xf" title="Applies to this part: view, Part STLs, Merged STL and AI part naming. Pivot is the part's center.">
-        <span></span><span class="ax">X</span><span class="ax">Y</span><span class="ax">Z</span>
-        <span data-icon-span="scale" title="Scale %"></span><input id="xfS0" type="number" step="1"><input id="xfS1" type="number" step="1"><input id="xfS2" type="number" step="1">
-        <span data-icon-span="rotate" title="Rotate °"></span><input id="xfR0" type="number" step="5"><input id="xfR1" type="number" step="5"><input id="xfR2" type="number" step="5">
-        <span data-icon-span="move" title="Move mm"></span><input id="xfT0" type="number" step="0.5"><input id="xfT1" type="number" step="0.5"><input id="xfT2" type="number" step="0.5">
-      </div>
-      <div class="row" id="healRow" title="Heal joint: after a move or rotate, stretch or squeeze this part near its cut so the cut's edge lands back on the neighbor's edge. Only faces within the blend distance of the cut change shape.">
-        <label class="small"><input id="healOn" type="checkbox"> heal joint</label>
-        <input id="healR" type="number" min="0.5" step="0.5" style="width:64px"> <span class="small">mm blend</span>
-      </div>
-      <div class="row" id="stretchRow" title="Stretch: lengthen (over 100%) or shorten this part along its length, from its joint with the rest, e.g. an arm from the shoulder. What it holds or carries moves out with its end. Applies to all selected parts.">
-        <span class="small">stretch</span> <input id="stretchPct" type="number" min="20" max="500" step="5" style="width:64px"> <span class="small">%</span>
-      </div>
-      <div class="row small" id="hitRow" style="color:#f0a030" title="This part now passes through another part it didn't touch before. Move, rotate or stretch one of them."></div>
-      <div class="row small" id="followRow" title="Parts that move with this one keep their place relative to it (right-click a part > Move with…)"></div>
-      <div class="sub">
-        <h2>Replace</h2>
-        <button id="repDel" data-icon="trash" title="Remove the replacement (old part comes back)"></button>
-        <button id="repBtn" data-icon="replace" title="Swap this part for another STL/3MF, lined up on the old part's joint">Replace…</button>
-        <input id="repIn" type="file" accept=".stl,.3mf" hidden>
-      </div>
-      <div id="repName" class="small" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap"></div>
-      <div class="row" id="repOpts">
-        <button id="repFlip" title="Attach by the other end of the replacement">Flip</button>
-        <button id="repRoll" title="Roll 90° about the joint axis">Roll 90°</button>
-        <button id="repPick" title="Then click the spot on the replacement that attaches. When a picked joint is set, this button goes back to auto">Pick joint</button>
-        <label class="small" title="Keep the replacement where it sits in its file (for a part edited from this same model) instead of lining it up on the joint"><input id="repKeep" type="checkbox"> in place</label>
-        <label id="repFitL" class="small" title="Scale the replacement so its longest dimension matches the old part's"><input id="repFit" type="checkbox"> fit</label>
-        <label id="repEmbedL" class="small" title="How far the replacement sinks into the rest so the slicer fuses them">embed <input id="repEmbed" type="number" step="0.5" min="0" style="width:44px"> mm</label>
-      </div>
-    </div>
-
-    <div id="aiCard" class="float card grow" hidden>
+    <div id="aiCard" class="float card" hidden>
       <div class="cardHead">
         <h2>Part names</h2>
         <span id="aiState" class="small"></span>
@@ -297,6 +316,7 @@
     </div>
   </div>
 
+  <div id="info" class="float" hidden></div>
   <div id="ctxMenu" class="menu" hidden></div>
   <div id="placeHint" class="float" hidden>Click the new part</div>
   <div id="flowPop" class="float" hidden>
@@ -395,7 +415,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffe
 renderer.setPixelRatio(window.devicePixelRatio);
 view.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x202329);
+scene.background = new THREE.Color(0x5C5C63);
 const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 10000);
 camera.up.set(0, 0, 1);
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -409,7 +429,9 @@ scene.add(seedGroup);
 
 function resize() {
   const w = view.clientWidth, h = view.clientHeight;
-  renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); render();
+  renderer.setSize(w, h); camera.aspect = w / h;
+  if (camera.view?.enabled) camera.setViewOffset(w, h, camera.view.offsetX, 0, w, h);
+  camera.updateProjectionMatrix(); render();
 }
 function render() { renderer.render(scene, camera); }
 controls.addEventListener("change", render);
@@ -431,6 +453,7 @@ async function loadArrayBuffer(name, buf) {
 function loadRaw(name, raw) {
   Object.assign(S, core.newSplit(name, raw), { hist: { past: [], future: [] } });
   buildMesh();
+  updatePlate();
   frame();
   refreshUI();
   const bb = S.G.bbox;
@@ -800,7 +823,7 @@ const baseMat = (i) => (isIdXf(S.parts[i].xf) ? new THREE.Matrix4() : baseMatrix
 // What part j rides on when it moves with / is carried by part l: l's transform without its stretch, shifted by how
 // far the stretch moves j's center (a hand carried by a stretched arm moves out with the arm's end, unstretched).
 function carryMat(l, j) {
-  const st = S.parts[l].xf?.st, M = baseMat(l);
+  const x = S.parts[l]?.xf, st = x?.st, M = x?.rig ? new THREE.Matrix4().fromArray(x.rig) : baseMat(l); // rig: Reach/Hold matrix without its own stretch
   if (!st || st.k === 1) return M;
   const c = new THREE.Vector3(...ensureXf(j).c), d = c.clone().applyMatrix4(stretchMatrix(st)).sub(c);
   return M.multiply(new THREE.Matrix4().makeTranslation(d.x, d.y, d.z));
@@ -809,7 +832,7 @@ function leaderOf(i) { const f = S.parts[i]?.follow; return f ? S.parts.findInde
 function followersOf(i) { const u = S.parts[i]?.uid; return u ? S.parts.map((q, j) => (j > 0 && q.follow?.to === u ? j : -1)).filter((j) => j > 0) : []; }
 function setXfMatrix(j, M) {
   const x = ensureXf(j), pos = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
-  delete x.m;
+  delete x.m; delete x.rig;
   M.decompose(pos, q, sc);
   const e = new THREE.Euler().setFromQuaternion(q, "XYZ"), c = new THREE.Vector3(...x.c), w = c.clone().applyMatrix4(M);
   x.s = sc.toArray().map((v) => +v.toFixed(5)); x.r = [e.x, e.y, e.z].map((v) => +(v * 180 / Math.PI).toFixed(3));
@@ -817,7 +840,7 @@ function setXfMatrix(j, M) {
 }
 // Call after part i's own transform changed: refresh its offset to its leader, then carry its followers.
 function xfEdited(i) {
-  if (S.parts[i].xf?.m) delete S.parts[i].xf.m;
+  if (S.parts[i].xf?.m) { delete S.parts[i].xf.m; delete S.parts[i].xf.rig; }
   const l = leaderOf(i);
   if (l > 0) S.parts[i].follow.rel = carryMat(l, i).invert().multiply(baseMat(i)).toArray();
   carry(i, new Set([i]));
@@ -870,7 +893,8 @@ function reachPoints(j, k) {
 function reachOf(i) { const r = S.parts[i]?.reach; return r ? S.parts.findIndex((q, j) => j > 0 && q.uid === r.to) : -1; }
 // part.hold = { a, b: holder uids, ga, gb: grip points (original coords) }: the part (a broom stick) is placed so its
 // two grips sit on the two holders (hands) wherever they moved: the grip-to-grip line is turned onto the new one
-// (shortest turn) and centered between the new grips. Parts that move with it are carried.
+// (shortest turn), stretched along it to the new grip distance and centered between the new grips. Parts that move
+// with it are carried rigidly (without the stretch).
 function holdersOf(j) { const h = S.parts[j]?.hold; if (!h) return null; const f = (u) => S.parts.findIndex((q, k) => k > 0 && q.uid === u); const a = f(h.a), b = f(h.b); return a > 0 && b > 0 ? [a, b] : null; }
 function updateHolds() {
   S.parts.forEach((q, j) => {
@@ -878,9 +902,16 @@ function updateHolds() {
     const A0 = new THREE.Vector3(...q.hold.ga), B0 = new THREE.Vector3(...q.hold.gb);
     const A1 = A0.clone().applyMatrix4(partMat(hb[0])), B1 = B0.clone().applyMatrix4(partMat(hb[1]));
     const d0 = B0.clone().sub(A0), d1 = B1.clone().sub(A1); if (d0.lengthSq() < 1e-9 || d1.lengthSq() < 1e-9) return;
+    const kS = q.hold.stretch === false ? 1 : d1.length() / d0.length(); // stretch so both grips land on the hands
     const R = new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(d0.normalize(), d1.normalize()));
-    const m0 = A0.clone().add(B0).multiplyScalar(0.5), m1 = A1.clone().add(B1).multiplyScalar(0.5);
-    setXfMatrix(j, new THREE.Matrix4().makeTranslation(m1.x, m1.y, m1.z).multiply(R).multiply(new THREE.Matrix4().makeTranslation(-m0.x, -m0.y, -m0.z)));
+    const m0 = A0.clone().add(B0).multiplyScalar(0.5), m1 = A1.clone().add(B1).multiplyScalar(0.5), a = d0;
+    const S3 = new THREE.Matrix4().set(
+      1 + (kS-1)*a.x*a.x, (kS-1)*a.x*a.y, (kS-1)*a.x*a.z, 0,
+      (kS-1)*a.y*a.x, 1 + (kS-1)*a.y*a.y, (kS-1)*a.y*a.z, 0,
+      (kS-1)*a.z*a.x, (kS-1)*a.z*a.y, 1 + (kS-1)*a.z*a.z, 0, 0, 0, 0, 1);
+    const M = new THREE.Matrix4().makeTranslation(m1.x, m1.y, m1.z).multiply(R).multiply(S3).multiply(new THREE.Matrix4().makeTranslation(-m0.x, -m0.y, -m0.z));
+    setXfMatrix(j, M); const xh = ensureXf(j); xh.m = M.toArray();
+    xh.rig = new THREE.Matrix4().makeTranslation(m1.x, m1.y, m1.z).multiply(R).multiply(new THREE.Matrix4().makeTranslation(-m0.x, -m0.y, -m0.z)).toArray();
     carry(j, new Set([j]));
   });
 }
@@ -889,7 +920,7 @@ function setHold(j, a, b) { // part j held by parts a and b (a <= 0: release)
   pushUndo();
   const q = S.parts[j];
   if (a > 0) { q.hold = { a: uidOf(a), b: uidOf(b), ga: reachPoints(a, j).e, gb: reachPoints(b, j).e }; delete q.follow; delete q.reach; updateReach(); }
-  else delete q.hold;
+  else { delete q.hold; if (q.xf) { delete q.xf.m; delete q.xf.rig; } }
   afterEdit(a > 0 ? `${q.name} is held by ${S.parts[a].name} and ${S.parts[b].name}` : `${q.name} is no longer held`);
 }
 function updateReach() {
@@ -906,7 +937,8 @@ function updateReach() {
       (kS-1)*a.z*a.x, (kS-1)*a.z*a.y, 1 + (kS-1)*a.z*a.z, 0, 0, 0, 0, 1);
     const R = new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(a, d1.clone().divideScalar(L1)));
     const M = new THREE.Matrix4().makeTranslation(P.x, P.y, P.z).multiply(R).multiply(S3).multiply(new THREE.Matrix4().makeTranslation(-P.x, -P.y, -P.z));
-    setXfMatrix(j, M); ensureXf(j).m = M.toArray();
+    setXfMatrix(j, M); const xr = ensureXf(j); xr.m = M.toArray();
+    xr.rig = new THREE.Matrix4().makeTranslation(P.x, P.y, P.z).multiply(R).multiply(new THREE.Matrix4().makeTranslation(-P.x, -P.y, -P.z)).toArray();
   });
 }
 function setReach(j, k) { // part j reaches for part k (k <= 0: stop)
@@ -914,7 +946,7 @@ function setReach(j, k) { // part j reaches for part k (k <= 0: stop)
   pushUndo();
   const q = S.parts[j];
   if (k > 0) { q.reach = { to: uidOf(k), ...reachPoints(j, k) }; delete q.follow; updateReach(); }
-  else { delete q.reach; if (q.xf) delete q.xf.m; }
+  else { delete q.reach; if (q.xf) { delete q.xf.m; delete q.xf.rig; } }
   afterEdit(k > 0 ? `${q.name} now reaches for ${S.parts[k].name}: it turns at its joint and stretches to stay on it` : `${q.name} stopped reaching`);
 }
 // ---------------------------------------------------------------- stretch
@@ -995,6 +1027,7 @@ function healSoup(i, orig, out) {
   return out;
 }
 
+function filColor(n) { return orcaFil?.[n - 1] || S.parts.find((q) => q.filament === n)?.color || "#666"; }
 let orcaFil = null; // OrcaSlicer's filament colors by slot (plugin), used by the filament view
 let byFilament = false; try { byFilament = localStorage.getItem("meshsplit:byFil") === "1"; } catch {}
 // Display color of part i: its own color, or (filament view) the color of the first part on the same slot.
@@ -1055,6 +1088,22 @@ function drawSeeds() {
   render();
 }
 
+// Print plate under the model, like OrcaSlicer's: 256 mm (an X1/P1 bed) or larger, under the model's footprint
+// with its top at the model's lowest point. Display only: the mesh and every export keep their coordinates.
+let plate = null;
+function updatePlate() {
+  if (plate) { scene.remove(plate); plate.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); }); plate = null; }
+  if (!S.G) return;
+  const b = S.G.bbox, size = Math.max(256, Math.ceil(Math.max(b[3] - b[0], b[4] - b[1]) / 10) * 10 + 20);
+  plate = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshStandardMaterial({ color: 0x3E3E45, roughness: 0.95, metalness: 0 }));
+  base.position.z = -0.3;
+  const grid = new THREE.GridHelper(size, size / 10, 0x6A6A73, 0x55555E);
+  grid.rotation.x = Math.PI / 2;
+  plate.add(base, grid);
+  plate.position.set((b[0] + b[3]) / 2, (b[1] + b[4]) / 2, b[2]);
+  scene.add(plate);
+}
 function frame() {
   const b = S.G.bbox, c = new THREE.Vector3((b[0]+b[3])/2, (b[1]+b[4])/2, (b[2]+b[5])/2), d = S.G.diag;
   controls.target.copy(c);
@@ -1101,9 +1150,8 @@ document.querySelectorAll("[data-tools]").forEach((g) => [...g.dataset.tools.spl
 function setTool(t) {
   S.tool = t;
   document.querySelectorAll("[data-tool]").forEach((b) => b.classList.toggle("on", b.dataset.tool === t));
-  let any = false;
-  document.querySelectorAll("#opts > [data-for]").forEach((d) => { const on = d.dataset.for === t; d.classList.toggle("show", on); any ||= on; });
-  $("opts").classList.toggle("hide", !any);
+  if (t === "seed") showSplit(true, "seeds");
+  else if (t === "fill" || t === "brush") showSplit(true, "paint");
   queueMicrotask(() => syncGizmo()); // the gizmo shows with the Select tool only
 }
 
@@ -1210,7 +1258,7 @@ function refreshUI() {
     tr.title = i ? "Click: select · Ctrl/Shift+click: select more · Right-click: actions" : "Click: select · Right-click: actions";
     tr.innerHTML = `<td><span class="sw" style="background:${p.color}"></span></td>
       <td class="nm">${esc(p.name)}</td>
-      <td class="n" title="Filament slot">F${p.filament}</td>
+      <td title="Filament slot"><span class="fil" style="background:${filColor(p.filament)}">${p.filament}</span></td>
       <td class="n">${cnt[i].toLocaleString()}${p.seeds.length ? ` · ${p.seeds.length}●` : ""}</td>
       <td><button class="eye" title="${p.visible ? "Hide" : "Show"}">${icon(p.visible ? "eye" : "eyeOff")}</button></td>`;
     tr.onclick = (ev) => {
@@ -1452,16 +1500,56 @@ $("pcName").onblur = () => { const p = act(); if (p) $("pcName").value = p.name;
 $("pcFil").onchange = () => { const p = act(); if (p) { p.filament = Math.max(1, Math.min(32, Math.round(+$("pcFil").value || 1))); refreshUI(); autosave(); } };
 $("pcClose").onclick = () => selectPart(0);
 $("pcDel").onclick = () => S.active > 0 && deletePart(S.active);
-// auto split popover
-$("autoBtn").onclick = () => {
-  const pop = $("autoPop"), b = $("autoBtn").getBoundingClientRect(), v = view.getBoundingClientRect();
-  pop.hidden = !pop.hidden; $("autoBtn").classList.toggle("on", !pop.hidden);
-  if (!pop.hidden) { pop.style.left = `${Math.max(8, b.left - v.left - 8)}px`; $("opts").style.visibility = "hidden"; $("autoK").focus(); }
-  else $("opts").style.visibility = "";
-};
-const closeAuto = () => { $("autoPop").hidden = true; $("autoBtn").classList.remove("on"); $("opts").style.visibility = ""; };
-$("autoRun").onclick = () => { closeAuto(); S.G && later(() => autoSplit($("autoK").value === "" ? 0 : Math.max(2, Math.min(32, +$("autoK").value | 0)))); };
+// Tool panels dock at the right of the view. While one is open, the view's center moves to the middle of the
+// space left of it, so the model isn't hidden behind the panel and keeps its size.
+function fitViewToPanels() {
+  const w = view.clientWidth, h = view.clientHeight;
+  const open = [...document.querySelectorAll("#view > .gp")].find((g) => !g.hidden);
+  const shift = open && w > 2 * open.offsetWidth ? Math.round((open.offsetWidth + 12) / 2) : 0;
+  if (shift === (camera.view?.enabled ? camera.view.offsetX : 0)) return;
+  if (shift) camera.setViewOffset(w, h, shift, 0, w, h); else camera.clearViewOffset();
+  render();
+}
+// Split panel: one place for every way to split. Seeds and Paint are the seed / brush / fill tools.
+let splitMethod = "auto";
+function showSplit(on, m = splitMethod) {
+  const P = $("splitPanel");
+  splitMethod = m;
+  P.hidden = !on; $("autoBtn").classList.toggle("on", on);
+  document.querySelectorAll("#splitMethods [data-method]").forEach((b) => b.classList.toggle("on", b.dataset.method === m));
+  P.querySelectorAll("[data-m]").forEach((d) => d.classList.toggle("show", d.dataset.m.split(" ").includes(m)));
+  syncGizmo();
+  if (on) renderPaintSw();
+  fitViewToPanels();
+}
+function setSplitMethod(m) {
+  showSplit(true, m);
+  if (m === "seeds") setTool("seed");
+  else if (m === "paint") setTool(S.tool === "fill" ? "fill" : "brush");
+  else if (S.tool !== "orbit") setTool("orbit");
+}
+document.querySelectorAll("#splitMethods [data-method]").forEach((b) => (b.onclick = () => setSplitMethod(b.dataset.method)));
+const closeAuto = () => { showSplit(false); if (S.tool !== "orbit") setTool("orbit"); };
+$("autoBtn").onclick = () => { if ($("splitPanel").hidden) { setSplitMethod(splitMethod); if (splitMethod === "auto") $("autoK").focus(); } else closeAuto(); };
+$("splitDone").onclick = closeAuto;
+$("autoRun").onclick = () => { $("autoK").blur(); S.G && later(() => autoSplit($("autoK").value === "" ? 0 : Math.max(2, Math.min(32, +$("autoK").value | 0)))); };
 $("autoK").addEventListener("keydown", (e) => { if (e.key === "Enter") $("autoRun").click(); if (e.key === "Escape") closeAuto(); });
+// Paint into part: one swatch per part, numbered like OrcaSlicer's filament swatches.
+function renderPaintSw() {
+  const box = $("paintSw"); if ($("splitPanel").hidden || splitMethod !== "paint" || !S.G) return;
+  box.innerHTML = "";
+  S.parts.forEach((p, i) => {
+    if (!i) return;
+    const b = document.createElement("button");
+    b.textContent = i; b.title = p.name; b.style.background = p.color; b.classList.toggle("on", i === S.active);
+    b.onclick = () => selectPart(i);
+    box.appendChild(b);
+  });
+  const add = document.createElement("button");
+  add.textContent = "+"; add.title = "New part to paint into"; add.style.background = "var(--in)";
+  add.onclick = () => { pushUndo(); S.parts.push(newPart()); S.active = S.parts.length - 1; afterEdit(`${S.parts[S.active].name} added: paint it on the model`); };
+  box.appendChild(add);
+}
 // review card
 const showAi = (on) => { $("aiCard").hidden = !on; $("aiToggle").classList.toggle("on", on); };
 $("aiToggle").onclick = () => showAi($("aiCard").hidden);
@@ -1522,13 +1610,14 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (e.key === "Home" && S.G) { e.preventDefault(); frame(); return; }
-  if (e.key === "Escape") { if (!$("ctxMenu").hidden) closeCtx(); else if (placing) stopPlacing(); else if (flow) closeFlow(); else if (!$("autoPop").hidden) closeAuto(); else if (pickingJoint) { pickingJoint = false; refreshUI(); status(""); } else if (S.G && S.active) selectPart(0); return; }
+  if (e.key === "Escape") { if (!$("ctxMenu").hidden) closeCtx(); else if (placing) stopPlacing(); else if (flow) closeFlow(); else if (pickingJoint) { pickingJoint = false; refreshUI(); status(""); } else if (S.G && S.active) selectPart(0); else if (!$("splitPanel").hidden) closeAuto(); return; }
   if (e.key === "Delete" && S.G && S.active > 0) { deletePart(S.active); return; }
   if (k === "c" && S.G) { setColorMode(!byFilament); return; }
   if (S.G && S.active > 0 && k === "j") { setGizmoJoint(!gzJointOn); return; }
   if (S.G && S.active > 0 && (k === "w" || k === "e" || k === "r")) { setGizmo({ w: "translate", e: "rotate", r: "scale" }[k]); return; }
   if (S.G && k === "q") { setGizmo("off"); return; }
   const t = TOOLS.find((t) => t.key === k);
+  if (k === "a" && S.G) { $("autoBtn").click(); return; }
   if (t) setTool(t.id);
 });
 
@@ -1726,6 +1815,7 @@ function refreshXfPanel() {
   }
   $("clrAllSeeds").disabled = !S.G || !S.parts.some((q) => q.seeds.length);
   $("xfReset").disabled = !ok || isIdXf(p?.xf);
+  $("gzCenter").classList.toggle("on", !gzJointOn);
   $("healRow").classList.toggle("hide", !ok || !!p?.rep);
   $("stretchRow").classList.toggle("hide", !ok || !!p?.rep);
   if (ok && document.activeElement !== $("stretchPct")) $("stretchPct").value = +((p.xf?.st?.k ?? 1) * 100).toFixed(1);
@@ -1745,12 +1835,16 @@ function refreshXfPanel() {
   renderFollowRow(i); renderHitRow(i);
   showXfDims();
   syncGizmo();
+  renderPaintSw();
 }
 function showXfDims() {
   const i = S.active;
-  if (!S.G || !mesh || i <= 0) { $("xfDims").textContent = ""; return; }
-  const b = partWorldBox(i);
-  $("xfDims").textContent = isFinite(b[0]) ? `${(b[3]-b[0]).toFixed(1)} × ${(b[4]-b[1]).toFixed(1)} × ${(b[5]-b[2]).toFixed(1)} mm` : "no faces";
+  const info = $("info");
+  if (!S.G || !mesh || i <= 0) { info.hidden = true; return; }
+  const b = partWorldBox(i), p = S.parts[i];
+  const dims = isFinite(b[0]) ? `${(b[3]-b[0]).toFixed(1)} × ${(b[4]-b[1]).toFixed(1)} × ${(b[5]-b[2]).toFixed(1)} mm` : "no faces";
+  info.innerHTML = `Part name: ${esc(p.name)}<br>Size: ${dims}<br>Triangles: ${partCounts()[i].toLocaleString()} · Filament ${p.filament}`;
+  info.hidden = false;
 }
 $("xfPanel").addEventListener("focusin", () => { if (S.G) xfSnap = snapshot(); });
 $("xfPanel").addEventListener("input", (ev) => {
@@ -1806,6 +1900,10 @@ function syncGizmo() {
   const i = gizmoTarget();
   document.querySelectorAll("#gzModes [data-gz]").forEach((b) => b.classList.toggle("on", gzOn && b.dataset.gz === gzMode));
   $("gzJoint").classList.toggle("on", gzJointOn);
+  const card = $("xfCard"), show = gzOn && i >= 0 && S.tool === "orbit" && !placing && !pickingJoint && $("splitPanel").hidden;
+  card.hidden = !show;
+  fitViewToPanels();
+  $("gzCenter").classList.toggle("on", !gzJointOn);
   if (!gzOn || i < 0 || S.tool !== "orbit" || placing || pickingJoint) { jointAxis.visible = false; if (gizmo.object) { gizmo.detach(); render(); } return; }
   if (gizmo.dragging) return;
   const x = S.parts[i].xf || { s: [1, 1, 1], r: [0, 0, 0], t: [0, 0, 0], c: (() => { const b = partBox(i); return [0, 1, 2].map((k) => (b[k] + b[k+3]) / 2); })() };
@@ -1855,7 +1953,9 @@ function setGizmoJoint(on) {
   }
   syncGizmo();
 }
-$("gzJoint").onclick = () => setGizmoJoint(!gzJointOn);
+$("gzJoint").onclick = () => setGizmoJoint(true);
+$("gzCenter").onclick = () => setGizmoJoint(false);
+$("xfDone").onclick = () => setGizmo("off");
 function setGizmo(mode) {
   if (mode === "off" || (mode === gzMode && gzOn)) gzOn = false; else { gzOn = true; gzMode = mode; }
   try { localStorage.setItem("meshsplit:gizmo", gzOn ? gzMode : "off"); } catch {}
@@ -1967,7 +2067,7 @@ function shoot(view, w, h, mode) {
   shotCam.position.copy(sp.center).addScaledVector(d, dist); shotCam.lookAt(sp.center); shotCam.updateProjectionMatrix();
   shotCam.add(key); // headlight follows the shot camera
   const bg = scene.background, sv = seedGroup.visible, bv = brushRing?.visible;
-  seedGroup.visible = false; if (brushRing) brushRing.visible = false;
+  seedGroup.visible = false; if (brushRing) brushRing.visible = false; if (plate) plate.visible = false;
   if (mode === "id") {
     scene.background = null; shotR.setClearColor(0x000000, 1); shotR.outputColorSpace = THREE.LinearSRGBColorSpace;
     const col = geo.getAttribute("color"), keep = col.array, ids = new Float32Array(keep.length);
@@ -1982,7 +2082,7 @@ function shoot(view, w, h, mode) {
     shotR.outputColorSpace = THREE.SRGBColorSpace;
     shotR.render(scene, shotCam);
   }
-  scene.background = bg; seedGroup.visible = sv; if (brushRing) brushRing.visible = bv;
+  scene.background = bg; seedGroup.visible = sv; if (brushRing) brushRing.visible = bv; if (plate) plate.visible = true;
   camera.add(key);
   return shotR.domElement;
 }
@@ -2429,6 +2529,7 @@ if (ORCA.on) {
   $("toast").onclick = () => ($("toast").hidden = true);
   document.querySelectorAll("#fileMenu .meta").forEach((e) => e.remove()); // Ctrl+O is OrcaSlicer's Open project
   document.querySelectorAll(".orcaOnly").forEach((e) => (e.hidden = false));
+  $("fileBtnLbl").textContent = "From plate";
   $("expMain").lastChild.textContent = "Send to Orca";
   $("expMain").title = "Save a multi-part 3MF (each part keeps its filament slot) to Downloads, then import it in OrcaSlicer with Ctrl+I";
   $("expParts").hidden = true;

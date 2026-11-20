@@ -17,6 +17,7 @@ nav:
   - Move, rotate, scale and heal: features/transforms.md
   - Exporting: features/exporting.md
   - Command line: features/command-line.md
+  - How it works: how-it-works.md
 theme:
   name: material
   logo: icon.png
@@ -40,6 +41,11 @@ markdown_extensions:
   - tables
   - attr_list
   - admonition
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
 validation:
   links:
     anchors: warn

@@ -15,8 +15,8 @@ Splits the whole mesh into parts in one click. Cuts land on concave creases (the
 ### How to use it
 
 1. Open an STL or 3MF. A single-shell mesh is auto split as soon as it opens.
-2. To split again, click **Auto split** in the toolbar.
-3. Set **Parts**, or leave it empty to pick the count automatically. Tick **selected only** to split just the selected part.
+2. To split again, click **Split** in the toolbar (or press **A**). The Split panel opens at the right of the view on **Auto**.
+3. Set **Parts**, or leave it empty to pick the count automatically. Tick **Only inside the selected part** to split just that part.
 4. Click **Split**.
 
 ![Auto split options](img/auto-popup.png)
@@ -24,7 +24,7 @@ Splits the whole mesh into parts in one click. Cuts land on concave creases (the
 ### Tips
 
 - With the automatic count, it over-splits first, then merges neighbors whose shared edge isn't a real crease.
-- Each part gets its own color and filament slot (F2, F3, …). Change either on the part card.
+- Each part gets its own color and filament slot (F2, F3, …). Change either in the sidebar's **Part** section.
 - To refine the result, use [seeds](#seeds-and-add-part), [fill, brush or merge](editing-parts.md#fill). Every step can be undone with Ctrl+Z.
 
 ## Split by shells
@@ -36,7 +36,7 @@ Makes one part per disconnected piece (shell) of the mesh. Use it for files that
 ### How to use it
 
 1. Open the file. The header shows how many shells it has (for example `9 shells`).
-2. Click **Split by shells** in the toolbar (next to **Auto split**).
+2. Click **Split** in the toolbar, pick **Shells**, then click **Split by shells**.
 3. Each shell becomes a part named `Shell 1`, `Shell 2`, … with its own filament slot.
 
 ### Tips
@@ -48,13 +48,13 @@ Makes one part per disconnected piece (shell) of the mesh. Use it for files that
 
 Pick exactly where each part is. Each seed grows across the surface until it meets a crease or another part.
 
-![Three seeds, then Segment](img/seeds.png)
+![Three seeds, then Grow from seeds](img/seeds.png)
 
 ### Seed tool
 
-1. Press **S** (or click the seed tool).
+1. Press **S** (or pick **Seeds** in the Split panel).
 2. Click the model once per part. A click with no part selected starts a new part; with a part selected, it adds another seed to that part. Press **Esc** to deselect before starting the next part. **Alt+click** removes the nearest seed.
-3. Click **Segment**.
+3. Click **Grow from seeds**.
 
 Options:
 
