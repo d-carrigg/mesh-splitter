@@ -146,7 +146,7 @@ flowchart LR
 
 - **Move with:** the follower keeps a fixed offset to its leader: its matrix = leader's matrix × the offset saved when you linked them. Moving the leader carries the follower, and its followers in turn. Moving the follower itself just updates the offset. Loops are refused.
 - **Reach:** for an arm reaching a broom. The part has a **pivot** (its joint with the rest, the shoulder) and an **end** (where it touches the target, the hand on the stick). When the target moves, the part rotates about the pivot so the end points at the target's new position, and it stretches along that line by new length ÷ old length, so the end lands on it.
-- **Hold:** a part held by two others (a stick in two hands). Its two grip points are where it touches each holder. When the holders move, the grip-to-grip line is turned onto the new grip-to-grip line by the shortest rotation and centered between the new grips. With [#32](https://github.com/d-carrigg/mesh-splitter/pull/32) (open) it also stretches along that line so both grips land exactly, and parts that move with it (the broom head) ride along without the stretch.
+- **Hold:** a part held by two others (a stick in two hands). Its two grip points are where it touches each holder. When the holders move, the grip-to-grip line is turned onto the new grip-to-grip line by the shortest rotation and centered between the new grips. It also stretches along that line so both grips land exactly ([#32](https://github.com/d-carrigg/mesh-splitter/pull/32)), and parts that move with it (the broom head) ride along without the stretch.
 
 Links follow parts by an id, not their position in the list, so they survive merges and deletes.
 
