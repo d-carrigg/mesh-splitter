@@ -11,7 +11,7 @@ Turn one solid mesh into separate, color-coded parts for multi-color or multi-pi
 - **Move, rotate, scale:** drag handles in the view (W / E / R, Shift to snap), with undo.
 - **Replace with…:** right-click a part and swap in another STL. It snaps onto the joint and keeps the part's name and filament.
 - **Send to Orca:** one multi-part 3MF, every part on its filament. Painted 3MF, merged STL and per-part STLs are also available.
-- **Optional AI review:** suggests part names and flags bad cuts.
+- **Optional AI part naming:** suggests part names and flags bad cuts (browser version).
 
 ## Install in OrcaSlicer
 
@@ -43,15 +43,38 @@ It opens at `http://127.0.0.1:8766/app/`. Everything runs locally, and nothing i
 | Ctrl+Z / Ctrl+Y | Undo / redo |
 | Right-click | Part actions: rename, show only, replace, … |
 
-## AI review (optional)
+## How it works
 
-**Check** runs local checks and needs no key. **Review** sends rendered views to a vision model on [OpenRouter](https://openrouter.ai/) for part names and cut problems. Put `OPENROUTER_API_KEY=sk-or-...` in a `.env` file in the repo root. The key stays in the local server.
+1. **Face graph:** the mesh is loaded as triangles. For every edge between two faces, it measures the dihedral angle and whether the crease is concave (a valley, where parts usually meet) or convex (a ridge).
+2. **Crease barrier:** each face gets a concavity score, smoothed over its neighbors (the **Smooth** slider) so noise doesn't count as a crease.
+3. **Growing parts from seeds:** every seed grows outward across the face graph. Each face goes to the seed it can reach while crossing the shallowest worst crease on the way. Ties go to the nearer seed by surface distance. So a part fills its whole smooth surface and stops at the valleys around it.
+4. **Auto split:** places seeds by farthest-point sampling, then moves each one to the deepest face of its region and regrows, a few times over. With the automatic count, it over-splits first, then merges neighbors whose shared boundary isn't a real crease.
+5. **Cleanup:** tiny regions are absorbed into their neighbors. Boundaries are snapped onto the nearest crease with a minimum cut. Then the jagged triangle edges along each boundary are smoothed into a clean cut line by splitting the faces it crosses. The surface shape doesn't change.
+6. **Export:** each part becomes its own body, with the filament slot you picked.
+
+**Split by shells** skips all of this and makes one part per disconnected piece of the mesh.
+
+## AI part naming (optional, browser only)
+
+Splitting runs entirely on your machine. Optionally, you can send the result to an AI vision model. It suggests a name for each part and points out bad cuts, such as stray fragments, slivers or a feature split in two. Nothing changes until you click **Apply names**.
+
+It needs the local server, so it works in the browser version (`uv run mesh-splitter`) but not inside the OrcaSlicer plugin. **Check**, which runs the same cut checks locally without AI, works in both.
+
+It currently uses [OpenRouter](https://openrouter.ai/) (OpenAI-compatible API, any vision model it lists).
+
+1. Get an API key from OpenRouter.
+2. Put `OPENROUTER_API_KEY=sk-or-...` in a `.env` file in the repo root. Optionally add `OPENROUTER_MODEL=...` to pick the model.
+3. Run `uv run mesh-splitter`, open a mesh and split it.
+4. Open the AI panel (sparkle button) and click **Review**.
+5. Read the suggested names and issues, then click **Apply names** to keep the names.
+
+The key stays in the local server and is never sent to the page.
 
 ## Development
 
 - `app/index.html`: the whole app, a single HTML file.
 - `plugin/`: OrcaSlicer plugin. `npm ci && uv run python build.py` writes `dist/mesh_splitter_any.py`. Tests: `uv run python test_plugin.py`.
-- `server/`: local server behind `uv run mesh-splitter` and the AI review proxy.
+- `server/`: local server behind `uv run mesh-splitter` and the AI naming proxy.
 
 The OrcaCloud listing description lives in `plugin/DESCRIPTION.md`. OrcaCloud's GitHub publishing only takes the version, changelog and files, so paste it into **Edit plugin** when it changes.
 

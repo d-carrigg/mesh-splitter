@@ -2342,11 +2342,11 @@ function localChecks(st) {
 
 let lastReview = null;
 async function llmStatus() {
-  if (location.protocol === "file:") { $("aiState").textContent = "needs uv run splitter"; return { configured: false }; } // no local server (e.g. inside OrcaSlicer)
+  if (location.protocol === "file:") { $("aiState").textContent = "browser version only"; return { configured: false }; } // no local server (e.g. inside OrcaSlicer)
   try {
     const j = await (await fetch("/api/llm/status")).json();
     $("aiState").textContent = j.configured ? `key: ${j.source}` : "no key";
-    $("aiState").title = j.configured ? "" : "Put OPENROUTER_API_KEY=... in .env (repo root), set the env var, or put {\"api_key\": \"...\"} in tools/openrouter.local.json, then restart the splitter";
+    $("aiState").title = j.configured ? "" : "Put OPENROUTER_API_KEY=... in .env (repo root), set the env var, or put {\"api_key\": \"...\"} in server/openrouter.local.json, then restart uv run mesh-splitter";
     let m = null; try { m = localStorage.getItem("meshsplit:model"); } catch {}
     $("aiModel").value = (m && m !== "google/gemini-2.5-flash") ? m : j.model;
     return j;
