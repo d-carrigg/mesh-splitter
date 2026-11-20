@@ -1,0 +1,64 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "curler.stl",
+ "out": null,
+ "orca": true,
+ "viewport": {
+  "width": 1200,
+  "height": 760
+ },
+ "camera": {
+  "az": 20,
+  "el": 15,
+  "dist": 0.85,
+  "lift": -0.02
+ },
+ "css": "#__cursor { display: none !important }",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "key",
+   "key": "q"
+  },
+  {
+   "do": "click",
+   "target": "#fileBtn",
+   "after": 0
+  },
+  {
+   "do": "shot",
+   "name": "orca-plate-menu",
+   "clip": [
+    0,
+    0,
+    620,
+    300
+   ]
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "eval",
+   "js": "document.body.click()"
+  },
+  {
+   "do": "click",
+   "target": "#expMain",
+   "after": 0.5
+  },
+  {
+   "do": "shot",
+   "name": "orca-send",
+   "clip": [
+    0,
+    0,
+    1200,
+    760
+   ]
+  }
+ ]
+}

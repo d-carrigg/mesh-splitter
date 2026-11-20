@@ -6,14 +6,16 @@ Split one solid mesh into separate, color-coded parts for multi-color or multi-p
 
 ## Features
 
-- **Split in a few clicks:** auto split, split by shells, or click a seed per part. Cuts follow the model's creases.
-- **One color per part:** each part gets its own filament slot. Rename, hide, or show only one part.
-- **Move, rotate, scale:** drag handles in the view (W / E / R, Shift to snap), with undo.
-- **Rotate on joint:** spin a part about its cut's axis (J), so a part on an angled surface stays seated on it.
-- **Heal joint:** after moving or rotating a part, stretch or squeeze it near its cut so the cut's edge lands back on its neighbor (no gap).
-- **Replace with…:** right-click a part and swap in another STL. It snaps onto the joint and keeps the part's name and filament. A replacement made from the same model, such as edited eyes, stays in place.
-- **Send to Orca:** one multi-part 3MF, every part on its filament. Painted 3MF, merged STL and per-part STLs are also available.
-- **Optional AI part naming:** suggests part names and flags bad cuts (browser version).
+Every feature is documented with pictures in [docs/features](docs/features/README.md).
+
+- **Split in a few clicks:** [auto split](docs/features/splitting.md#auto-split), [split by shells](docs/features/splitting.md#split-by-shells), or [click a seed per part](docs/features/splitting.md#seeds-and-add-part). Cuts follow the model's creases.
+- **One color per part:** each part gets its own filament slot. [Rename](docs/features/editing-parts.md#rename), hide, or [show only one part](docs/features/editing-parts.md#show-only-this-part). Fix parts by hand with [fill, brush and merge](docs/features/editing-parts.md#fill).
+- **[Move, rotate, scale](docs/features/transforms.md#move-rotate-scale-and-undo):** drag handles in the view (W / E / R, Shift to snap), with undo.
+- **[Rotate on joint](docs/features/transforms.md#rotate-on-joint):** spin a part about its cut's axis (J), so a part on an angled surface stays seated on it.
+- **[Heal joint](docs/features/transforms.md#heal-joint):** after moving or rotating a part, stretch or squeeze it near its cut so the cut's edge lands back on its neighbor (no gap).
+- **[Replace with…](docs/features/editing-parts.md#replace-with):** right-click a part and swap in another STL. It snaps onto the joint and keeps the part's name and filament. A replacement made from the same model, such as edited eyes, stays in place.
+- **[Send to Orca](docs/features/exporting.md#send-to-orca):** one multi-part 3MF, every part on its filament. Painted 3MF, merged STL and per-part STLs are also available.
+- **Optional [AI part naming](docs/features/editing-parts.md#ai-part-naming):** suggests part names and flags bad cuts (browser version).
 
 ## Install in OrcaSlicer
 
@@ -78,7 +80,7 @@ The key stays in the local server and is never sent to the page.
 - `app/index.html`: the whole app, a single HTML file.
 - `plugin/`: OrcaSlicer plugin. `npm ci && uv run python build.py` writes `dist/mesh_splitter_any.py`. Tests: `uv run python test_plugin.py`.
 - `server/`: local server behind `uv run mesh-splitter` and the AI naming proxy.
-- `docs/demo/`: script that records `docs/demo.gif` with headless Chromium and ffmpeg: `node docs/demo/record.mjs` (needs `npm ci` in `plugin/`). Steps, timing, camera and size are in `docs/demo/demo.config.json`. The meshes come from `prep_curling.py` and aren't in the repo.
+- `docs/demo/`: script that records `docs/demo.gif` with headless Chromium and ffmpeg: `node docs/demo/record.mjs` (needs `npm ci` in `plugin/`). Steps, timing, camera and size are in `docs/demo/demo.config.json`. The meshes come from `prep_curling.py` and aren't in the repo. The same script makes the feature docs' images: `node docs/demo/record.mjs docs/features/demo/*.json`.
 
 The OrcaCloud listing description lives in `plugin/DESCRIPTION.md`. OrcaCloud's GitHub publishing only takes the version, changelog and files, so paste it into **Edit plugin** when it changes.
 

@@ -1,0 +1,177 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "curler.stl",
+ "out": null,
+ "viewport": {
+  "width": 1200,
+  "height": 760
+ },
+ "camera": {
+  "az": 20,
+  "el": 15,
+  "dist": 0.85,
+  "lift": -0.02
+ },
+ "css": "#__cursor { display: none !important }",
+ "steps": [
+  {
+   "do": "load",
+   "split": false
+  },
+  {
+   "do": "shot",
+   "name": "_auto-before",
+   "clip": [
+    330,
+    140,
+    780,
+    620
+   ]
+  },
+  {
+   "do": "click",
+   "target": "#autoBtn",
+   "after": 0
+  },
+  {
+   "do": "shot",
+   "name": "auto-popup",
+   "clip": [
+    280,
+    40,
+    520,
+    140
+   ]
+  },
+  {
+   "do": "click",
+   "target": "#autoRun",
+   "after": 0
+  },
+  {
+   "do": "shot",
+   "name": "_auto-after",
+   "clip": [
+    330,
+    140,
+    780,
+    620
+   ]
+  },
+  {
+   "do": "shot",
+   "name": "_auto-parts-list",
+   "clip": [
+    0,
+    40,
+    280,
+    380
+   ]
+  },
+  {
+   "do": "compare",
+   "left": "_auto-before",
+   "right": "_auto-after",
+   "labels": [
+    "One shell",
+    "Auto split: 11 parts"
+   ],
+   "name": "auto-split"
+  },
+  {
+   "do": "eval",
+   "js": "document.getElementById('clrAllSeeds').click()"
+  },
+  {
+   "do": "load",
+   "split": false
+  },
+  {
+   "do": "key",
+   "key": "s"
+  },
+  {
+   "do": "click",
+   "target": {
+    "at": [
+     5.6,
+     -3.8,
+     78.5
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "target": {
+    "at": [
+     18.9,
+     55.8,
+     119.9
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "target": {
+    "at": [
+     45,
+     -100,
+     24
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "shot",
+   "name": "_seeds-placed",
+   "clip": [
+    330,
+    140,
+    780,
+    620
+   ]
+  },
+  {
+   "do": "set",
+   "target": "#lambda",
+   "value": "8",
+   "after": 0
+  },
+  {
+   "do": "click",
+   "target": "#segBtn",
+   "after": 0
+  },
+  {
+   "do": "shot",
+   "name": "_seeds-segmented",
+   "clip": [
+    330,
+    140,
+    780,
+    620
+   ]
+  },
+  {
+   "do": "compare",
+   "left": "_seeds-placed",
+   "right": "_seeds-segmented",
+   "labels": [
+    "Seed tool (S): one click per part",
+    "Segment"
+   ],
+   "name": "seeds"
+  }
+ ]
+}

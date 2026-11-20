@@ -1,0 +1,316 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "curler.stl",
+ "out": null,
+ "viewport": {
+  "width": 1200,
+  "height": 760
+ },
+ "camera": {
+  "az": 20,
+  "el": 15,
+  "dist": 0.85,
+  "lift": -0.02
+ },
+ "css": "#__cursor { display: none !important }",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "key",
+   "key": "q"
+  },
+  {
+   "do": "click",
+   "target": {
+    "at": [
+     5.6,
+     -3.8,
+     78.5
+    ]
+   },
+   "after": 0
+  },
+  {
+   "do": "shot",
+   "name": "_fill-before",
+   "clip": [
+    480,
+    160,
+    420,
+    360
+   ]
+  },
+  {
+   "do": "key",
+   "key": "f"
+  },
+  {
+   "do": "click",
+   "target": {
+    "at": [
+     -8.5,
+     -5,
+     81.6
+    ]
+   },
+   "after": 0
+  },
+  {
+   "do": "shot",
+   "name": "_fill-after",
+   "clip": [
+    480,
+    160,
+    420,
+    360
+   ]
+  },
+  {
+   "do": "compare",
+   "left": "_fill-before",
+   "right": "_fill-after",
+   "labels": [
+    "Body selected",
+    "Fill (F): click the eye"
+   ],
+   "name": "fill"
+  },
+  {
+   "do": "key",
+   "key": "Control+z"
+  },
+  {
+   "do": "key",
+   "key": "v"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "target": {
+    "at": [
+     18.9,
+     55.8,
+     119.9
+    ]
+   },
+   "after": 0
+  },
+  {
+   "do": "key",
+   "key": "b"
+  },
+  {
+   "do": "set",
+   "target": "#brushR",
+   "value": "8",
+   "after": 0
+  },
+  {
+   "do": "drag",
+   "target": {
+    "at": [
+     5.6,
+     -3.8,
+     78.5
+    ]
+   },
+   "dx": -60,
+   "dy": 30,
+   "by": [
+    140,
+    0
+   ],
+   "after": 0
+  },
+  {
+   "do": "shot",
+   "name": "brush",
+   "clip": [
+    300,
+    40,
+    800,
+    560
+   ]
+  },
+  {
+   "do": "key",
+   "key": "Control+z"
+  },
+  {
+   "do": "key",
+   "key": "v"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "target": "#partsBody tr[data-part=\"7\"]",
+   "after": 0
+  },
+  {
+   "do": "click",
+   "target": "#partsBody tr[data-part=\"5\"]",
+   "mods": [
+    "Shift"
+   ],
+   "after": 0
+  },
+  {
+   "do": "shot",
+   "name": "_merge-before",
+   "clip": [
+    0,
+    40,
+    960,
+    560
+   ]
+  },
+  {
+   "do": "click",
+   "target": "#mergeBtn",
+   "after": 0
+  },
+  {
+   "do": "shot",
+   "name": "_merge-after",
+   "clip": [
+    0,
+    40,
+    960,
+    560
+   ]
+  },
+  {
+   "do": "compare",
+   "left": "_merge-before",
+   "right": "_merge-after",
+   "labels": [
+    "Shift+click two parts",
+    "Merge"
+   ],
+   "name": "merge"
+  },
+  {
+   "do": "key",
+   "key": "Control+z"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "target": {
+    "at": [
+     5.6,
+     -3.8,
+     78.5
+    ]
+   },
+   "button": "right",
+   "after": 0
+  },
+  {
+   "do": "shot",
+   "name": "context-menu",
+   "clip": [
+    500,
+    200,
+    520,
+    400
+   ]
+  },
+  {
+   "do": "shot",
+   "name": "_solo-before",
+   "clip": [
+    330,
+    140,
+    780,
+    580
+   ]
+  },
+  {
+   "do": "click",
+   "target": "#ctxMenu >> text=Show only this",
+   "after": 0
+  },
+  {
+   "do": "shot",
+   "name": "_solo-after",
+   "clip": [
+    330,
+    140,
+    780,
+    580
+   ]
+  },
+  {
+   "do": "compare",
+   "left": "_solo-before",
+   "right": "_solo-after",
+   "labels": [
+    "Right-click a part",
+    "Show only this"
+   ],
+   "name": "show-only"
+  },
+  {
+   "do": "click",
+   "target": "#showAll",
+   "after": 0
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "target": {
+    "at": [
+     18.9,
+     55.8,
+     119.9
+    ]
+   },
+   "after": 0
+  },
+  {
+   "do": "click",
+   "target": "#pcName",
+   "after": 0
+  },
+  {
+   "do": "type",
+   "target": "#pcName",
+   "text": "Handle"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "target": "#partsBody >> text=Handle",
+   "button": "right",
+   "after": 0
+  },
+  {
+   "do": "shot",
+   "name": "rename",
+   "clip": [
+    0,
+    40,
+    1200,
+    420
+   ]
+  }
+ ]
+}

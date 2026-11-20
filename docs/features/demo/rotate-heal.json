@@ -1,0 +1,116 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "curler.stl",
+ "out": null,
+ "viewport": {
+  "width": 1200,
+  "height": 800
+ },
+ "deviceScaleFactor": 1.5,
+ "camera": {
+  "az": 20,
+  "el": 22,
+  "dist": 0.62,
+  "lift": 0.2
+ },
+ "css": "#__cursor { display: none !important }",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "eval",
+   "js": "app.S.active = 4; app.refreshUI(); app.setGizmo('rotate'); app.setGizmoJoint(true)"
+  },
+  {
+   "do": "shot",
+   "name": "rotate-joint-ui",
+   "clip": [
+    560,
+    40,
+    640,
+    520
+   ]
+  },
+  {
+   "do": "eval",
+   "js": "app.setGizmo('off'); document.getElementById('rightCol').style.visibility = 'hidden'; const x = app.ensureXf(4); x.r = [0, 0, -90]; app.applyXf(); app.refreshUI(); app.S.active = 0; app.refreshUI()"
+  },
+  {
+   "do": "shot",
+   "name": "_rotate-plain",
+   "clip": {
+    "around": {
+     "part": 4
+    },
+    "w": 620,
+    "h": 440
+   }
+  },
+  {
+   "do": "eval",
+   "js": "app.undo(); const x = app.ensureXf(4); x.r = [0, 0, 0]; x.t = [6, 0, 0]; app.applyXf(); app.S.active = 0; app.refreshUI()"
+  },
+  {
+   "do": "shot",
+   "name": "_move-plain",
+   "clip": {
+    "around": {
+     "part": 4
+    },
+    "w": 620,
+    "h": 440
+   }
+  },
+  {
+   "do": "eval",
+   "js": "app.S.active = 4; app.refreshUI(); document.getElementById('healOn').click(); app.S.active = 0; app.refreshUI()"
+  },
+  {
+   "do": "shot",
+   "name": "_heal-move",
+   "clip": {
+    "around": {
+     "part": 4
+    },
+    "w": 620,
+    "h": 440
+   }
+  },
+  {
+   "do": "compare",
+   "left": "_move-plain",
+   "right": "_heal-move",
+   "labels": [
+    "Moved 6 mm, heal joint off",
+    "Heal joint on"
+   ],
+   "name": "heal-joint"
+  },
+  {
+   "do": "eval",
+   "js": "app.S.active = 4; document.getElementById('healOn').click(); const x = app.ensureXf(4); x.r = [0, 0, 0]; x.t = [0, 0, 0]; app.applyXf(); app.setGizmoJoint(true); const { gizmo, gzProxy } = app, Q = gzProxy.quaternion.constructor; gizmo.dispatchEvent({ type: 'dragging-changed', value: true }); gzProxy.quaternion.multiply(new Q().setFromAxisAngle(gzProxy.up.clone().set(0, 1, 0), -Math.PI / 2)); gizmo.dispatchEvent({ type: 'objectChange' }); gizmo.dispatchEvent({ type: 'dragging-changed', value: false }); app.setGizmo('off'); app.S.active = 0; app.refreshUI()"
+  },
+  {
+   "do": "shot",
+   "name": "_rotate-joint",
+   "clip": {
+    "around": {
+     "part": 4
+    },
+    "w": 620,
+    "h": 440
+   }
+  },
+  {
+   "do": "compare",
+   "left": "_rotate-plain",
+   "right": "_rotate-joint",
+   "labels": [
+    "Rotate (E), 90\u00b0",
+    "Rotate on joint (J), 90\u00b0"
+   ],
+   "name": "rotate-on-joint"
+  }
+ ]
+}
