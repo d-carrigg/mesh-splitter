@@ -1,18 +1,22 @@
 name: Command line
 
 # Runs `mesh-splitter split` (cli/split.mjs on app/core.js) on a test mesh and checks the 3MFs it writes
-# the way OrcaSlicer's importer reads them.
+# the way OrcaSlicer's importer reads them. Runs only on the release PR from Release Please
+# (branch release-please--*) or when run by hand, to save CI minutes.
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   split:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release-please--')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

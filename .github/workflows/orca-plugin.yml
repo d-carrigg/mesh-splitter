@@ -1,8 +1,9 @@
 name: OrcaSlicer plugin
 
-# Builds the Mesh Splitter plugin for OrcaSlicer (plugin/) from app/index.html, tests it,
-# and uploads dist/mesh_splitter_any.py (version: pyproject.toml [project].version). On main it also refreshes the "orca-plugin" release so the
+# Builds the Mesh Splitter plugin for OrcaSlicer (plugin/) from app/index.html and uploads dist/mesh_splitter_any.py (version: pyproject.toml [project].version). On main it also refreshes the "orca-plugin" release so the
 # latest build has a stable download link.
+# Tests (unit, end-to-end, real OrcaSlicer) run only on the release PR from Release Please
+# (branch release-please--*) or when run by hand, so feature PRs and merges don't spend CI minutes on them.
 on:
   push:
     branches: [main]
@@ -12,11 +13,18 @@ on:
 permissions:
   contents: write
 
+concurrency:   # a newer push to the same branch cancels the older run
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
+    # Other PRs skip the job; main still builds the dev release.
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'release-please--')
     runs-on: ubuntu-24.04   # matches OrcaSlicer's Ubuntu 24.04 AppImage used by the real OrcaSlicer test
     env:
       ORCA_VERSION: 2.5.1   # the OrcaSlicer release the plugin targets
+      RUN_TESTS: ${{ startsWith(github.head_ref, 'release-please--') || github.event_name == 'workflow_dispatch' }}
     defaults:
       run:
         working-directory: plugin
@@ -34,10 +42,12 @@ jobs:
       - name: Build
         run: uv run python build.py --page-out build/page.html   # version from pyproject.toml
       - name: Unit tests
+        if: env.RUN_TESTS == 'true'
         run: |
           uv run python test_plugin.py
           uv run python ../server/test_llm_review.py
       - name: End-to-end (page + plugin bridge + multi-part 3MF)
+        if: env.RUN_TESTS == 'true'
         run: |
           npm i --no-save playwright@1.49.1
           npx playwright install --with-deps chromium
@@ -46,14 +56,16 @@ jobs:
           PYTHON="$(uv run which python)" node e2e.mjs build/snowman.stl build/out
           uv run python verify_3mf.py build/out/snowman_parts.3mf
       - name: Cache OrcaSlicer ${{ env.ORCA_VERSION }}
+        if: env.RUN_TESTS == 'true'
         uses: actions/cache@v4
         with:
           path: ~/orca/orca.AppImage
           key: orcaslicer-${{ env.ORCA_VERSION }}-ubuntu2404
       - name: Real OrcaSlicer (install plugin, load it, read the plate, import the split 3MF)
+        if: env.RUN_TESTS == 'true'
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q --no-install-recommends xvfb imagemagick locales \
+          sudo apt-get install -y -q --no-install-recommends xvfb x11-utils imagemagick locales \
             libwebkit2gtk-4.1-0 libegl1 libopengl0 libsecret-1-0 libwayland-server0 libgl1-mesa-dri
           sudo locale-gen en_US.UTF-8
           mkdir -p ~/orca && cd ~/orca
@@ -65,7 +77,7 @@ jobs:
             uv run python real_orca_test.py ~/orca/squashfs-root/AppRun dist/mesh_splitter_any.py \
             build/snowman.stl build/out/snowman_parts.3mf --out build/real-orca
       - name: Upload real OrcaSlicer logs
-        if: always()
+        if: always() && env.RUN_TESTS == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: real-orca-${{ github.run_number }}

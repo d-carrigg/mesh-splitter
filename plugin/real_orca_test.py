@@ -16,6 +16,7 @@ Logs, the probe's report and a screenshot go to --out.
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -53,6 +54,14 @@ def screenshot(path):
         subprocess.run(["import", "-window", "root", str(path)], capture_output=True, timeout=30)
 
 
+def window_names():
+    """Titles of the top-level X windows, e.g. a modal prompt that blocks startup."""
+    if not shutil.which("xwininfo"):
+        return []
+    out = subprocess.run(["xwininfo", "-root", "-tree"], capture_output=True, text=True, timeout=30).stdout
+    return sorted({line.split('"')[1] for line in out.splitlines() if line.count('"') >= 2} - {""})
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("orca")
@@ -75,6 +84,8 @@ def main():
     report.unlink(missing_ok=True)
     env = dict(os.environ, MESH_SPLITTER_PROBE_OUT=str(report.resolve()), LIBGL_ALWAYS_SOFTWARE="1",
                LANG=os.environ.get("LANG", "C.UTF-8"))
+    # Without SSL_CERT_FILE, OrcaSlicer on Linux asks "use system SSL certificate ...?" in a modal at startup.
+    env.setdefault("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt")
     with open(a.out / "orca-stdout.log", "w") as log:
         proc = subprocess.Popen([a.orca, "--datadir", str(data), str(a.mesh.resolve()), str(a.split_3mf.resolve())],
                                 stdout=log, stderr=subprocess.STDOUT, env=env, start_new_session=True)
@@ -83,6 +94,7 @@ def main():
             time.sleep(2)
         time.sleep(1)
         screenshot(a.out / "orca.png")
+        windows = window_names()
         if proc.poll() is None:
             os.killpg(proc.pid, 9)
         proc.wait()
@@ -122,6 +134,13 @@ def main():
 
     shutil.rmtree(data, ignore_errors=True)
     if problems:
+        # Enough to diagnose a CI failure from the job log alone (a modal dialog shows up in the window list).
+        print("Open windows: " + ", ".join(windows), file=sys.stderr)
+        keep = re.compile(r"plugin|python|uv |AUDIT|error|warning|wizard|load_files", re.I)
+        lines = [ln[:400] for ln in debug.splitlines() if keep.search(ln) and "preset" not in ln]
+        print("--- OrcaSlicer log, plugin/error lines (last 80) ---\n" + "\n".join(lines[-80:]), file=sys.stderr)
+        out = (a.out / "orca-stdout.log").read_text(errors="replace").splitlines()
+        print("--- OrcaSlicer output (last 40 lines) ---\n" + "\n".join(ln[:400] for ln in out[-40:]), file=sys.stderr)
         print("FAILED in real OrcaSlicer:\n  - " + "\n  - ".join(problems), file=sys.stderr)
         sys.exit(1)
     print(f"OK: real OrcaSlicer loaded {a.plugin.name}, the plugin read the plate mesh, and "
