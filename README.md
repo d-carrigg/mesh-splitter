@@ -1,6 +1,13 @@
 # Mesh Splitter
 
-Split a single-shell mesh (STL/3MF, e.g. AI-generated figures with no STEP) into printable parts, each with its own filament slot. Runs in the browser, or inside OrcaSlicer 2.5 as a plugin.
+Turn one solid mesh into separate, colour-coded parts for multi-colour or multi-piece 3D printing. Made for AI-generated figures and other STL/3MF files that come as a single shell with no CAD source. Use it as an OrcaSlicer 2.5 plugin or in any browser.
+
+- **Split in a few clicks:** auto split, split by shells, or drop a seed per part and let it follow the model's creases. Fill, brush and merge to fix the edges.
+- **See every part at a glance:** each part gets its own colour and filament slot, with show-only, hide and inline rename.
+- **Move parts in the view:** move, rotate and scale handles (W/E/R, Shift to snap), with undo.
+- **Replace with…:** right-click a part and swap in another STL/3MF. It lines up on the joint and keeps the part's name and filament.
+- **Send to Orca:** export one multi-part 3MF with each part on its filament, then import it with Ctrl+I. Painted 3MF, merged STL and per-part STLs are also available.
+- **Optional AI review** suggests part names and flags bad cuts.
 
 ![Mesh Splitter: a figure auto-split into 10 colour-coded parts](docs/screenshot.png)
 
@@ -11,7 +18,7 @@ Split a single-shell mesh (STL/3MF, e.g. AI-generated figures with no STEP) into
 
 ## Using it
 
-Splits a single-shell mesh (STL/3MF, e.g. AI figures with no STEP) into parts. Segmentation runs in the browser.
+Everything runs in the browser; nothing is uploaded.
 
 - **Seed** (default tool): **+ Part**, click the model to drop a seed, repeat for each part (several seeds per part are fine), then **Segment from seeds**. Faces go to the seed reachable across the gentlest concave creases. Fix leaks with an extra seed and re-run.
 - **Auto split** N parts, **Split by shells**, **Fill** (flood until a crease), **Brush** (Shift = erase), **Pick**, merge, hide/solo, undo.
