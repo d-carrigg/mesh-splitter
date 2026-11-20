@@ -1,0 +1,117 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "curler.stl",
+ "viewport": {
+  "width": 1200,
+  "height": 760
+ },
+ "fps": 12,
+ "gif": {
+  "width": 720,
+  "colors": 128,
+  "dither": "sierra2_4a",
+  "loop": 0,
+  "crop": [
+   280,
+   40,
+   920,
+   720
+  ]
+ },
+ "camera": {
+  "az": 20,
+  "el": 22,
+  "dist": 0.55,
+  "lift": 0.22
+ },
+ "out": "docs/features/img/rotate-on-joint.gif",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "click",
+   "target": {
+    "at": [
+     18.9,
+     55.8,
+     119.9
+    ]
+   },
+   "after": 0.2
+  },
+  {
+   "do": "caption",
+   "text": "J: rotate on joint"
+  },
+  {
+   "do": "key",
+   "key": "j",
+   "after": 0.8
+  },
+  {
+   "do": "caption",
+   "text": "The part spins on its cut and stays seated"
+  },
+  {
+   "do": "eval",
+   "js": "const { gizmo, gzProxy } = app, Q = gzProxy.quaternion.constructor; gizmo.dispatchEvent({ type: 'dragging-changed', value: true }); gzProxy.quaternion.multiply(new Q().setFromAxisAngle(gzProxy.up.clone().set(0, 1, 0), -Math.PI / 12)); gizmo.dispatchEvent({ type: 'objectChange' }); gizmo.dispatchEvent({ type: 'dragging-changed', value: false })"
+  },
+  {
+   "do": "hold",
+   "s": 0.25
+  },
+  {
+   "do": "eval",
+   "js": "const { gizmo, gzProxy } = app, Q = gzProxy.quaternion.constructor; gizmo.dispatchEvent({ type: 'dragging-changed', value: true }); gzProxy.quaternion.multiply(new Q().setFromAxisAngle(gzProxy.up.clone().set(0, 1, 0), -Math.PI / 12)); gizmo.dispatchEvent({ type: 'objectChange' }); gizmo.dispatchEvent({ type: 'dragging-changed', value: false })"
+  },
+  {
+   "do": "hold",
+   "s": 0.25
+  },
+  {
+   "do": "eval",
+   "js": "const { gizmo, gzProxy } = app, Q = gzProxy.quaternion.constructor; gizmo.dispatchEvent({ type: 'dragging-changed', value: true }); gzProxy.quaternion.multiply(new Q().setFromAxisAngle(gzProxy.up.clone().set(0, 1, 0), -Math.PI / 12)); gizmo.dispatchEvent({ type: 'objectChange' }); gizmo.dispatchEvent({ type: 'dragging-changed', value: false })"
+  },
+  {
+   "do": "hold",
+   "s": 0.25
+  },
+  {
+   "do": "eval",
+   "js": "const { gizmo, gzProxy } = app, Q = gzProxy.quaternion.constructor; gizmo.dispatchEvent({ type: 'dragging-changed', value: true }); gzProxy.quaternion.multiply(new Q().setFromAxisAngle(gzProxy.up.clone().set(0, 1, 0), -Math.PI / 12)); gizmo.dispatchEvent({ type: 'objectChange' }); gizmo.dispatchEvent({ type: 'dragging-changed', value: false })"
+  },
+  {
+   "do": "hold",
+   "s": 0.25
+  },
+  {
+   "do": "eval",
+   "js": "const { gizmo, gzProxy } = app, Q = gzProxy.quaternion.constructor; gizmo.dispatchEvent({ type: 'dragging-changed', value: true }); gzProxy.quaternion.multiply(new Q().setFromAxisAngle(gzProxy.up.clone().set(0, 1, 0), -Math.PI / 12)); gizmo.dispatchEvent({ type: 'objectChange' }); gizmo.dispatchEvent({ type: 'dragging-changed', value: false })"
+  },
+  {
+   "do": "hold",
+   "s": 0.25
+  },
+  {
+   "do": "eval",
+   "js": "const { gizmo, gzProxy } = app, Q = gzProxy.quaternion.constructor; gizmo.dispatchEvent({ type: 'dragging-changed', value: true }); gzProxy.quaternion.multiply(new Q().setFromAxisAngle(gzProxy.up.clone().set(0, 1, 0), -Math.PI / 12)); gizmo.dispatchEvent({ type: 'objectChange' }); gizmo.dispatchEvent({ type: 'dragging-changed', value: false })"
+  },
+  {
+   "do": "hold",
+   "s": 0.25
+  },
+  {
+   "do": "hold",
+   "s": 1.2
+  },
+  {
+   "do": "caption",
+   "text": ""
+  },
+  {
+   "do": "hold",
+   "s": 0.3
+  }
+ ]
+}

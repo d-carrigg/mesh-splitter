@@ -1,6 +1,10 @@
-// Record the README / OrcaCloud demo GIF by driving the browser app headless.
+// Record the README / OrcaCloud demo GIF (and the feature docs' GIFs and screenshots) by driving the browser app headless.
 //
-//   node docs/demo/record.mjs [config.json] [--out docs/demo.gif] [--assets DIR] [--keep-frames]
+//   node docs/demo/record.mjs [config.json ...] [--out docs/demo.gif] [--assets DIR] [--keep-frames]
+//
+// Several configs run one after another (e.g. docs/features/demo/*.json). A config with "out": null records
+// no GIF and only writes its "shot" / "compare" PNGs (into "shots", default docs/features/img).
+// "orca": true fakes the OrcaSlicer plugin host, so the page shows its plugin UI (Send to Orca).
 //
 // Needs Playwright (with Chromium), ffmpeg, and plugin/node_modules (cd plugin && npm ci), which stands in
 // for the CDN imports. The page is served from the repo through Playwright routes, so no server runs.
@@ -22,9 +26,21 @@ const args = process.argv.slice(2);
 const flag = (n) => args.includes(n);
 const opt = (n, d) => (args.includes(n) ? args[args.indexOf(n) + 1] : d);
 const VALUED = ["--out", "--assets"];
-const cfgPath = path.resolve(args.find((a, i) => !a.startsWith("--") && !VALUED.includes(args[i - 1])) || path.join(here, "demo.config.json"));
+const cfgArgs = args.filter((a, i) => !a.startsWith("--") && !VALUED.includes(args[i - 1]));
+if (cfgArgs.length > 1) { // one run per config, each in its own process
+  const rest = args.filter((a) => !cfgArgs.includes(a));
+  for (const c of cfgArgs) {
+    console.log(`== ${c}`);
+    const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), c, ...rest], { stdio: "inherit" });
+    if (r.status !== 0) process.exit(r.status || 1);
+  }
+  process.exit(0);
+}
+const cfgPath = path.resolve(cfgArgs[0] || path.join(here, "demo.config.json"));
 const cfg = JSON.parse(readFileSync(cfgPath, "utf8"));
+const gifOn = cfg.out !== null; // "out": null = screenshots only
 const out = path.resolve(root, opt("--out", cfg.out || "docs/demo.gif"));
+const shotsDir = path.resolve(root, cfg.shots || "docs/features/img");
 // Model files: absolute, or relative to cfg.assets (itself relative to the repo root). --assets overrides it.
 const assets = path.resolve(root, opt("--assets", cfg.assets || "."));
 const asset = (f) => path.resolve(assets, f);
@@ -48,6 +64,7 @@ const vp = cfg.viewport || { width: 1200, height: 720 };
 const page = await browser.newPage({ viewport: vp, deviceScaleFactor: cfg.deviceScaleFactor ?? 1 });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
+page.on("console", (m) => m.text().startsWith("demo:") && console.log(m.text())); // console.log("demo: ...") from an eval step
 page.on("dialog", (d) => { errors.push("dialog: " + d.message()); d.dismiss(); });
 await page.route("https://cdn.jsdelivr.net/npm/**", (r) => {
   const m = new URL(r.request().url()).pathname.match(/^\/npm\/((?:@[^/]+\/)?[^@/]+)@[^/]+\/(.*)$/);
@@ -55,16 +72,29 @@ await page.route("https://cdn.jsdelivr.net/npm/**", (r) => {
 });
 await page.route(ORIGIN + "/**", (r) => {
   const p = decodeURIComponent(new URL(r.request().url()).pathname);
-  if (p === "/api/llm/status") return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ configured: false, source: null, model: "" }) });
+  if (p === "/api/llm/status") return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(cfg.llmStatus || { configured: false, source: null, model: "" }) });
   return serve(r, path.join(root, p.endsWith("/") ? p + "index.html" : p));
 });
+// "orca": true stands in for the OrcaSlicer plugin host, so the page shows its plugin UI. It lists the demo
+// model as the one plate object (the model itself is opened by the load step) and answers saves with a path.
+if (cfg.orca) await page.addInitScript((name) => {
+  let rx = null;
+  const reply = (m) => setTimeout(() => rx?.(m), 0);
+  window.orca = {
+    onMessage: (f) => (rx = f),
+    postMessage(m) {
+      if (m.cmd === "objects") reply({ cmd: "objects", objects: [{ id: "1", index: 0, name, faces: +(document.getElementById("fileInfo")?.textContent.match(/[\d,]+(?= faces)/)?.[0] || "0").replace(/,/g, ""), parts: 1 }] });
+      else if (m.cmd === "save" && m.part === m.of - 1) reply({ cmd: "saved", id: m.id, path: `C:\\Users\\you\\Downloads\\${m.name}` });
+    },
+  };
+}, path.parse(cfg.model).name);
 await page.addInitScript((theme) => {
   try { localStorage.clear(); for (const [k, v] of Object.entries(theme || {})) localStorage.setItem(k, v); } catch {}
 }, cfg.localStorage || {});
 
 // ---------------------------------------------------------------- frame capture
 let n = 0;
-const snap = async () => writeFile(path.join(framesDir, `f${String(n++).padStart(5, "0")}.png`), await page.screenshot());
+const snap = async () => gifOn && writeFile(path.join(framesDir, `f${String(n++).padStart(5, "0")}.png`), await page.screenshot());
 const hold = async (s) => { for (let i = 0, k = Math.max(1, Math.round(s * fps)); i < k; i++) await snap(); };
 const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 const idle = () => page.waitForFunction(() => getComputedStyle(document.getElementById("busy")).display === "none", null, { timeout: 300000 });
@@ -116,7 +146,14 @@ const locate = async (target) => {
     const THREE = app.camera.position.constructor;
     let p;
     if (t.at) p = new THREE(...t.at);
-    else if (t.gizmo) p = app.gzProxy.position.clone();
+    else if (t.gizmo) { // the gizmo's center, or t.px pixels out along t.axis (e.g. onto the X arrow)
+      p = app.gzProxy.position.clone();
+      if (t.axis) {
+        const r = document.querySelector("#view canvas").getBoundingClientRect(), scr = (v) => { v = v.clone().project(app.camera); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; };
+        const a = scr(p), b = scr(p.clone().add(new THREE(...t.axis))), l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        return { x: a[0] + (b[0] - a[0]) / l * t.px, y: a[1] + (b[1] - a[1]) / l * t.px, dir: [(b[0] - a[0]) / l, (b[1] - a[1]) / l] };
+      }
+    }
     else {
       const { S } = app, cen = S.G.cen, sum = [0, 0, 0]; let c = 0;
       for (let f = 0; f < S.nF; f++) if (S.labels[f] === t.part) { for (let k = 0; k < 3; k++) sum[k] += cen[f * 3 + k]; c++; }
@@ -169,7 +206,9 @@ const steps = {
     // file: the file to pick in the Open dialog the click shows. With input: set it on that <input type=file>
     // instead (a dialog opened from script, not the click itself, never fires Playwright's filechooser event).
     const chooser = s.file && !s.input ? page.waitForEvent("filechooser", { timeout: 5000 }) : null;
-    await page.mouse.click(cur.x, cur.y, { button: s.button || "left" });
+    for (const m of s.mods || []) await page.keyboard.down(m); // e.g. "mods": ["Shift"]
+    await page.mouse.click(cur.x, cur.y, { button: s.button || "left", clickCount: s.double ? 2 : 1 });
+    for (const m of s.mods || []) await page.keyboard.up(m);
     await pulse();
     if (chooser) await (await chooser).setFiles(asset(s.file));
     else if (s.file) await page.setInputFiles(s.input, asset(s.file));
@@ -178,12 +217,14 @@ const steps = {
     if (s.wait !== false) await idle();
     await hold(s.after ?? 0.3);
   },
-  async drag(s) { // drag from target by [dx, dy] pixels
+  async drag(s) { // drag from target by [dx, dy] pixels; "mods": ["Shift"] holds keys during the drag
     const p = await locate(s.target);
-    await cursorTo(p.x, p.y, s.s ?? 0.6);
+    await cursorTo(p.x + (s.dx ?? 0), p.y + (s.dy ?? 0), s.s ?? 0.6);
     await page.mouse.down(); await pulse();
-    await cursorTo(p.x + s.by[0], p.y + s.by[1], s.dragS ?? 1, true);
-    await page.mouse.up(); await idle();
+    for (const m of s.mods || []) await page.keyboard.down(m);
+    const by = s.along && p.dir ? [p.dir[0] * s.along, p.dir[1] * s.along] : s.by; // along: pixels along a gizmo axis
+    await cursorTo(p.x + (s.dx ?? 0) + by[0], p.y + (s.dy ?? 0) + by[1], s.dragS ?? 1, true);
+    await page.mouse.up(); for (const m of s.mods || []) await page.keyboard.up(m); await idle();
     await hold(s.after ?? 0.3);
   },
   async type(s) {
@@ -194,7 +235,44 @@ const steps = {
   async set(s) { await page.locator(s.target).fill(String(s.value)); await idle(); await hold(s.after ?? 0.3); }, // e.g. a color input
   async key(s) { await page.keyboard.press(s.key); await idle(); await hold(s.after ?? 0.3); },
   async eval(s) { await page.evaluate(s.js); await idle(); }, // escape hatch: run JS in the page
+  // Save a PNG of the page (or a region) to shotsDir/<name>.png. clip: a CSS selector, [x, y, w, h], or
+  // {around: target, w, h} (a box centered on a target point, kept inside the page).
+  async shot(s) {
+    if (s.wait !== false) await idle();
+    await page.evaluate(() => app.render());
+    let clip;
+    if (typeof s.clip === "string") clip = await page.locator(s.clip).first().boundingBox();
+    else if (Array.isArray(s.clip)) clip = { x: s.clip[0], y: s.clip[1], width: s.clip[2], height: s.clip[3] };
+    else if (s.clip?.around) {
+      const p = await locate(s.clip.around), w = Math.min(s.clip.w, vp.width), h = Math.min(s.clip.h, vp.height);
+      clip = { x: Math.max(0, Math.min(vp.width - w, p.x - w / 2)), y: Math.max(0, Math.min(vp.height - h, p.y - h / 2)), width: w, height: h };
+    }
+    const dir = s.name.startsWith("_") ? path.join(here, "build", "shots") : shotsDir; // "_name": a scratch shot for compare
+    mkdirSync(dir, { recursive: true });
+    const f = path.join(dir, `${s.name}.png`);
+    await writeFile(f, await page.screenshot({ clip }));
+    shots.set(s.name, f);
+    console.log(`  ${path.relative(root, f)}`);
+  },
+  // Put two shots side by side with a label over each, e.g. a before / after pair: {left, right, name, labels}.
+  async compare(s) {
+    const img = (k) => "data:image/png;base64," + readFileSync(shots.get(k) || path.join(shotsDir, `${k}.png`)).toString("base64");
+    const [la, lb] = s.labels || ["Before", "After"];
+    const p2 = await browser.newPage({ viewport: { width: 4000, height: 3000 }, deviceScaleFactor: cfg.deviceScaleFactor ?? 1 });
+    await p2.setContent(`<body style="margin:0;background:#1b1d22;display:inline-flex;gap:6px;padding:6px">
+      ${[[img(s.left), la], [img(s.right), lb]].map(([u, l]) => `<figure style="margin:0;position:relative">
+        <img src="${u}" style="display:block;border-radius:6px">
+        <figcaption style="position:absolute;left:10px;top:10px;padding:4px 12px;border-radius:6px;background:#000b;color:#fff;
+          font:600 18px system-ui,sans-serif">${l}</figcaption></figure>`).join("")}</body>`);
+    const box = await p2.locator("body").boundingBox();
+    mkdirSync(shotsDir, { recursive: true });
+    const f = path.join(shotsDir, `${s.name}.png`);
+    await writeFile(f, await p2.screenshot({ clip: box }));
+    await p2.close();
+    console.log(`  ${path.relative(root, f)}`);
+  },
 };
+const shots = new Map();
 
 await page.goto(`${ORIGIN}/app/index.html`);
 await page.waitForFunction(() => window.app && window.__cur, null, { timeout: 60000 });
@@ -210,9 +288,11 @@ await browser.close();
 if (errors.length) { console.error("FAILED:", errors.join(" | ")); process.exit(1); }
 
 // ---------------------------------------------------------------- encode
+if (!gifOn) process.exit(0);
 const g = cfg.gif || {};
 const width = g.width ?? 800, colors = g.colors ?? 128, dither = g.dither ?? "sierra2_4a";
-const scale = `fps=${fps},scale=${width}:-1:flags=lanczos`;
+const crop = g.crop ? `crop=${g.crop[2]}:${g.crop[3]}:${g.crop[0]}:${g.crop[1]},` : ""; // gif.crop: [x, y, w, h] in page pixels
+const scale = `fps=${fps},${crop}scale=${width}:-1:flags=lanczos`;
 const ff = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(fps), "-i", path.join(framesDir, "f%05d.png"),
   "-filter_complex", `[0:v]${scale},split[a][b];[a]palettegen=max_colors=${colors}:stats_mode=diff[p];[b][p]paletteuse=dither=${dither}:diff_mode=rectangle`,
   "-loop", String(g.loop ?? 0), out], { stdio: "inherit" });

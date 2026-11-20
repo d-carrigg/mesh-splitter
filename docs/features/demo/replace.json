@@ -1,0 +1,184 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "curler.stl",
+ "out": null,
+ "viewport": {
+  "width": 1200,
+  "height": 760
+ },
+ "camera": {
+  "az": 40,
+  "el": 15,
+  "dist": 0.75,
+  "lift": 0.05
+ },
+ "css": "#__cursor { display: none !important }",
+ "steps": [
+  {
+   "do": "load",
+   "split": false
+  },
+  {
+   "do": "click",
+   "target": "#autoBtn",
+   "after": 0
+  },
+  {
+   "do": "type",
+   "target": "#autoK",
+   "text": "6"
+  },
+  {
+   "do": "click",
+   "target": "#autoRun",
+   "after": 0
+  },
+  {
+   "do": "camera",
+   "az": -15,
+   "el": 12,
+   "dist": 0.5,
+   "lift": 0.05,
+   "s": 0.1
+  },
+  {
+   "do": "click",
+   "target": "#addPart",
+   "after": 0
+  },
+  {
+   "do": "click",
+   "target": {
+    "at": [
+     -9,
+     -6,
+     81
+    ]
+   },
+   "after": 0
+  },
+  {
+   "do": "click",
+   "target": "#fpSeed",
+   "after": 0
+  },
+  {
+   "do": "click",
+   "target": {
+    "at": [
+     42,
+     -1.5,
+     71
+    ]
+   },
+   "after": 0
+  },
+  {
+   "do": "shot",
+   "name": "add-part",
+   "clip": [
+    300,
+    40,
+    900,
+    600
+   ]
+  },
+  {
+   "do": "click",
+   "target": "#fpDone",
+   "after": 0
+  },
+  {
+   "do": "click",
+   "target": "#clrSeeds",
+   "after": 0
+  },
+  {
+   "do": "key",
+   "key": "q"
+  },
+  {
+   "do": "click",
+   "target": "#pcName",
+   "after": 0
+  },
+  {
+   "do": "type",
+   "target": "#pcName",
+   "text": "Eyes",
+   "perChar": 0
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "set",
+   "target": "#pcColor",
+   "value": "#dcdcdc",
+   "after": 0
+  },
+  {
+   "do": "camera",
+   "az": -32,
+   "el": 18,
+   "dist": 0.36,
+   "lift": 0.0,
+   "s": 0.1
+  },
+  {
+   "do": "eval",
+   "js": "document.getElementById('rightCol').style.visibility = 'hidden'"
+  },
+  {
+   "do": "shot",
+   "name": "_replace-before",
+   "clip": [
+    420,
+    120,
+    620,
+    420
+   ]
+  },
+  {
+   "do": "eval",
+   "js": "document.getElementById('rightCol').style.visibility = ''"
+  },
+  {
+   "do": "click",
+   "target": "#repBtn",
+   "file": "eyes_flipped.stl",
+   "input": "#repIn",
+   "after": 0
+  },
+  {
+   "do": "shot",
+   "name": "replace-panel",
+   "clip": "#partCard"
+  },
+  {
+   "do": "eval",
+   "js": "document.getElementById('rightCol').style.visibility = 'hidden'"
+  },
+  {
+   "do": "shot",
+   "name": "_replace-after",
+   "clip": [
+    420,
+    120,
+    620,
+    420
+   ]
+  },
+  {
+   "do": "compare",
+   "left": "_replace-before",
+   "right": "_replace-after",
+   "labels": [
+    "Eyes as one part",
+    "Replace with\u2026 the flipped eyes"
+   ],
+   "name": "replace"
+  }
+ ]
+}

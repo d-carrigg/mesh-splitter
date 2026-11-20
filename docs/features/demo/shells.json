@@ -1,0 +1,61 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "sheet_tile.stl",
+ "out": null,
+ "viewport": {
+  "width": 1200,
+  "height": 760
+ },
+ "camera": {
+  "az": 15,
+  "el": 50,
+  "dist": 0.8,
+  "lift": 0
+ },
+ "css": "#__cursor { display: none !important }",
+ "steps": [
+  {
+   "do": "load",
+   "split": false
+  },
+  {
+   "do": "shot",
+   "name": "_shells-before",
+   "clip": [
+    0,
+    40,
+    1200,
+    720
+   ]
+  },
+  {
+   "do": "click",
+   "target": "#shellBtn",
+   "after": 0
+  },
+  {
+   "do": "key",
+   "key": "q"
+  },
+  {
+   "do": "shot",
+   "name": "_shells-after",
+   "clip": [
+    0,
+    40,
+    1200,
+    720
+   ]
+  },
+  {
+   "do": "compare",
+   "left": "_shells-before",
+   "right": "_shells-after",
+   "labels": [
+    "One file, several shells",
+    "Split by shells"
+   ],
+   "name": "shells"
+  }
+ ]
+}

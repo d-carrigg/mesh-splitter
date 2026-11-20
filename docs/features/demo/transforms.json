@@ -1,0 +1,110 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "curler.stl",
+ "viewport": {
+  "width": 1200,
+  "height": 760
+ },
+ "fps": 12,
+ "gif": {
+  "width": 720,
+  "colors": 128,
+  "dither": "sierra2_4a",
+  "loop": 0,
+  "crop": [
+   280,
+   40,
+   920,
+   720
+  ]
+ },
+ "camera": {
+  "az": 20,
+  "el": 22,
+  "dist": 0.55,
+  "lift": 0.22
+ },
+ "out": "docs/features/img/transforms.gif",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "eval",
+   "js": "app.setGizmo('off')"
+  },
+  {
+   "do": "caption",
+   "text": "Click a part, then W for move handles"
+  },
+  {
+   "do": "click",
+   "target": {
+    "at": [
+     18.9,
+     55.8,
+     119.9
+    ]
+   },
+   "after": 0.3
+  },
+  {
+   "do": "key",
+   "key": "w",
+   "after": 0.6
+  },
+  {
+   "do": "caption",
+   "text": "Drag an arrow; hold Shift to snap to 1 mm"
+  },
+  {
+   "do": "drag",
+   "target": {
+    "gizmo": true,
+    "axis": [
+     1,
+     0,
+     0
+    ],
+    "px": 55
+   },
+   "mods": [
+    "Shift"
+   ],
+   "dragS": 1.5,
+   "after": 0.8,
+   "along": 90
+  },
+  {
+   "do": "caption",
+   "text": "E rotates, R scales"
+  },
+  {
+   "do": "key",
+   "key": "e",
+   "after": 1.0
+  },
+  {
+   "do": "key",
+   "key": "r",
+   "after": 1.0
+  },
+  {
+   "do": "caption",
+   "text": "Ctrl+Z undoes"
+  },
+  {
+   "do": "key",
+   "key": "Control+z",
+   "after": 1.2
+  },
+  {
+   "do": "caption",
+   "text": ""
+  },
+  {
+   "do": "hold",
+   "s": 0.4
+  }
+ ]
+}

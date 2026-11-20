@@ -1,0 +1,50 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "curler.stl",
+ "out": null,
+ "llmStatus": {
+  "configured": true,
+  "source": "env",
+  "model": "deepseek/deepseek-v4.1-flash"
+ },
+ "viewport": {
+  "width": 1200,
+  "height": 760
+ },
+ "camera": {
+  "az": 20,
+  "el": 15,
+  "dist": 0.85,
+  "lift": -0.02
+ },
+ "css": "#__cursor { display: none !important }",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "key",
+   "key": "q"
+  },
+  {
+   "do": "click",
+   "target": "#aiToggle",
+   "after": 0
+  },
+  {
+   "do": "click",
+   "target": "#aiChk",
+   "after": 0.3
+  },
+  {
+   "do": "shot",
+   "name": "ai-panel",
+   "clip": [
+    280,
+    0,
+    920,
+    760
+   ]
+  }
+ ]
+}
