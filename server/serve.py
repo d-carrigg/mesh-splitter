@@ -3,7 +3,7 @@
 
 uv run mesh-splitter [--port 8766] [--no-browser]
 
-Static files from the repo root plus the AI review endpoints (/api/llm/status, /api/llm/review),
+Static files from the repo root plus the AI part-naming endpoints (/api/llm/status, /api/llm/name-parts),
 which keep the OpenRouter key on this machine.
 """
 from __future__ import annotations
@@ -50,7 +50,7 @@ class Handler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self) -> None:
-        if urlsplit(self.path).path != "/api/llm/review":
+        if urlsplit(self.path).path != "/api/llm/name-parts":
             self._json(404, {"ok": False, "error": "not found"})
             return
         # JSON content type forces a CORS preflight (unhandled here), so other sites can't spend the key.

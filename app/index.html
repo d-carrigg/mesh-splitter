@@ -189,7 +189,7 @@
     <span class="sep"></span>
     <div class="grp">
       <button id="aiChk" data-icon="check" title="Check parts: fragments, slivers, unassigned faces"></button>
-      <button id="aiToggle" data-icon="sparkle" title="AI review"></button>
+      <button id="aiToggle" data-icon="sparkle" title="AI part naming"></button>
     </div>
     <span class="sep"></span>
     <div class="grp">
@@ -243,7 +243,7 @@
         <label class="small" title="Scale X/Y/Z together"><input id="xfLock" type="checkbox" checked> uniform</label>
         <button id="xfReset" data-icon="reset" title="Reset this part's transform"></button>
       </div>
-      <div id="xfPanel" class="xf" title="Applies to this part: view, Part STLs, Merged STL and AI review. Pivot is the part's center.">
+      <div id="xfPanel" class="xf" title="Applies to this part: view, Part STLs, Merged STL and AI part naming. Pivot is the part's center.">
         <span></span><span class="ax">X</span><span class="ax">Y</span><span class="ax">Z</span>
         <span data-icon-span="scale" title="Scale %"></span><input id="xfS0" type="number" step="1"><input id="xfS1" type="number" step="1"><input id="xfS2" type="number" step="1">
         <span data-icon-span="rotate" title="Rotate °"></span><input id="xfR0" type="number" step="5"><input id="xfR1" type="number" step="5"><input id="xfR2" type="number" step="5">
@@ -267,7 +267,7 @@
 
     <div id="aiCard" class="float card grow" hidden>
       <div class="cardHead">
-        <h2>Review</h2>
+        <h2>Part names</h2>
         <span id="aiState" class="small"></span>
         <button id="aiClose" data-icon="x" title="Close"></button>
       </div>
@@ -277,9 +277,9 @@
           <option value="deepseek/deepseek-v4.1-flash"><option value="google/gemini-2.5-flash"><option value="google/gemini-2.5-pro">
           <option value="anthropic/claude-sonnet-4.5"><option value="openai/gpt-5-mini">
         </datalist>
-        <button id="aiBtn" class="pri" data-icon="sparkle" title="Render views + part stats, ask a vision model (OpenRouter) to name parts and flag segmentation problems">Review</button>
+        <button id="aiBtn" class="pri" data-icon="sparkle" title="Render views + part stats, ask a vision model (OpenRouter) to name parts and flag segmentation problems">Name parts</button>
       </div>
-      <input id="aiNote" type="text" placeholder="Note for the model (optional)">
+      <input id="aiNote" type="text" placeholder="Hint, e.g. what the object is (optional)">
       <div id="aiOut"></div>
     </div>
   </div>
@@ -2241,7 +2241,7 @@ function label(cx, x, y, text, size = 15) {
   cx.lineWidth = 4; cx.strokeStyle = "#000"; cx.strokeText(text, x, y); cx.fillStyle = "#fff"; cx.fillText(text, x, y);
 }
 
-function captureForReview(stats) {
+function captureForNaming(stats) {
   const nP = S.parts.length, vis = S.parts.map((p) => p.visible);
   gizmo.detach(); setTimeout(syncGizmo, 0);
   S.parts.forEach((p) => (p.visible = true)); updateVisibility(); updateColors(true);
@@ -2340,7 +2340,7 @@ function localChecks(st) {
   return out;
 }
 
-let lastReview = null;
+let lastNaming = null;
 async function llmStatus() {
   if (location.protocol === "file:") { $("aiState").textContent = "browser version only"; return { configured: false }; } // no local server (e.g. inside OrcaSlicer)
   try {
@@ -2355,7 +2355,7 @@ async function llmStatus() {
 $("aiModel").onchange = () => { try { localStorage.setItem("meshsplit:model", $("aiModel").value.trim()); } catch {} };
 
 const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-function renderReview(R) {
+function renderNaming(R) {
   const o = $("aiOut"), nP = S.parts.length; o.innerHTML = "";
   const ai = R.ai, add = (h) => o.insertAdjacentHTML("beforeend", h);
   if (R.error) add(`<div class="iss high">${esc(R.error)}${R.raw ? `<div class="fix">${esc(R.raw.slice(0, 300))}</div>` : ""}</div>`);
@@ -2401,31 +2401,31 @@ function renderReview(R) {
 
 function runChecks() {
   if (!S.G) return;
-  const st = partStats(); renderReview({ checks: localChecks(st) }); status("Local checks done");
+  const st = partStats(); renderNaming({ checks: localChecks(st) }); status("Local checks done");
 }
-async function runReview() {
+async function runNaming() {
   if (!S.G) return;
   const model = $("aiModel").value.trim();
   $("busy").textContent = "Rendering views…"; busy(true);
   await new Promise((r) => setTimeout(r, 30));
   let st, cap;
-  try { st = partStats(); cap = captureForReview(st); }
+  try { st = partStats(); cap = captureForNaming(st); }
   catch (e) { console.error(e); busy(false); $("busy").textContent = "Working…"; alert(e.message); return; }
   const checks = localChecks(st);
-  renderReview({ checks, pending: true, model, images: cap.images });
+  renderNaming({ checks, pending: true, model, images: cap.images });
   $("busy").textContent = `Asking ${model}…`;
   try {
-    const r = await fetch("/api/llm/review", { method: "POST", headers: { "Content-Type": "application/json" },
+    const r = await fetch("/api/llm/name-parts", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model, images: cap.images, captions: cap.captions, stats: statsForLLM(st), hint: $("aiNote").value }) });
     const j = await r.json().catch(() => ({ ok: false, error: `HTTP ${r.status}` }));
-    lastReview = j;
-    if (!j.ok) renderReview({ checks, error: j.error, raw: j.raw, images: cap.images });
-    else { renderReview({ checks, ai: j.result, images: cap.images, usage: j.usage }); status(`Reviewed by ${j.model}`); }
+    lastNaming = j;
+    if (!j.ok) renderNaming({ checks, error: j.error, raw: j.raw, images: cap.images });
+    else { renderNaming({ checks, ai: j.result, images: cap.images, usage: j.usage }); status(`Named by ${j.model}`); }
   } catch (e) {
-    renderReview({ checks, error: `Server unreachable: ${e.message}`, images: cap.images });
+    renderNaming({ checks, error: `Server unreachable: ${e.message}`, images: cap.images });
   } finally { busy(false); $("busy").textContent = "Working…"; }
 }
-$("aiBtn").onclick = runReview;
+$("aiBtn").onclick = runNaming;
 $("aiChk").onclick = () => { if (S.G) { showAi(true); runChecks(); } };
 
 // ---------------------------------------------------------------- export
@@ -2831,7 +2831,7 @@ if (ORCA.on) {
   $("expMain").lastChild.textContent = "Send to Orca";
   $("expMain").title = "Save a multi-part 3MF (each part keeps its filament slot) to Downloads, then import it in OrcaSlicer with Ctrl+I";
   $("expParts").hidden = true;
-  $("aiBtn").disabled = true; $("aiBtn").title = "AI review needs the standalone splitter (uv run mesh-splitter); Check still works here";
+  $("aiBtn").disabled = true; $("aiBtn").title = "AI part naming needs the browser version (uv run mesh-splitter); Check still works here";
   window.orca.onMessage((m) => {
     if (!m || typeof m !== "object") return;
     if (m.cmd === "objects") {
@@ -2847,7 +2847,7 @@ if (ORCA.on) {
   });
   orcaSend({ cmd: "objects", auto: true });
 }
-window.app = { S, ORCA, gizmo, gzProxy, setGizmo, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForReview, runReview, applyXf, ensureXf, xfMatrix, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, ORCA, gizmo, gzProxy, setGizmo, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, xfMatrix, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
 </script>
 </body>
 </html>
