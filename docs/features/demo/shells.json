@@ -30,6 +30,16 @@
   },
   {
    "do": "click",
+   "target": "#autoBtn",
+   "after": 0
+  },
+  {
+   "do": "click",
+   "target": "#splitMethods [data-method=shells]",
+   "after": 0
+  },
+  {
+   "do": "click",
    "target": "#shellBtn",
    "after": 0
   },
