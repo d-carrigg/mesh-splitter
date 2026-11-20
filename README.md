@@ -78,7 +78,7 @@ The key stays in the local server and is never sent to the page.
 
 The OrcaCloud listing description lives in `plugin/DESCRIPTION.md`. OrcaCloud's GitHub publishing only takes the version, changelog and files, so paste it into **Edit plugin** when it changes.
 
-CI builds and tests the plugin on every push, and publishes it to the release from `main`. Releasing: bump `version` in `pyproject.toml` (the only place it lives), merge, then push the matching `vX.Y.Z` tag. That builds the version and pushes it to the [OrcaCloud Plugin Hub](https://cloud.orcaslicer.com/app/plugins/plugin-hub) (`publish-orcacloud.yml`).
+CI builds and tests the plugin on every push, and publishes it to the release from `main`. Releasing: bump `version` in `pyproject.toml` (the only place it lives), merge, then publish a GitHub release tagged `vX.Y.Z` with the changelog as its notes. That builds the plugin, attaches it to the release, and publishes it to the [OrcaCloud Plugin Hub](https://cloud.orcaslicer.com/app/plugins/plugin-hub) (`publish-orcacloud.yml`).
 
 ## License
 
