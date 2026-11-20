@@ -5,3 +5,4 @@ __pycache__/
 server/openrouter.local.json
 docs/demo/build/
 site/
+node_modules/

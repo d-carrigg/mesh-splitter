@@ -10,6 +10,7 @@ package.json to match the importmap).
 import argparse
 import base64
 import json
+import os
 import re
 import subprocess
 import sys
@@ -36,12 +37,16 @@ def check_versions(html):
 def bundle(js):
     entry = HERE / "build" / "entry.js"
     entry.parent.mkdir(exist_ok=True)
+    # the page imports ./core.js next to app/index.html; core.js imports fflate, resolved from plugin/node_modules
+    core = (SEGMENT.parent / "core.js").as_posix()
+    js = js.replace('from "./core.js"', f'from "{core}"')
     entry.write_text(js, encoding="utf-8")
     esbuild = HERE / "node_modules" / ".bin" / ("esbuild.cmd" if sys.platform == "win32" else "esbuild")
     out = subprocess.run(
         [str(esbuild), str(entry), "--bundle", "--minify", "--format=esm", "--target=es2020",
          "--legal-comments=none", "--log-level=warning"],
-        cwd=HERE, check=True, capture_output=True, text=True, encoding="utf-8")
+        cwd=HERE, check=True, capture_output=True, text=True, encoding="utf-8",
+        env={**os.environ, "NODE_PATH": str(HERE / "node_modules")})
     if out.stderr.strip():
         print(out.stderr, file=sys.stderr)
     return out.stdout

@@ -1,0 +1,47 @@
+name: Command line
+
+# Runs `mesh-splitter split` (cli/split.mjs on app/core.js) on a test mesh and checks the 3MFs it writes
+# the way OrcaSlicer's importer reads them.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  split:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync
+      - run: npm ci
+      - name: Test mesh (two spheres)
+        run: |
+          mkdir -p build
+          uv run python -c "import trimesh; a=trimesh.creation.icosphere(3,20); b=trimesh.creation.icosphere(3,13); b.apply_translation([0,0,30]); trimesh.util.concatenate([a,b]).export('build/snowman.stl')"
+          echo '[{"name":"Bottom","filament":3,"points":[[0,0,-20]]},{"name":"Top","points":[[0,0,43]]}]' > build/seeds.json
+      - name: Split
+        run: |
+          uv run mesh-splitter split build/snowman.stl --shells -o build/shells.3mf --stl build/stl --painted build/painted.3mf
+          uv run mesh-splitter split build/snowman.stl --seeds build/seeds.json -o build/seeds.3mf --save-session build/seeds.split.json
+          uv run mesh-splitter split build/snowman.stl --session build/seeds.split.json -o build/session.3mf
+          uv run mesh-splitter split build/snowman.stl --auto -o build/auto.3mf
+          uv run mesh-splitter split build/snowman.stl --auto 4 -o build/auto4.3mf
+          test "$(ls build/stl/*.stl | wc -l)" = 2
+      - name: Check the 3MFs
+        working-directory: plugin
+        run: |
+          uv run python verify_3mf.py ../build/shells.3mf --parts 2
+          uv run python verify_3mf.py ../build/seeds.3mf --parts 2
+          uv run python verify_3mf.py ../build/session.3mf --parts 2
+          uv run python verify_3mf.py ../build/auto.3mf
+          uv run python verify_3mf.py ../build/auto4.3mf

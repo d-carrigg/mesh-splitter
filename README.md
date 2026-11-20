@@ -15,6 +15,7 @@ Every feature is documented with pictures on the [docs site](https://d-carrigg.g
 - **[Heal joint](https://d-carrigg.github.io/mesh-splitter/features/transforms/#heal-joint):** after moving or rotating a part, stretch or squeeze it near its cut so the cut's edge lands back on its neighbor (no gap).
 - **[Replace with…](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#replace-with):** right-click a part and swap in another STL. It snaps onto the joint and keeps the part's name and filament. A replacement made from the same model, such as edited eyes, stays in place.
 - **[Send to Orca](https://d-carrigg.github.io/mesh-splitter/features/exporting/#send-to-orca):** one multi-part 3MF, every part on its filament. Painted 3MF, merged STL and per-part STLs are also available.
+- **[Command line](https://d-carrigg.github.io/mesh-splitter/features/command-line/):** `uv run mesh-splitter split model.stl --auto 6 -o model.3mf` splits and exports without opening the app, with the same results.
 - **Optional [AI part naming](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#ai-part-naming):** suggests part names and flags bad cuts (browser version).
 
 ## Install in OrcaSlicer
@@ -34,6 +35,19 @@ uv run mesh-splitter
 ```
 
 It opens at `http://127.0.0.1:8766/app/`. Everything runs locally, and nothing is uploaded.
+
+## Command line
+
+Split and export from a terminal or script. It needs [Node.js](https://nodejs.org/) 18+ as well as uv, and runs the same splitting code as the app:
+
+```
+uv run mesh-splitter split figure.stl --auto 6 -o figure.3mf --stl parts/
+uv run mesh-splitter split kit.3mf --shells --painted kit_painted.3mf
+uv run mesh-splitter split figure.stl --seeds seeds.json
+uv run mesh-splitter split figure.stl --session figure.split.json
+```
+
+All options, the seeds file format and outputs: [Command line docs](https://d-carrigg.github.io/mesh-splitter/features/command-line/), or `uv run mesh-splitter split --help`.
 
 ## Controls
 
@@ -77,7 +91,9 @@ The key stays in the local server and is never sent to the page.
 
 ## Development
 
-- `app/index.html`: the whole app, a single HTML file.
+- `app/index.html`: the app (UI, display, editing tools).
+- `app/core.js`: mesh loading, the splitting algorithm and the file writers, with no UI code. The app, the plugin bundle and the command line all import it.
+- `cli/split.mjs`: the command line (`uv run mesh-splitter split`, or `npm ci && node cli/split.mjs`).
 - `plugin/`: OrcaSlicer plugin. `npm ci && uv run python build.py` writes `dist/mesh_splitter_any.py`. Tests: `uv run python test_plugin.py`.
 - `server/`: local server behind `uv run mesh-splitter` and the AI naming proxy.
 - `docs/demo/`: script that records `docs/demo.gif` with headless Chromium and ffmpeg: `node docs/demo/record.mjs` (needs `npm ci` in `plugin/`). Steps, timing, camera and size are in `docs/demo/demo.config.json`. The meshes come from `prep_curling.py` and aren't in the repo. The same script makes the feature docs' images: `node docs/demo/record.mjs docs/features/demo/*.json`.

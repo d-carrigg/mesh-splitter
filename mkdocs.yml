@@ -16,6 +16,7 @@ nav:
   - Editing parts: features/editing-parts.md
   - Move, rotate, scale and heal: features/transforms.md
   - Exporting: features/exporting.md
+  - Command line: features/command-line.md
 theme:
   name: material
   logo: icon.png
