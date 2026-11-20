@@ -5,6 +5,8 @@ Change a part's position, angle and size, and keep it joined to its neighbor.
 - [Move, rotate, scale and undo](#move-rotate-scale-and-undo)
 - [Rotate on joint](#rotate-on-joint)
 - [Heal joint](#heal-joint)
+- [Stretch](#stretch)
+- [Collision warning](#collision-warning)
 
 ## Move, rotate, scale and undo
 
@@ -72,3 +74,25 @@ After you move or rotate a part, its cut edge may no longer line up with its nei
 - It works with any move or rotate. [Rotate on joint](#rotate-on-joint) plus heal joint is the usual pair for turning a part in place.
 - Replaced parts can't be healed; the option hides for them.
 - Undo turns it off like any other edit.
+
+## Stretch
+
+Lengthens (over 100%) or shortens a part along its own length, from its joint with the rest. Use it to lengthen raised arms so the broom they hold clears the stone's handle.
+
+![Before: the stick goes through the handle. After: both arms stretched to 115% and the stick clears it](img/stretch.png)
+
+### How to use it
+
+1. Select the part (Ctrl+click to select more, e.g. both arms).
+2. On the part card, type a **stretch %**. It applies to every selected part. 100 turns it off.
+
+### Tips
+
+- The joint stays put, so [heal joint](#heal-joint) keeps it seated.
+- Parts that move with it move out with its end without stretching, and a part it holds re-solves onto the new grips.
+- It works on top of move, rotate and rotate on joint. Reset clears it.
+
+## Collision warning
+
+After a transform, a part that passes through another part it didn't touch before (the broom stick through the handle) shows **⚠ Goes through …** on its part card, in the status bar and in Check. Parts that share a cut are skipped, since they always touch there.
+
