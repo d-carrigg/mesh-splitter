@@ -1,0 +1,165 @@
+{
+  "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+  "model": "curler.stl",
+  "out": "docs/demo.gif",
+  "viewport": {
+    "width": 1200,
+    "height": 720
+  },
+  "fps": 12,
+  "gif": {
+    "width": 960,
+    "colors": 128,
+    "dither": "sierra2_4a",
+    "loop": 0
+  },
+  "camera": {
+    "az": 40,
+    "el": 15,
+    "dist": 0.75,
+    "lift": 0.05
+  },
+  "steps": [
+    {
+      "do": "load",
+      "split": false
+    },
+    {
+      "do": "hold",
+      "s": 0.6
+    },
+    {
+      "do": "camera",
+      "az": 10,
+      "s": 1.2
+    },
+    {
+      "do": "click",
+      "target": "#autoBtn",
+      "after": 0.2
+    },
+    {
+      "do": "type",
+      "target": "#autoK",
+      "text": "6"
+    },
+    {
+      "do": "click",
+      "target": "#autoRun",
+      "after": 1
+    },
+    {
+      "do": "camera",
+      "az": -5,
+      "el": 10,
+      "dist": 0.5,
+      "lift": 0.05,
+      "s": 1
+    },
+    {
+      "do": "click",
+      "target": "#addPart",
+      "after": 0.2
+    },
+    {
+      "do": "click",
+      "target": {
+        "at": [
+          -9,
+          -6,
+          81
+        ]
+      },
+      "after": 0.4
+    },
+    {
+      "do": "click",
+      "target": "#fpSeed",
+      "after": 0.2
+    },
+    {
+      "do": "click",
+      "target": {
+        "at": [
+          42,
+          -1.5,
+          71
+        ]
+      },
+      "after": 0.4
+    },
+    {
+      "do": "click",
+      "target": "#fpDone",
+      "after": 0.3
+    },
+    {
+      "do": "click",
+      "target": "#clrSeeds",
+      "after": 0.2
+    },
+    {
+      "do": "key",
+      "key": "q",
+      "after": 0.1
+    },
+    {
+      "do": "click",
+      "target": "#pcName",
+      "after": 0.1
+    },
+    {
+      "do": "type",
+      "target": "#pcName",
+      "text": "Eyes",
+      "perChar": 0.1
+    },
+    {
+      "do": "key",
+      "key": "Enter",
+      "after": 0.1
+    },
+    {
+      "do": "set",
+      "target": "#pcColor",
+      "value": "#dcdcdc",
+      "after": 0.2
+    },
+    {
+      "do": "camera",
+      "az": 0,
+      "el": 6,
+      "dist": 0.42,
+      "lift": 0.0,
+      "s": 1
+    },
+    {
+      "do": "hold",
+      "s": 0.6
+    },
+    {
+      "do": "click",
+      "target": "#repBtn",
+      "file": "eyes_flipped.stl",
+      "input": "#repIn",
+      "after": 1.8
+    },
+    {
+      "do": "camera",
+      "az": 35,
+      "el": 15,
+      "dist": 0.7,
+      "lift": 0.05,
+      "s": 2.5
+    },
+    {
+      "do": "move",
+      "target": "#expMain",
+      "s": 0.8
+    },
+    {
+      "do": "hold",
+      "s": 1.5
+    }
+  ]
+}
