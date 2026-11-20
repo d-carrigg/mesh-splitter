@@ -1,0 +1,44 @@
+site_name: Mesh Splitter
+site_url: https://d-carrigg.github.io/mesh-splitter/
+site_description: Split one solid mesh into separate, color-coded parts for multi-color or multi-piece printing, in OrcaSlicer or a browser.
+repo_url: https://github.com/d-carrigg/mesh-splitter
+repo_name: d-carrigg/mesh-splitter
+edit_uri: edit/main/docs/
+docs_dir: docs
+exclude_docs: |
+  demo/
+  features/demo/
+  features/README.md
+  screenshot.png
+nav:
+  - Home: index.md
+  - Splitting: features/splitting.md
+  - Editing parts: features/editing-parts.md
+  - Move, rotate, scale and heal: features/transforms.md
+  - Exporting: features/exporting.md
+theme:
+  name: material
+  logo: icon.png
+  favicon: icon.png
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue grey
+      toggle: { icon: material/brightness-7, name: Dark mode }
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue grey
+      toggle: { icon: material/brightness-4, name: Light mode }
+  features:
+    - navigation.sections
+    - navigation.footer
+    - toc.follow
+    - search.highlight
+markdown_extensions:
+  - toc: { permalink: true }
+  - tables
+  - attr_list
+  - admonition
+validation:
+  links:
+    anchors: warn
