@@ -713,6 +713,7 @@ function healBase(i) { // geometry-only part: loop, rim angles, nearest loop ver
   u.addScaledVector(n, -u.dot(n)).normalize(); const v = new THREE.Vector3().crossVectors(n, u);
   const ang = (p) => { const d = p.clone().sub(J); return Math.atan2(d.dot(v), d.dot(u)); };
   const rim = pts.map((p) => ({ a: ang(p), p })).sort((x, y) => x.a - y.a);
+  const p2 = pts.map((p) => { const d = p.clone().sub(J); return [d.dot(u), d.dot(v)]; }); // loop in the joint plane
   // nearest loop vertex for every vertex of the part (brute force over a subsampled loop, then refined)
   const verts = new Set(); for (let f = 0; f < S.nF; f++) if (S.labels[f] === i) for (let c = 0; c < 3; c++) verts.add(S.tri[3*f+c]);
   const near = new Int32Array(S.nV), dist = new Float32Array(S.nV).fill(Infinity);
@@ -724,8 +725,23 @@ function healBase(i) { // geometry-only part: loop, rim angles, nearest loop ver
     for (let j = -step; j <= step; j++) { const k = (bk + j + pts.length) % pts.length, d = d2(k); if (d < bd) { bd = d; bk = k; } }
     near[vi] = bk; dist[vi] = Math.sqrt(bd);
   }
-  const out = { L, pts, J, n, u, v, rim, near, dist, verts, len: bl };
+  const out = { L, pts, p2, J, n, u, v, rim, near, dist, verts, len: bl };
   healCache.set(key, out); return out;
+}
+// Point on the fixed rim where the ray from the joint center at angle a crosses it (the crossing nearest `m` when the
+// loop is not star-shaped). Falls back to angle-sorted interpolation if no segment is hit.
+function rimHit(B, a, m) {
+  const cx = Math.cos(a), cy = Math.sin(a), P = B.p2, n = P.length;
+  let best = null, bd = Infinity;
+  for (let k = 0; k < n; k++) {
+    const [x0, y0] = P[k], [x1, y1] = P[(k+1) % n], ex = x1 - x0, ey = y1 - y0;
+    const den = cx * ey - cy * ex; if (Math.abs(den) < 1e-12) continue;
+    const t = (x0 * ey - y0 * ex) / den, s = (x0 * cy - y0 * cx) / den; // ray param t, segment param s
+    if (t <= 0 || s < 0 || s > 1) continue;
+    const q = B.pts[k].clone().lerp(B.pts[(k+1) % n], s), d = q.distanceToSquared(m);
+    if (d < bd) { bd = d; best = q; }
+  }
+  return best || rimAt(B, a);
 }
 function rimAt(B, a) { // point on the fixed rim at angle a (linear between the two rim vertices around it)
   const R = B.rim, m = R.length; let lo = 0, hi = m;
@@ -744,7 +760,7 @@ function healField(i) {
   const r = Math.max(0.1, +p.heal.r || healDefault(i));
   const d = B.pts.map((q) => {
     const m = q.clone().applyMatrix4(M), e = m.clone().sub(B.J);
-    return rimAt(B, Math.atan2(e.dot(B.v), e.dot(B.u))).sub(m);
+    return rimHit(B, Math.atan2(e.dot(B.v), e.dot(B.u)), m).sub(m);
   });
   const w = new Float32Array(S.nV);
   for (const vi of B.verts) { const s = B.dist[vi]; if (s < r) w[vi] = 0.5 * (1 + Math.cos(Math.PI * s / r)); }
