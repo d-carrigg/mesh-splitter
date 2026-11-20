@@ -2,7 +2,7 @@
 
 Split one solid mesh into separate, color-coded parts for multi-color or multi-piece printing, right inside OrcaSlicer. You can also scale, rotate, transform, or replace subsections of a mesh. For the example photo, I made the eyes 1 part, then replaced them with a flipped version to change where the figure looked.
 
-**Docs:** [Splitting](https://github.com/d-carrigg/mesh-splitter/blob/main/docs/features/splitting.md) · [Editing parts](https://github.com/d-carrigg/mesh-splitter/blob/main/docs/features/editing-parts.md) · [Move, rotate, scale and heal](https://github.com/d-carrigg/mesh-splitter/blob/main/docs/features/transforms.md) · [Exporting](https://github.com/d-carrigg/mesh-splitter/blob/main/docs/features/exporting.md)
+**Docs:** [Splitting](https://d-carrigg.github.io/mesh-splitter/features/splitting/) · [Editing parts](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/) · [Move, rotate, scale and heal](https://d-carrigg.github.io/mesh-splitter/features/transforms/) · [Exporting](https://d-carrigg.github.io/mesh-splitter/features/exporting/)
 
 ## Features
 

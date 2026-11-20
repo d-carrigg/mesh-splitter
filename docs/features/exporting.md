@@ -13,7 +13,7 @@ Inside OrcaSlicer, the main button is **Send to Orca**. It saves one multi-part 
 
 ### How to use it
 
-1. Install the plugin (see [Install in OrcaSlicer](../../README.md#install-in-orcaslicer)) and open the **Mesh Splitter** tab.
+1. Install the plugin (see [Install in OrcaSlicer](../index.md#install-in-orcaslicer)) and open the **Mesh Splitter** tab.
 2. Pick the object from the plate in the file menu. A single object on the plate opens by itself.
 3. Split it, then click **Send to Orca**.
 4. It saves `<name>_parts.3mf` to Downloads, and the status bar shows the path. In OrcaSlicer, import it with **Ctrl+I**.
