@@ -55,7 +55,7 @@ It opens at `http://127.0.0.1:8766/app/`. Everything runs locally, and nothing i
 - `plugin/`: OrcaSlicer plugin. `npm ci && uv run python build.py` writes `dist/mesh_splitter_any.py`. Tests: `uv run python test_plugin.py`.
 - `server/`: local server behind `uv run mesh-splitter` and the AI review proxy.
 
-CI builds and tests the plugin on every push, and publishes it to the release from `main`. Pushing a `vX.Y.Z` tag builds that version and pushes it to the [OrcaCloud Plugin Hub](https://cloud.orcaslicer.com/app/plugins/plugin-hub) (`publish-orcacloud.yml`).
+CI builds and tests the plugin on every push, and publishes it to the release from `main`. Releasing: bump `version` in `pyproject.toml` (the only place it lives), merge, then push the matching `vX.Y.Z` tag. That builds the version and pushes it to the [OrcaCloud Plugin Hub](https://cloud.orcaslicer.com/app/plugins/plugin-hub) (`publish-orcacloud.yml`).
 
 ## License
 
