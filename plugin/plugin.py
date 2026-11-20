@@ -4,7 +4,7 @@
 #
 # [tool.orcaslicer.plugin]
 # name = "Mesh Splitter"
-# description = "Split one solid mesh into colour-coded parts (auto split, seeds, brush), move or replace parts, and send it back as a multi-part 3MF with a filament per part."
+# description = "Split one solid mesh into color-coded parts (auto split, seeds, brush), move or replace parts, and send it back as a multi-part 3MF with a filament per part."
 # author = "d-carrigg"
 # version = "__VERSION__"
 # ///
@@ -64,8 +64,8 @@ def event_name(event):
     return getattr(event, "name", None) or str(event).split(".")[-1]
 
 
-def filament_colours():
-    """OrcaSlicer's current filament colours by slot ('#RRGGBB'), or [] if unavailable."""
+def filament_colors():
+    """OrcaSlicer's current filament colors by slot ('#RRGGBB'), or [] if unavailable."""
     try:
         raw = orca.host.preset_bundle().full_config_value("filament_colour")
     except Exception:
@@ -174,7 +174,7 @@ class Bridge:
         try:
             if cmd == "objects":
                 self.send({"cmd": "objects", "auto": bool(msg.get("auto")), "objects": list_objects(orca.host.model()),
-                           "filament_colours": filament_colours()})
+                           "filament_colors": filament_colors()})
             elif cmd == "mesh":
                 if np is None:
                     raise RuntimeError("numpy is not installed; reload the plugin so OrcaSlicer can install it")

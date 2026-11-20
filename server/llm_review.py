@@ -22,10 +22,10 @@ DEFAULT_MODEL = "deepseek/deepseek-v4.1-flash"
 MAX_IMAGES = 6
 
 SYSTEM = """You review a 3D mesh that a user split into parts for multi-color / multi-piece 3D printing (FDM).
-You get rendered views (each part drawn in its own color, labelled #id) and per-part stats as JSON.
+You get rendered views (each part drawn in its own color, labeled #id) and per-part stats as JSON.
 Tasks:
 1. Name each part with a short, specific noun phrase (e.g. "left boot", "broom head", "helmet visor"). Use the object's context.
-2. Flag obvious segmentation problems: a part that bleeds into a neighbour, one real feature split across parts, stray fragments/islands,
+2. Flag obvious segmentation problems: a part that bleeds into a neighbor, one real feature split across parts, stray fragments/islands,
    tiny slivers, faces left Unassigned, or a cut through a thin feature that will be hard to print or glue.
 Only flag what the images or stats support. Say which part ids are involved and a concrete fix using the app's tools
 (add a seed to part #n and re-segment, Fill, Brush, Merge, Smooth, Auto split active part).

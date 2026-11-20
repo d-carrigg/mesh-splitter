@@ -120,20 +120,20 @@ class FakeWindow:
 
 
 class FakeBundle:
-    def __init__(self, colours):
-        self.colours = colours
+    def __init__(self, colors):
+        self.colors = colors
 
     def full_config_value(self, key):
-        return ";".join(f'"{c}"' for c in self.colours) if key == "filament_colour" else None
+        return ";".join(f'"{c}"' for c in self.colors) if key == "filament_colour" else None
 
 
-def install(objects, storage=None, colours=("#FF0000", "#00AE42")):
+def install(objects, storage=None, colors=("#FF0000", "#00AE42")):
     orca = types.ModuleType("orca")
     state = {"model": FakeModel(objects), "permissions": [], "capabilities": [], "windows": [], "notifications": []}
     host = types.SimpleNamespace(
         model=lambda: state["model"],
         plugin=types.SimpleNamespace(storage=lambda: storage or tempfile.gettempdir()),
-        preset_bundle=lambda: FakeBundle(list(colours)),
+        preset_bundle=lambda: FakeBundle(list(colors)),
         ui=types.SimpleNamespace(
             create_window=lambda **kw: state["windows"].append(FakeWindow(**kw)) or state["windows"][-1],
             push_notification=lambda level, text, hyper_text="", on_click=None: state["notifications"].append(text),

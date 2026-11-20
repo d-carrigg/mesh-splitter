@@ -1,15 +1,15 @@
 # Mesh Splitter
 
-Turn one solid mesh into separate, colour-coded parts for multi-colour or multi-piece 3D printing. Use it as an **OrcaSlicer plugin** or in **any browser**.
+Turn one solid mesh into separate, color-coded parts for multi-color or multi-piece 3D printing. Use it as an **OrcaSlicer plugin** or in **any browser**.
 
-![A curling-stone figure split into 10 colour-coded parts](docs/screenshot.png)
+![A curling-stone figure split into 10 color-coded parts](docs/screenshot.png)
 
 Made for AI-generated figures and other STL/3MF files that come as one shell with no CAD source.
 
 ## Features
 
 - **Split in a few clicks:** auto split, split by shells, or click a seed per part. Cuts follow the model's creases.
-- **One colour per part:** each part gets its own filament slot. Rename, hide, or show only one part.
+- **One color per part:** each part gets its own filament slot. Rename, hide, or show only one part.
 - **Move, rotate, scale:** drag handles in the view (W / E / R, Shift to snap), with undo.
 - **Replace with…:** right-click a part and swap in another STL. It snaps onto the joint and keeps the part's name and filament.
 - **Send to Orca:** one multi-part 3MF, every part on its filament. Painted 3MF, merged STL and per-part STLs are also available.
@@ -39,9 +39,9 @@ It opens at `http://127.0.0.1:8766/app/`. Everything runs locally, and nothing i
 | --- | --- |
 | W / E / R / Q | Move / rotate / scale handles, then hide them |
 | Shift (while dragging) | Snap to 1 mm, 15° or 5% |
-| C | Toggle part colours / filament colours |
+| C | Toggle part colors / filament colors |
 | Home | Frame the model |
-| Del | Delete the part (its faces join the neighbour) |
+| Del | Delete the part (its faces join the neighbor) |
 | Ctrl+Z / Ctrl+Y | Undo / redo |
 | Right-click | Part actions: rename, show only, replace, … |
 
