@@ -64,6 +64,28 @@ const moved = await page.evaluate(() => ({ t: app.S.parts[1].xf?.t, undo: app.S.
 console.log("gizmo:", JSON.stringify({ attached: g.on, ...moved }));
 if (!g.on || !moved.t || moved.t.every((v) => v === 0) || moved.undo !== g.undo + 1) errors.push("gizmo drag did not move the part");
 await page.keyboard.press("Control+z");
+// Rotate on joint: cut a tilted cap off the body, spin it on its joint, expect the joint's center and normal to stay put.
+const jt = await page.evaluate(() => {
+  const { S } = app, n = [0.5, 0, 0.866];
+  const body = S.labels[0], cap = S.parts.push(app.newPart()) - 1, ctr = [0, 0, 0], fc = (f) => [0, 1, 2].map((k) => (S.pos[3*S.tri[3*f]+k] + S.pos[3*S.tri[3*f+1]+k] + S.pos[3*S.tri[3*f+2]+k]) / 3);
+  let m = 0; for (let f = 0; f < S.nF; f++) if (S.labels[f] === body) { fc(f).forEach((v, k) => (ctr[k] += v)); m++; }
+  for (let f = 0; f < S.nF; f++) if (S.labels[f] === body && fc(f).reduce((d, v, k) => d + (v - ctr[k] / m) * n[k], 0) > 12) S.labels[f] = cap;
+  S.active = cap; app.afterEdit(); app.setGizmo("rotate"); app.setGizmoJoint(true);
+  const jf0 = app.jointFrame(cap); if (!jf0) return { err: "no joint frame" };
+  const { gizmo, gzProxy } = app, THREE = gzProxy.quaternion.constructor;
+  const before = S.hist.past.length;
+  gizmo.dispatchEvent({ type: "dragging-changed", value: true });
+  gzProxy.quaternion.multiply(new THREE().setFromAxisAngle(gzProxy.up.clone().set(0, 1, 0), Math.PI / 3)); // 60° on the ring's axis
+  gizmo.dispatchEvent({ type: "objectChange" });
+  gizmo.dispatchEvent({ type: "dragging-changed", value: false });
+  const jf1 = app.jointFrame(cap), x = S.parts[cap].xf;
+  return { r: x.r, t: x.t, dJ: jf1.J.distanceTo(jf0.J), dot: jf1.n.dot(jf0.n), undo: S.hist.past.length - before, ring: { x: gizmo.showX, y: gizmo.showY, z: gizmo.showZ } };
+});
+console.log("joint:", JSON.stringify(jt));
+if (jt.err || jt.dJ > 1e-3 || jt.dot < 0.9999 || jt.r.every((v) => v === 0) || jt.undo !== 1 || jt.ring.x || !jt.ring.y) errors.push("rotate on joint moved the joint: " + JSON.stringify(jt));
+if (shot) await page.screenshot({ path: shot.replace(/\.png$/, "_joint.png") });
+await page.keyboard.press("Control+z");
+await page.evaluate(() => app.setGizmoJoint(false));
 if (shot) await page.screenshot({ path: shot });
 await page.click("#expMain");
 const t0 = Date.now();
