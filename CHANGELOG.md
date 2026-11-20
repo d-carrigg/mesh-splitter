@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.7](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.6...v0.3.7) (2026-11-20)
+
+
+### Bug Fixes
+
+* send OrcaCloud release metadata with --form-string ([#17](https://github.com/d-carrigg/mesh-splitter/issues/17)) ([cbb5cd1](https://github.com/d-carrigg/mesh-splitter/commit/cbb5cd1a4aa0fa7245bdc23b8fa8f3e396f48631))
+
 ## [0.3.6](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.5...v0.3.6) (2026-11-20)
 
 
