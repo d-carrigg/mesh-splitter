@@ -2,7 +2,7 @@ name: Publish to OrcaCloud
 
 # Runs when a vX.Y.Z GitHub release is published (by Release Please or by hand). It builds the plugin at that
 # version, attaches the file to the release, and publishes it to the OrcaCloud Plugin Hub with the release
-# notes as the changelog. Auth is GitHub OIDC (no secrets): the plugin on OrcaCloud
+# notes as the changelog (converted to plain text by release_notes.py). Auth is GitHub OIDC (no secrets): the plugin on OrcaCloud
 # must have this repository connected under Edit plugin > GitHub publishing.
 # Steps from https://cloud.orcaslicer.com/wiki/#publish-from-github
 on:
@@ -25,10 +25,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.TAG }}
-      - name: Changelog from the release notes
+      - name: Changelog from the release notes (plain text; OrcaCloud does not render markdown)
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release view "$TAG" --json body -q .body | head -c 4000 > ../changelog.txt
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" --json body -q .body | python3 release_notes.py | head -c 4000 > ../changelog.txt
+          cat ../changelog.txt
       - uses: actions/setup-node@v4
         with:
           node-version: 22
