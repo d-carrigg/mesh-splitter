@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.3.9](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.8...v0.3.9) (2026-11-20)
+
+
+### Features
+
+* command line splitting (mesh-splitter split) ([#29](https://github.com/d-carrigg/mesh-splitter/issues/29)) ([f05c956](https://github.com/d-carrigg/mesh-splitter/commit/f05c9566f2d9da824659642179de212c3f773ac1))
+* make Mesh Splitter look and feel like a native part of OrcaSlicer ([#33](https://github.com/d-carrigg/mesh-splitter/issues/33)) ([b8732ff](https://github.com/d-carrigg/mesh-splitter/commit/b8732ffe45b09ac96dad5726a4666763c8bd353f))
+* move parts together (Move with, Reach, Hold) ([#31](https://github.com/d-carrigg/mesh-splitter/issues/31)) ([722fb78](https://github.com/d-carrigg/mesh-splitter/commit/722fb787cb81d5b321a2df4de6abf3ec6d119588))
+* stretch parts from their joint (with auto stretch), and warn when parts pass through each other ([#34](https://github.com/d-carrigg/mesh-splitter/issues/34)) ([d76e114](https://github.com/d-carrigg/mesh-splitter/commit/d76e1149243032aeb4dd4c1cf23bb53f05149333))
+
+
+### Bug Fixes
+
+* heal joint lands on the rim for jagged or non-round cuts ([#36](https://github.com/d-carrigg/mesh-splitter/issues/36)) ([2d04a70](https://github.com/d-carrigg/mesh-splitter/commit/2d04a706c4471d823c6efce9b8d3201b67beb8a8))
+* stretch a held part so it reaches both hands ([#32](https://github.com/d-carrigg/mesh-splitter/issues/32)) ([5a1c6b1](https://github.com/d-carrigg/mesh-splitter/commit/5a1c6b19586d92a2898374100fe5fdca768506ef))
+
+
+### Documentation
+
+* add How it works page ([#35](https://github.com/d-carrigg/mesh-splitter/issues/35)) ([108e9d5](https://github.com/d-carrigg/mesh-splitter/commit/108e9d5fa549e5661539f5c36b6554c25e5645dd))
+* publish the docs on GitHub Pages ([#27](https://github.com/d-carrigg/mesh-splitter/issues/27)) ([083a224](https://github.com/d-carrigg/mesh-splitter/commit/083a22472162fe7999e7653ba943df51b5c817c3))
+
 ## [0.3.8](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.7...v0.3.8) (2026-11-20)
 
 
