@@ -79,6 +79,12 @@ await page.addInitScript(() => {
     const ring = c.querySelector("i");
     ring.style.cssText = "position:absolute;left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;border:3px solid #4fc3f7;opacity:0;transform:scale(.4)";
     document.body.appendChild(c);
+    const cap = document.createElement("div");
+    cap.id = "__caption";
+    cap.style.cssText = "position:fixed;left:50%;bottom:44px;transform:translateX(-50%);z-index:99998;pointer-events:none;padding:10px 22px;" +
+      "border-radius:10px;background:#000b;color:#fff;font:600 24px system-ui,sans-serif;white-space:nowrap;transition:opacity .2s;opacity:0";
+    document.body.appendChild(cap);
+    window.__caption = (t, at) => { cap.textContent = t || ""; cap.style.opacity = t ? "1" : "0"; if (at) Object.assign(cap.style, at); };
     window.__cur = {
       at(x, y) { c.style.left = x + "px"; c.style.top = y + "px"; },
       pulse(t) { ring.style.opacity = String(Math.max(0, 1 - t)); ring.style.transform = `scale(${0.4 + t})`; },
@@ -184,6 +190,7 @@ const steps = {
     if (s.target) await page.locator(s.target).fill("");
     for (const ch of String(s.text)) { await page.keyboard.type(ch); await hold(s.perChar ?? 0.12); }
   },
+  async caption(s) { await page.evaluate(([t, at]) => window.__caption(t, at), [s.text || "", s.style || null]); if (s.s) await hold(s.s); },
   async set(s) { await page.locator(s.target).fill(String(s.value)); await idle(); await hold(s.after ?? 0.3); }, // e.g. a color input
   async key(s) { await page.keyboard.press(s.key); await idle(); await hold(s.after ?? 0.3); },
   async eval(s) { await page.evaluate(s.js); await idle(); }, // escape hatch: run JS in the page

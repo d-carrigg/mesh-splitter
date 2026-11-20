@@ -25,13 +25,21 @@
       "split": false
     },
     {
+      "do": "caption",
+      "text": "Open a single-shell mesh"
+    },
+    {
       "do": "hold",
-      "s": 0.6
+      "s": 0.8
     },
     {
       "do": "camera",
       "az": 10,
       "s": 1.2
+    },
+    {
+      "do": "caption",
+      "text": "Auto split along the creases"
     },
     {
       "do": "click",
@@ -46,15 +54,19 @@
     {
       "do": "click",
       "target": "#autoRun",
-      "after": 1
+      "after": 1.2
     },
     {
       "do": "camera",
-      "az": -5,
-      "el": 10,
+      "az": -15,
+      "el": 12,
       "dist": 0.5,
       "lift": 0.05,
       "s": 1
+    },
+    {
+      "do": "caption",
+      "text": "Add a part: click each eye"
     },
     {
       "do": "click",
@@ -104,6 +116,10 @@
       "after": 0.1
     },
     {
+      "do": "caption",
+      "text": "Name it and pick a color"
+    },
+    {
       "do": "click",
       "target": "#pcName",
       "after": 0.1
@@ -123,34 +139,60 @@
       "do": "set",
       "target": "#pcColor",
       "value": "#dcdcdc",
-      "after": 0.2
+      "after": 0.5
+    },
+    {
+      "do": "caption",
+      "text": "Replace the eyes with ones that look the other way"
     },
     {
       "do": "camera",
-      "az": 0,
-      "el": 6,
-      "dist": 0.42,
+      "az": -32,
+      "el": 18,
+      "dist": 0.36,
       "lift": 0.0,
-      "s": 1
+      "s": 1.2
     },
     {
       "do": "hold",
-      "s": 0.6
+      "s": 0.8
     },
     {
       "do": "click",
       "target": "#repBtn",
       "file": "eyes_flipped.stl",
       "input": "#repIn",
-      "after": 1.8
+      "after": 1.5
+    },
+    {
+      "do": "caption",
+      "text": "Before"
+    },
+    {
+      "do": "key",
+      "key": "Control+z",
+      "after": 1
+    },
+    {
+      "do": "caption",
+      "text": "After"
+    },
+    {
+      "do": "key",
+      "key": "Control+y",
+      "after": 1.2
+    },
+    {
+      "do": "caption",
+      "text": "Export one multi-part 3MF, a filament per part"
     },
     {
       "do": "camera",
-      "az": 35,
+      "az": 30,
       "el": 15,
       "dist": 0.7,
       "lift": 0.05,
-      "s": 2.5
+      "s": 2.2
     },
     {
       "do": "move",
@@ -159,7 +201,7 @@
     },
     {
       "do": "hold",
-      "s": 1.5
+      "s": 1.6
     }
   ]
 }
