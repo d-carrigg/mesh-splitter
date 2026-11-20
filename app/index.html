@@ -733,11 +733,14 @@ function healField(i) {
 let uidSeq = 1;
 const uidOf = (i) => (S.parts[i].uid ||= `u${Date.now().toString(36)}${uidSeq++}`);
 const partMat = (i) => xfMatrix(S.parts[i]) || new THREE.Matrix4();
+// Frame that followers ride on: the part's matrix without any Reach/Hold stretch (xf.rig), so a broom head attached
+// to a stretched stick moves with it but keeps its shape.
+const frameMat = (i) => (S.parts[i]?.xf?.rig ? new THREE.Matrix4().fromArray(S.parts[i].xf.rig) : partMat(i));
 function leaderOf(i) { const f = S.parts[i]?.follow; return f ? S.parts.findIndex((q, j) => j > 0 && q.uid === f.to) : -1; }
 function followersOf(i) { const u = S.parts[i]?.uid; return u ? S.parts.map((q, j) => (j > 0 && q.follow?.to === u ? j : -1)).filter((j) => j > 0) : []; }
 function setXfMatrix(j, M) {
   const x = ensureXf(j), pos = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
-  delete x.m;
+  delete x.m; delete x.rig;
   M.decompose(pos, q, sc);
   const e = new THREE.Euler().setFromQuaternion(q, "XYZ"), c = new THREE.Vector3(...x.c), w = c.clone().applyMatrix4(M);
   x.s = sc.toArray().map((v) => +v.toFixed(5)); x.r = [e.x, e.y, e.z].map((v) => +(v * 180 / Math.PI).toFixed(3));
@@ -745,14 +748,14 @@ function setXfMatrix(j, M) {
 }
 // Call after part i's own transform changed: refresh its offset to its leader, then carry its followers.
 function xfEdited(i) {
-  if (S.parts[i].xf?.m) delete S.parts[i].xf.m;
+  if (S.parts[i].xf?.m) { delete S.parts[i].xf.m; delete S.parts[i].xf.rig; }
   const l = leaderOf(i);
-  if (l > 0) S.parts[i].follow.rel = partMat(l).invert().multiply(partMat(i)).toArray();
+  if (l > 0) S.parts[i].follow.rel = frameMat(l).invert().multiply(partMat(i)).toArray();
   carry(i, new Set([i]));
   updateReach();
 }
 function carry(i, seen) {
-  const M = partMat(i);
+  const M = frameMat(i);
   for (const j of followersOf(i)) {
     if (seen.has(j)) continue; seen.add(j);
     setXfMatrix(j, M.clone().multiply(new THREE.Matrix4().fromArray(S.parts[j].follow.rel)));
@@ -767,7 +770,7 @@ function setFollow(js, l) { // js follow part l (null: stop following)
   if (!js.length) return;
   pushUndo();
   for (const j of js) {
-    if (l > 0) S.parts[j].follow = { to: uidOf(l), rel: partMat(l).invert().multiply(partMat(j)).toArray() };
+    if (l > 0) S.parts[j].follow = { to: uidOf(l), rel: frameMat(l).invert().multiply(partMat(j)).toArray() };
     else delete S.parts[j].follow;
   }
   const names = js.map((j) => S.parts[j].name).join(", ");
@@ -800,7 +803,7 @@ function reachOf(i) { const r = S.parts[i]?.reach; return r ? S.parts.findIndex(
 // part.hold = { a, b: holder uids, ga, gb: grip points (original coords) }: the part (a broom stick) is placed so its
 // two grips sit on the two holders (hands) wherever they moved: the grip-to-grip line is turned onto the new one
 // (shortest turn), stretched along it to the new grip distance and centered between the new grips. Parts that move
-// with it are carried (stretch included), so attach a broom head to the hand rather than to the stick.
+// with it are carried rigidly (without the stretch).
 function holdersOf(j) { const h = S.parts[j]?.hold; if (!h) return null; const f = (u) => S.parts.findIndex((q, k) => k > 0 && q.uid === u); const a = f(h.a), b = f(h.b); return a > 0 && b > 0 ? [a, b] : null; }
 function updateHolds() {
   S.parts.forEach((q, j) => {
@@ -816,7 +819,8 @@ function updateHolds() {
       (kS-1)*a.y*a.x, 1 + (kS-1)*a.y*a.y, (kS-1)*a.y*a.z, 0,
       (kS-1)*a.z*a.x, (kS-1)*a.z*a.y, 1 + (kS-1)*a.z*a.z, 0, 0, 0, 0, 1);
     const M = new THREE.Matrix4().makeTranslation(m1.x, m1.y, m1.z).multiply(R).multiply(S3).multiply(new THREE.Matrix4().makeTranslation(-m0.x, -m0.y, -m0.z));
-    setXfMatrix(j, M); ensureXf(j).m = M.toArray();
+    setXfMatrix(j, M); const xh = ensureXf(j); xh.m = M.toArray();
+    xh.rig = new THREE.Matrix4().makeTranslation(m1.x, m1.y, m1.z).multiply(R).multiply(new THREE.Matrix4().makeTranslation(-m0.x, -m0.y, -m0.z)).toArray();
     carry(j, new Set([j]));
   });
 }
@@ -825,7 +829,7 @@ function setHold(j, a, b) { // part j held by parts a and b (a <= 0: release)
   pushUndo();
   const q = S.parts[j];
   if (a > 0) { q.hold = { a: uidOf(a), b: uidOf(b), ga: reachPoints(a, j).e, gb: reachPoints(b, j).e }; delete q.follow; delete q.reach; updateReach(); }
-  else delete q.hold;
+  else { delete q.hold; if (q.xf) { delete q.xf.m; delete q.xf.rig; } }
   afterEdit(a > 0 ? `${q.name} is held by ${S.parts[a].name} and ${S.parts[b].name}` : `${q.name} is no longer held`);
 }
 function updateReach() {
@@ -842,7 +846,8 @@ function updateReach() {
       (kS-1)*a.z*a.x, (kS-1)*a.z*a.y, 1 + (kS-1)*a.z*a.z, 0, 0, 0, 0, 1);
     const R = new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(a, d1.clone().divideScalar(L1)));
     const M = new THREE.Matrix4().makeTranslation(P.x, P.y, P.z).multiply(R).multiply(S3).multiply(new THREE.Matrix4().makeTranslation(-P.x, -P.y, -P.z));
-    setXfMatrix(j, M); ensureXf(j).m = M.toArray();
+    setXfMatrix(j, M); const xr = ensureXf(j); xr.m = M.toArray();
+    xr.rig = new THREE.Matrix4().makeTranslation(P.x, P.y, P.z).multiply(R).multiply(new THREE.Matrix4().makeTranslation(-P.x, -P.y, -P.z)).toArray();
   });
 }
 function setReach(j, k) { // part j reaches for part k (k <= 0: stop)
@@ -850,7 +855,7 @@ function setReach(j, k) { // part j reaches for part k (k <= 0: stop)
   pushUndo();
   const q = S.parts[j];
   if (k > 0) { q.reach = { to: uidOf(k), ...reachPoints(j, k) }; delete q.follow; updateReach(); }
-  else { delete q.reach; if (q.xf) delete q.xf.m; }
+  else { delete q.reach; if (q.xf) { delete q.xf.m; delete q.xf.rig; } }
   afterEdit(k > 0 ? `${q.name} now reaches for ${S.parts[k].name}: it turns at its joint and stretches to stay on it` : `${q.name} stopped reaching`);
 }
 function renderFollowRow(i) {
