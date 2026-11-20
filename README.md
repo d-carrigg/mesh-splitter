@@ -4,8 +4,6 @@ Turn one solid mesh into separate, color-coded parts for multi-color or multi-pi
 
 ![A curling-stone figure split into 10 color-coded parts](docs/screenshot.png)
 
-Made for AI-generated figures and other STL/3MF files that come as one shell with no CAD source.
-
 ## Features
 
 - **Split in a few clicks:** auto split, split by shells, or click a seed per part. Cuts follow the model's creases.

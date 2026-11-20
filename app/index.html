@@ -2831,7 +2831,7 @@ if (ORCA.on) {
   $("expMain").lastChild.textContent = "Send to Orca";
   $("expMain").title = "Save a multi-part 3MF (each part keeps its filament slot) to Downloads, then import it in OrcaSlicer with Ctrl+I";
   $("expParts").hidden = true;
-  $("aiBtn").disabled = true; $("aiBtn").title = "AI review needs the standalone splitter (uv run splitter); Check still works here";
+  $("aiBtn").disabled = true; $("aiBtn").title = "AI review needs the standalone splitter (uv run mesh-splitter); Check still works here";
   window.orca.onMessage((m) => {
     if (!m || typeof m !== "object") return;
     if (m.cmd === "objects") {
