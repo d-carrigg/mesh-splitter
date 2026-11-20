@@ -1572,6 +1572,8 @@ function openCtx(ev) {
     it("plus", "New part here", () => { placing = { part: -1, from: 0 }; placeAt(h); });
     it("solo", "Show only this", () => { S.parts.forEach((q, i) => (q.visible = i === l)); afterEdit(); });
     it("eyeOff", "Hide", () => { p.visible = false; afterEdit(); });
+    it("replace", p.rep ? "Replace with another…" : "Replace with…", () => replaceWith(l));
+    if (p.rep) it("reset", "Remove replacement", () => { selectPart(l); $("repDel").click(); });
     it("trash", "Delete (merge into neighbour)", () => deletePart(l), "danger");
   }
   if (anyUn && l !== 0) it("fill", "Fill all unassigned", () => fillUnassigned(-1));
@@ -1617,6 +1619,7 @@ function openPartMenu(ev, i) {
   it(p.visible ? "eyeOff" : "eye", p.visible ? "Hide" : "Show", () => { p.visible = !p.visible; afterEdit(); });
   if (p.seeds.length) it("eraser", "Clear points", () => { pushUndo(); p.seeds = []; afterEdit(); });
   items.push("-");
+  if (i > 0) it("replace", p.rep ? "Replace with another…" : "Replace with…", () => replaceWith(i));
   it("trash", "Delete (merge into neighbour)", () => deletePart(i), "danger");
   showMenu(ev, `<span class="sw" style="background:${p.color}"></span>${esc(p.name)} · F${p.filament}`, items);
 }
@@ -1960,6 +1963,9 @@ async function replaceActive(file) {
   p.xf = { s: [1, 1, 1], r: [0, 0, 0], t: [0, 0, 0], c: pj ? pj.J.toArray() : ensureXf(i).c }; // transform pivots on the joint
   afterEdit(`${p.name} replaced by ${p.rep.name}${pj?.loopLen ? "" : " (part has no cut, attached at its bottom)"}`);
 }
+// Right-click "Replace with…": select the part, then pick the mesh. The replacement keeps the part's name and filament
+// slot, sits on the part's joint (its cut), is scaled to the old part's length (fit) and can be dragged with the gizmo.
+function replaceWith(i) { if (i <= 0) return; selectPart(i); $("repIn").click(); }
 function repEdit(fn, msg) { const p = S.parts[S.active]; if (!p?.rep) return; pushUndo(); fn(p.rep); afterEdit(msg); }
 
 // ---------------------------------------------------------------- transform panel
