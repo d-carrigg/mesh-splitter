@@ -89,7 +89,7 @@ The key stays in the local server and is never sent to the page.
 - `app/index.html`: the app (UI, display, editing tools).
 - `app/core.js`: mesh loading, the splitting algorithm and the file writers, with no UI code. The app, the plugin bundle and the command line all import it.
 - `cli/split.mjs`: the command line (`uv run mesh-splitter split`, or `npm ci && node cli/split.mjs`).
-- `plugin/`: OrcaSlicer plugin. `npm ci && uv run python build.py` writes `dist/mesh_splitter_any.py`. Tests: `uv run python test_plugin.py`.
+- `plugin/`: OrcaSlicer plugin. `npm ci && uv run python build.py` writes `dist/mesh_splitter_any.py`. Tests: `uv run python test_plugin.py`. CI also installs the plugin in a real OrcaSlicer 2.5.1 (Linux AppImage, headless under Xvfb) and checks that it loads, reads the plate mesh, and that its 3MF imports as one part per split part: `real_orca_test.py`.
 - `server/`: local server behind `uv run mesh-splitter` and the AI naming proxy.
 - `docs/demo/`: script that records `docs/demo.gif` with headless Chromium and ffmpeg: `node docs/demo/record.mjs` (needs `npm ci` in `plugin/`). Steps, timing, camera and size are in `docs/demo/demo.config.json`. The meshes come from `prep_curling.py` and aren't in the repo. The same script makes the feature docs' images: `node docs/demo/record.mjs docs/features/demo/*.json`.
 - Docs site: `mkdocs.yml` + `docs/`, built with MkDocs Material and deployed to [GitHub Pages](https://d-carrigg.github.io/mesh-splitter/) by `.github/workflows/docs.yml` on every merge to `main`. Preview locally with `pip install mkdocs-material && mkdocs serve`.

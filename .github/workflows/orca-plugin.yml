@@ -14,7 +14,9 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # matches OrcaSlicer's Ubuntu 24.04 AppImage used by the real OrcaSlicer test
+    env:
+      ORCA_VERSION: 2.5.1   # the OrcaSlicer release the plugin targets
     defaults:
       run:
         working-directory: plugin
@@ -43,6 +45,32 @@ jobs:
           mkdir -p build/out
           PYTHON="$(uv run which python)" node e2e.mjs build/snowman.stl build/out
           uv run python verify_3mf.py build/out/snowman_parts.3mf
+      - name: Cache OrcaSlicer ${{ env.ORCA_VERSION }}
+        uses: actions/cache@v4
+        with:
+          path: ~/orca/orca.AppImage
+          key: orcaslicer-${{ env.ORCA_VERSION }}-ubuntu2404
+      - name: Real OrcaSlicer (install plugin, load it, read the plate, import the split 3MF)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends xvfb imagemagick locales \
+            libwebkit2gtk-4.1-0 libegl1 libopengl0 libsecret-1-0 libwayland-server0 libgl1-mesa-dri
+          sudo locale-gen en_US.UTF-8
+          mkdir -p ~/orca && cd ~/orca
+          [ -f orca.AppImage ] || curl -fsSL -o orca.AppImage \
+            "https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v${ORCA_VERSION}/OrcaSlicer_Linux_AppImage_Ubuntu2404_V${ORCA_VERSION}.AppImage"
+          chmod +x orca.AppImage && ./orca.AppImage --appimage-extract >/dev/null   # no FUSE on runners
+          cd "$GITHUB_WORKSPACE/plugin"
+          LANG=en_US.UTF-8 xvfb-run -a -s "-screen 0 1600x1000x24" \
+            uv run python real_orca_test.py ~/orca/squashfs-root/AppRun dist/mesh_splitter_any.py \
+            build/snowman.stl build/out/snowman_parts.3mf --out build/real-orca
+      - name: Upload real OrcaSlicer logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-orca-${{ github.run_number }}
+          path: plugin/build/real-orca
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
           name: mesh_splitter-${{ github.run_number }}
