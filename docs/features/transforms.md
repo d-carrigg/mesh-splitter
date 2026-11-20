@@ -51,7 +51,7 @@ Spins a part about its cut instead of the world axes. The axis is the cut's norm
 ### Tips
 
 - A part with no cut (a separate shell) rotates on the world axes instead, and the status bar says so.
-- The rotation is stored as a normal rotation plus move, so the values on the part card stay editable in the Transform panel.
+- The rotation is stored as a normal rotation plus move, so its values stay editable in the Transform panel.
 - If a rotated part still doesn't meet its neighbor exactly (an oval cut, for example), turn on [heal joint](#heal-joint).
 
 ## Heal joint
