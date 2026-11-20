@@ -33,3 +33,7 @@ Splits a single-shell mesh (STL/3MF, e.g. AI figures with no STEP) into parts. S
 - **Send to Orca** writes `<name>_parts.3mf` (Multi-part 3MF) to Downloads (never overwriting: `name (2).3mf`) and shows an Orca notification. Import it with **Ctrl+I**. OrcaSlicer 2.5's plugin API can read the plate but cannot add or replace objects, so this import step is manual.
 - Export menu items save to Downloads too. AI review needs the standalone splitter; **Check** works in both.
 - Build locally: `cd tools/orca_plugin && npm ci && uv run python build.py` writes `dist/mesh_splitter.py`. esbuild bundles three / three-mesh-bvh / fflate into the page, with the same versions as the importmap. OrcaSlicer pages must be self-contained and under about 2 MB. Tests: `uv run python test_plugin.py`; `node e2e.mjs MESH.stl OUTDIR` drives the built page against the real plugin bridge with a fake host, and `verify_3mf.py` checks the result the way OrcaSlicer's importer reads it.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
