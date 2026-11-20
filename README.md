@@ -10,6 +10,7 @@ Split one solid mesh into separate, color-coded parts for multi-color or multi-p
 - **One color per part:** each part gets its own filament slot. Rename, hide, or show only one part.
 - **Move, rotate, scale:** drag handles in the view (W / E / R, Shift to snap), with undo.
 - **Rotate on joint:** spin a part about its cut's axis (J), so a part on an angled surface stays seated on it.
+- **Heal joint:** after moving or rotating a part, stretch or squeeze it near its cut so the cut's edge lands back on its neighbor (no gap).
 - **Replace with…:** right-click a part and swap in another STL. It snaps onto the joint and keeps the part's name and filament. A replacement made from the same model, such as edited eyes, stays in place.
 - **Send to Orca:** one multi-part 3MF, every part on its filament. Painted 3MF, merged STL and per-part STLs are also available.
 - **Optional AI part naming:** suggests part names and flags bad cuts (browser version).
