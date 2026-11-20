@@ -114,6 +114,21 @@ const rc = await page.evaluate(() => {
   return out;
 });
 console.log("reach:", JSON.stringify(rc));
+// Hold: the head is held by the cap and the body; after the cap moves, the head's grip midpoint follows the grips.
+const hd = await page.evaluate(() => {
+  const { S } = app, cap = S.active, body = S.labels[0], head = S.parts.findIndex((_, j) => j > 0 && j !== cap && j !== body);
+  app.setHold(head, cap, body);
+  const h = S.parts[head].hold, V = app.gzProxy.position.constructor;
+  S.active = cap; app.refreshUI();
+  const t0 = document.getElementById("xfT2"); t0.value = +t0.value + 5; t0.dispatchEvent(new Event("input", { bubbles: true }));
+  const A0 = new V(...h.ga), B0 = new V(...h.gb), m0 = A0.clone().add(B0).multiplyScalar(0.5);
+  const m1 = A0.clone().applyMatrix4(app.partMat(cap)).add(B0.clone().applyMatrix4(app.partMat(body))).multiplyScalar(0.5);
+  const out = { held: app.holdersOf(head), err: m0.applyMatrix4(app.partMat(head)).distanceTo(m1) };
+  app.undo(); out.after = !!S.parts[head].hold;
+  return out;
+});
+console.log("hold:", JSON.stringify(hd));
+if (!hd.held || hd.err > 1e-3 || hd.after) errors.push("hold failed: " + JSON.stringify(hd));
 if (rc.reach <= 0 || !rc.moved || rc.err > 1e-3 || rc.after) errors.push("reach failed: " + JSON.stringify(rc));
 if (mw.leader <= 0 || !mw.moved || mw.relErr > 5e-3 || mw.undo !== 2 || mw.after.follow || mw.after.moved) errors.push("move with failed: " + JSON.stringify(mw));
 // Heal joint: shift the cap 3 mm sideways, heal it, expect its cut edge back on the body's rim and a closed part.

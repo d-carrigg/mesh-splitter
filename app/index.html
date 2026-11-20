@@ -797,7 +797,32 @@ function reachPoints(j, k) {
   return { p: p.toArray(), e: e.toArray() };
 }
 function reachOf(i) { const r = S.parts[i]?.reach; return r ? S.parts.findIndex((q, j) => j > 0 && q.uid === r.to) : -1; }
+// part.hold = { a, b: holder uids, ga, gb: grip points (original coords) }: the part (a broom stick) is placed so its
+// two grips sit on the two holders (hands) wherever they moved: the grip-to-grip line is turned onto the new one
+// (shortest turn) and centered between the new grips. Parts that move with it are carried.
+function holdersOf(j) { const h = S.parts[j]?.hold; if (!h) return null; const f = (u) => S.parts.findIndex((q, k) => k > 0 && q.uid === u); const a = f(h.a), b = f(h.b); return a > 0 && b > 0 ? [a, b] : null; }
+function updateHolds() {
+  S.parts.forEach((q, j) => {
+    const hb = holdersOf(j); if (!hb) return;
+    const A0 = new THREE.Vector3(...q.hold.ga), B0 = new THREE.Vector3(...q.hold.gb);
+    const A1 = A0.clone().applyMatrix4(partMat(hb[0])), B1 = B0.clone().applyMatrix4(partMat(hb[1]));
+    const d0 = B0.clone().sub(A0), d1 = B1.clone().sub(A1); if (d0.lengthSq() < 1e-9 || d1.lengthSq() < 1e-9) return;
+    const R = new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(d0.normalize(), d1.normalize()));
+    const m0 = A0.clone().add(B0).multiplyScalar(0.5), m1 = A1.clone().add(B1).multiplyScalar(0.5);
+    setXfMatrix(j, new THREE.Matrix4().makeTranslation(m1.x, m1.y, m1.z).multiply(R).multiply(new THREE.Matrix4().makeTranslation(-m0.x, -m0.y, -m0.z)));
+    carry(j, new Set([j]));
+  });
+}
+function setHold(j, a, b) { // part j held by parts a and b (a <= 0: release)
+  if (j <= 0) return;
+  pushUndo();
+  const q = S.parts[j];
+  if (a > 0) { q.hold = { a: uidOf(a), b: uidOf(b), ga: reachPoints(a, j).e, gb: reachPoints(b, j).e }; delete q.follow; delete q.reach; updateReach(); }
+  else delete q.hold;
+  afterEdit(a > 0 ? `${q.name} is held by ${S.parts[a].name} and ${S.parts[b].name}` : `${q.name} is no longer held`);
+}
 function updateReach() {
+  updateHolds();
   S.parts.forEach((q, j) => {
     const k = reachOf(j); if (k <= 0) return;
     const P = new THREE.Vector3(...q.reach.p), E0 = new THREE.Vector3(...q.reach.e), E1 = E0.clone().applyMatrix4(partMat(k));
@@ -829,7 +854,8 @@ function renderFollowRow(i) {
     const x = document.createElement("button"); x.textContent = "×"; x.title = "Stop moving together";
     x.onclick = () => setFollow([j === leaderOf(i) ? i : j], null); c.appendChild(x); return c;
   };
-  const l = leaderOf(i), fs = followersOf(i), rk = reachOf(i);
+  const l = leaderOf(i), fs = followersOf(i), rk = reachOf(i), hb = holdersOf(i);
+  if (hb) { row.append("Held by "); for (const k of hb) { const c = chip(k, S.parts[k].name); c.querySelector("button").onclick = () => setHold(i, 0); row.appendChild(c); } }
   if (rk > 0) { const c = chip(rk, S.parts[rk].name); c.querySelector("button").onclick = () => setReach(i, 0); row.append("Reaches for "); row.appendChild(c); }
   if (l > 0) { row.append("Moves with "); row.appendChild(chip(l, S.parts[l].name)); }
   if (fs.length) { if (l > 0) row.append(" · "); row.append("Carries "); for (const j of fs) row.appendChild(chip(j, S.parts[j].name)); }
@@ -1135,6 +1161,8 @@ function openCtx(ev) {
   }
   if (anyUn && l !== 0) it("fill", "Fill all unassigned", () => fillUnassigned(-1));
   else if (l === 0) it("fill", "Fill all unassigned", () => fillUnassigned(-1));
+  { const sel2 = selected(); if (l > 0 && sel2.length === 2 && !sel2.includes(l)) it("reach", `Hold between ${S.parts[sel2[0]].name} and ${S.parts[sel2[1]].name}`, () => setHold(l, sel2[0], sel2[1])); }
+  if (l > 0 && holdersOf(l)) it("unlink", "Release (no longer held)", () => setHold(l, 0));
   if (l > 0 && mergeSel.size && selected().includes(l)) it("merge", `Merge ${selected().length} selected into ${S.parts[S.active].name}`, mergeSelected);
   showMenu(ev, `<span class="sw" style="background:${p.color}"></span>${esc(p.name)}`, items);
 }
@@ -2290,7 +2318,7 @@ if (ORCA.on) {
   });
   orcaSend({ cmd: "objects", auto: true });
 }
-window.app = { S, ORCA, gizmo, gzProxy, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
 </script>
 </body>
 </html>
