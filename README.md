@@ -64,14 +64,9 @@ All options, the seeds file format and outputs: [Command line docs](https://d-ca
 
 ## How it works
 
-1. **Face graph:** the mesh is loaded as triangles. For every edge between two faces, it measures the dihedral angle and whether the crease is concave (a valley, where parts usually meet) or convex (a ridge).
-2. **Crease barrier:** each face gets a concavity score, smoothed over its neighbors (the **Smooth** slider) so noise doesn't count as a crease.
-3. **Growing parts from seeds:** every seed grows outward across the face graph. Each face goes to the seed it can reach while crossing the shallowest worst crease on the way. Ties go to the nearer seed by surface distance. So a part fills its whole smooth surface and stops at the valleys around it.
-4. **Auto split:** places seeds by farthest-point sampling, then moves each one to the deepest face of its region and regrows, a few times over. With the automatic count, it over-splits first, then merges neighbors whose shared boundary isn't a real crease.
-5. **Cleanup:** tiny regions are absorbed into their neighbors. Boundaries are snapped onto the nearest crease with a minimum cut. Then the jagged triangle edges along each boundary are smoothed into a clean cut line by splitting the faces it crosses. The surface shape doesn't change.
-6. **Export:** each part becomes its own body, with the filament slot you picked.
+Parts are grown from seeds across the mesh and stop at concave creases, the valleys where one part meets the next. Auto split places the seeds itself, and the cut lines are then snapped onto the creases and smoothed. The app, the OrcaSlicer plugin and the command line all run the same code, so the same settings give the same parts.
 
-**Split by shells** skips all of this and makes one part per disconnected piece of the mesh.
+Details, with diagrams: [How it works](https://d-carrigg.github.io/mesh-splitter/how-it-works/).
 
 ## AI part naming (optional, browser only)
 
