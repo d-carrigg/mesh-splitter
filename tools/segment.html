@@ -1523,6 +1523,8 @@ function refreshUI() {
   const body = $("partsBody"); body.innerHTML = "";
   document.body.classList.toggle("empty", !S.G);
   if (!S.G) return;
+  const solo = isSolo(S.active);
+  $("soloBtn").classList.toggle("on", solo); $("soloBtn").title = solo ? "Show all parts again" : "Show only this part";
   const cnt = partCounts();
   for (const i of [...mergeSel]) if (i <= 0 || i >= S.parts.length || i === S.active) mergeSel.delete(i);
   S.parts.forEach((p, i) => {
@@ -1570,7 +1572,7 @@ function openCtx(ev) {
     it("pick", "Select", () => selectPart(l));
     if (act) it("fill", `Fill area into ${act.name}`, () => fillFrom(f));
     it("plus", "New part here", () => { placing = { part: -1, from: 0 }; placeAt(h); });
-    it("solo", "Show only this", () => { S.parts.forEach((q, i) => (q.visible = i === l)); afterEdit(); });
+    it("solo", isSolo(l) ? "Show all again" : "Show only this", () => toggleSolo(l));
     it("eyeOff", "Hide", () => { p.visible = false; afterEdit(); });
     it("replace", p.rep ? "Replace with another…" : "Replace with…", () => replaceWith(l));
     if (p.rep) it("reset", "Remove replacement", () => { selectPart(l); $("repDel").click(); });
@@ -1615,7 +1617,7 @@ function openPartMenu(ev, i) {
   }
   it("text", "Rename", () => { selectPart(i); $("pcName").focus(); $("pcName").select(); });
   it("frame", "Zoom to part", () => { selectPart(i); frameBox(partWorldBox(i)); });
-  it("solo", "Show only this", () => { S.parts.forEach((q, j) => (q.visible = j === i)); afterEdit(); });
+  it("solo", isSolo(i) ? "Show all again" : "Show only this", () => toggleSolo(i));
   it(p.visible ? "eyeOff" : "eye", p.visible ? "Hide" : "Show", () => { p.visible = !p.visible; afterEdit(); });
   if (p.seeds.length) it("eraser", "Clear points", () => { pushUndo(); p.seeds = []; afterEdit(); });
   items.push("-");
@@ -1711,7 +1713,20 @@ function mergeSelected() {
 $("clrSeeds").onclick = () => { pushUndo(); S.parts[S.active].seeds = []; afterEdit(); };
 $("clrAllSeeds").onclick = () => { pushUndo(); S.parts.forEach((p) => (p.seeds = [])); afterEdit(); };
 $("showAll").onclick = () => { S.parts.forEach((p) => (p.visible = true)); afterEdit(); };
-$("soloBtn").onclick = () => { S.parts.forEach((p, i) => (p.visible = i === S.active)); afterEdit(); };
+let soloPrev = null; // visibility before "Show only this", restored when toggled off
+function isSolo(i) { return S.parts.length > 1 && S.parts.every((q, j) => q.visible === (j === i)); }
+function toggleSolo(i) {
+  if (isSolo(i)) {
+    const prev = soloPrev && soloPrev.length === S.parts.length && soloPrev.some((v, j) => v && j !== i) ? soloPrev : null;
+    S.parts.forEach((q, j) => (q.visible = prev ? prev[j] : true));
+    soloPrev = null;
+  } else {
+    soloPrev = S.parts.map((q) => q.visible);
+    S.parts.forEach((q, j) => (q.visible = j === i));
+  }
+  afterEdit();
+}
+$("soloBtn").onclick = () => toggleSolo(S.active);
 $("undoBtn").onclick = undo;
 $("redoBtn").onclick = redo;
 $("frameBtn").onclick = () => S.G && frame();
