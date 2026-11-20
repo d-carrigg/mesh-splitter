@@ -4,7 +4,7 @@
 Key lookup (never sent to the browser, never committed):
   1. env OPENROUTER_API_KEY
   2. .env in the repo root (OPENROUTER_API_KEY=..., optional OPENROUTER_MODEL=...)   (gitignored)
-  3. tools/openrouter.local.json  {"api_key": "...", "model": "..."}   (gitignored)
+  3. server/openrouter.local.json  {"api_key": "...", "model": "..."}   (gitignored)
 """
 from __future__ import annotations
 
@@ -113,7 +113,7 @@ def build_messages(body: dict) -> list[dict]:
 def review(body: dict, opener=urllib.request.urlopen) -> tuple[int, dict]:
     cfg = load_config()
     if not cfg["api_key"]:
-        return 400, {"ok": False, "error": "No OpenRouter key. Set OPENROUTER_API_KEY or create tools/openrouter.local.json."}
+        return 400, {"ok": False, "error": "No OpenRouter key. Set OPENROUTER_API_KEY or create server/openrouter.local.json."}
     model = str(body.get("model") or cfg["model"]).strip()
     payload = {
         "model": model,

@@ -184,7 +184,7 @@ class RegistrationTests(unittest.TestCase):
 
 
 class BuildTests(unittest.TestCase):
-    @unittest.skipUnless((HERE / "node_modules" / "three").is_dir(), "run npm ci in tools/orca_plugin first")
+    @unittest.skipUnless((HERE / "node_modules" / "three").is_dir(), "run npm ci in plugin/ first")
     def test_build_embeds_self_contained_page(self):
         with tempfile.TemporaryDirectory() as d:
             out = Path(d) / "mesh_splitter.py"

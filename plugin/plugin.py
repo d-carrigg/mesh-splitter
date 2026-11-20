@@ -10,7 +10,7 @@
 # ///
 """Mesh Splitter for OrcaSlicer 2.5 (stock build).
 
-Built by tools/orca_plugin/build.py, which embeds the bundled tools/segment.html below. Install the built
+Built by plugin/build.py, which embeds the bundled app/index.html below. Install the built
 file (dist/mesh_splitter.py) from Plugins > Install local plugin, then tick Activate.
 
   page --orca.postMessage({cmd: 'objects'})--------------> plugin: list plate objects

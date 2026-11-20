@@ -1,7 +1,7 @@
 {
   "name": "mesh-splitter-orca-plugin",
   "private": true,
-  "description": "Build-time deps for the OrcaSlicer Mesh Splitter plugin (versions match the importmap in tools/segment.html)",
+  "description": "Build-time deps for the OrcaSlicer Mesh Splitter plugin (versions match the importmap in app/index.html)",
   "devDependencies": {
     "esbuild": "0.25.0",
     "fflate": "0.8.2",

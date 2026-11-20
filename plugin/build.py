@@ -1,6 +1,6 @@
-"""Build the OrcaSlicer plugin: bundle tools/segment.html into one self-contained page and embed it.
+"""Build the OrcaSlicer plugin: bundle app/index.html into one self-contained page and embed it.
 
-    cd tools/orca_plugin && npm ci && python build.py      ->  dist/mesh_splitter.py
+    cd plugin && npm ci && python build.py      ->  dist/mesh_splitter.py
 
 OrcaSlicer loads plugin pages with wxWebView::SetPage (WebView2 NavigateToString on Windows, ~2 MB cap),
 from a file:// base and with no network promise, so the CDN importmap is replaced by an esbuild bundle of
@@ -17,7 +17,7 @@ import zlib
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-SEGMENT = HERE.parent / "segment.html"
+SEGMENT = HERE.parent / "app" / "index.html"
 MAX_PAGE = 1_800_000  # bytes; stay clear of WebView2's 2 MB NavigateToString limit
 
 IMPORTMAP_RE = re.compile(r'<script type="importmap">.*?</script>\s*', re.S)
@@ -30,7 +30,7 @@ def check_versions(html):
     for name in ("three", "three-mesh-bvh", "fflate"):
         m = re.search(rf"/npm/{re.escape(name)}@([\d.]+)/", html)
         if m and m.group(1) != pkg[name]:
-            sys.exit(f"{name}: segment.html uses {m.group(1)}, package.json pins {pkg[name]}")
+            sys.exit(f"{name}: app/index.html uses {m.group(1)}, package.json pins {pkg[name]}")
 
 
 def bundle(js):
@@ -52,7 +52,7 @@ def build_page():
     check_versions(html)
     m = MODULE_RE.search(html)
     if not m or not IMPORTMAP_RE.search(html):
-        sys.exit("segment.html: importmap or module script not found")
+        sys.exit("app/index.html: importmap or module script not found")
     js = bundle(m.group(1)).replace("</script", "<\\/script")
     page = html[:m.start()] + '<script type="module">' + js + "</script>" + html[m.end():]
     page = IMPORTMAP_RE.sub("", page)

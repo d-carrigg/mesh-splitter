@@ -2,4 +2,4 @@
 __pycache__/
 *.egg-info/
 .env
-tools/openrouter.local.json
+server/openrouter.local.json
