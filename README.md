@@ -17,7 +17,7 @@ Made for AI-generated figures and other STL/3MF files that come as one shell wit
 
 ## Install in OrcaSlicer
 
-1. Download `mesh_splitter.py` from the [latest release](https://github.com/d-carrigg/mesh-splitter/releases/tag/orca-plugin).
+1. Download `mesh_splitter_any.py` from the [latest release](https://github.com/d-carrigg/mesh-splitter/releases/tag/orca-plugin).
 2. In OrcaSlicer 2.5, open **Plugins**, click the arrow next to **Browse plugins**, then **Install local plugin** and pick the file.
 3. Tick **Activate** and allow writing to Downloads. A **Mesh Splitter** tab appears next to Prepare / Preview.
 
@@ -52,10 +52,10 @@ It opens at `http://127.0.0.1:8766/app/`. Everything runs locally, and nothing i
 ## Development
 
 - `app/index.html`: the whole app, a single HTML file.
-- `plugin/`: OrcaSlicer plugin. `npm ci && uv run python build.py` writes `dist/mesh_splitter.py`. Tests: `uv run python test_plugin.py`.
+- `plugin/`: OrcaSlicer plugin. `npm ci && uv run python build.py` writes `dist/mesh_splitter_any.py`. Tests: `uv run python test_plugin.py`.
 - `server/`: local server behind `uv run mesh-splitter` and the AI review proxy.
 
-CI builds and tests the plugin on every push, and publishes it to the release from `main`.
+CI builds and tests the plugin on every push, and publishes it to the release from `main`. Publishing a GitHub release tagged `vX.Y.Z` builds that version and pushes it to the [OrcaCloud Plugin Hub](https://cloud.orcaslicer.com/app/plugins/plugin-hub) (`publish-orcacloud.yml`).
 
 ## License
 

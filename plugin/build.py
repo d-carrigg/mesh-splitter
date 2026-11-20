@@ -1,6 +1,6 @@
 """Build the OrcaSlicer plugin: bundle app/index.html into one self-contained page and embed it.
 
-    cd plugin && npm ci && python build.py      ->  dist/mesh_splitter.py
+    cd plugin && npm ci && python build.py      ->  dist/mesh_splitter_any.py
 
 OrcaSlicer loads plugin pages with wxWebView::SetPage (WebView2 NavigateToString on Windows, ~2 MB cap),
 from a file:// base and with no network promise, so the CDN importmap is replaced by an esbuild bundle of
@@ -64,7 +64,7 @@ def build_page():
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--version", default="0.1.0")
-    ap.add_argument("--out", default=str(HERE / "dist" / "mesh_splitter.py"))
+    ap.add_argument("--out", default=str(HERE / "dist" / "mesh_splitter_any.py"))
     ap.add_argument("--page-out", help="also write the bundled page here (for testing in a browser)")
     a = ap.parse_args()
     page = build_page()

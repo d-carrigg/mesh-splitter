@@ -4,14 +4,14 @@
 #
 # [tool.orcaslicer.plugin]
 # name = "Mesh Splitter"
-# description = "Split a plate object into parts (concavity watershed, auto split, brush) and send it back as a multi-part 3MF."
+# description = "Split one solid mesh into colour-coded parts (auto split, seeds, brush), move or replace parts, and send it back as a multi-part 3MF with a filament per part."
 # author = "d-carrigg"
 # version = "__VERSION__"
 # ///
 """Mesh Splitter for OrcaSlicer 2.5 (stock build).
 
 Built by plugin/build.py, which embeds the bundled app/index.html below. Install the built
-file (dist/mesh_splitter.py) from Plugins > Install local plugin, then tick Activate.
+file (dist/mesh_splitter_any.py) from Plugins > Install local plugin, then tick Activate.
 
   page --orca.postMessage({cmd: 'objects'})--------------> plugin: list plate objects
   page --orca.postMessage({cmd: 'mesh', index})----------> plugin: world-space mesh, base64 chunks
