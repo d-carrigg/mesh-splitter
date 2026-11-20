@@ -86,6 +86,12 @@ Lengthens (over 100%) or shortens a part along its own length, from its joint wi
 1. Select the part (Ctrl+click to select more, e.g. both arms).
 2. Open the Transform panel (move, rotate or scale in the toolbar) and type a **Stretch** %. It applies to every selected part. 100 turns it off.
 
+### Auto stretch
+
+Tick **Auto** next to the stretch % to let it pick the amount: the smallest stretch (the same for every selected part, so both arms match) that keeps what the parts hold or carry at least **Gap** mm (default 1 mm) from every other part. It re-solves whenever you move, rotate or relink parts. Typing a % turns Auto off.
+
+![Auto stretch with a 1 mm gap: both arms at 119.7%, the stick clears the handle](img/stretch-auto.png)
+
 ### Tips
 
 - The joint stays put, so [heal joint](#heal-joint) keeps it seated.

@@ -145,6 +145,17 @@ const st = await page.evaluate(() => {
   return out;
 });
 console.log("stretch:", JSON.stringify(st));
+// Auto stretch: turn it on for the cap (still holding the head), solve, expect a solved factor and nothing within the gap.
+const as = await page.evaluate(() => {
+  const { S } = app, cap = S.active, body = S.labels[0], head = S.parts.findIndex((_, j) => j > 0 && j !== cap && j !== body);
+  app.setHold(head, cap, body);
+  app.setAutoStretch([cap], true, 1); app.solveAutoStretch();
+  const st = S.parts[cap].xf.st, out = { auto: !!st.auto, gap: st.gap, k: st.k, near: app.findHits({ only: new Set([head]), gap: 1 }).length };
+  app.undo(); out.after = !!S.parts[cap].xf?.st?.auto; app.undo();
+  return out;
+});
+console.log("auto stretch:", JSON.stringify(as));
+if (!as.auto || as.gap !== 1 || !(as.k >= 1) || as.after) errors.push("auto stretch failed: " + JSON.stringify(as));
 if (st.k !== 1.3 || st.pivotErr > 1e-3 || st.holdErr > 1e-3 || !st.hits || st.after) errors.push("stretch failed: " + JSON.stringify(st));
 if (rc.reach <= 0 || !rc.moved || rc.err > 1e-3 || rc.after) errors.push("reach failed: " + JSON.stringify(rc));
 if (mw.leader <= 0 || !mw.moved || mw.relErr > 5e-3 || mw.undo !== 2 || mw.after.follow || mw.after.moved) errors.push("move with failed: " + JSON.stringify(mw));
