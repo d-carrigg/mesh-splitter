@@ -54,7 +54,7 @@ await page.waitForFunction(() => window.app?.S?.G && window.app.S.parts.length >
 const info = await page.evaluate(() => ({ faces: app.S.nF, parts: app.S.parts.length, name: app.S.name,
   file: document.getElementById("fileInfo").textContent, send: document.getElementById("expMain").textContent.trim() }));
 console.log("loaded:", JSON.stringify(info));
-// Transform gizmo: drag the move handle's centre, expect a translation and one undo step.
+// Transform gizmo: drag the move handle's center, expect a translation and one undo step.
 await page.evaluate(() => { app.S.active = 1; app.refreshUI(); });
 await page.waitForTimeout(100);
 const g = await page.evaluate(() => { const v = app.gzProxy.position.clone().project(app.camera), r = document.querySelector("#view canvas").getBoundingClientRect();

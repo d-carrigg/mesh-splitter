@@ -207,7 +207,7 @@
   <div id="opts" class="float">
     <div data-for="seed">
       <label class="sl" title="Concave creases sharper than this separate parts; lower = more sensitive, 0 = pure distance">Crease<input id="lambda" type="range" min="0" max="20" step="0.5" value="2"><output id="lambdaOut"></output></label>
-      <label class="sl" title="Neighbour-averaging passes on the concavity map; more = ignores small dents">Denoise<input id="smooth" type="range" min="0" max="20" step="1" value="4"><output id="smoothOut"></output></label>
+      <label class="sl" title="Neighbor-averaging passes on the concavity map; more = ignores small dents">Denoise<input id="smooth" type="range" min="0" max="20" step="1" value="4"><output id="smoothOut"></output></label>
       <button id="clrAllSeeds" data-icon="eraser" title="Clear all seeds"></button>
       <button id="segBtn" class="pri" data-icon="segment" title="Grow every seeded part from its seeds; boundaries settle on concave creases">Segment</button>
     </div>
@@ -231,7 +231,7 @@
         <span id="xfDims" class="small" style="margin-right:auto"></span>
         <button id="soloBtn" data-icon="solo" title="Show only this part"></button>
         <button id="clrSeeds" data-icon="eraser" title="Clear this part's seeds"></button>
-        <button id="pcDel" class="danger" data-icon="trash" title="Delete part, its faces join the neighbouring part (Del)"></button>
+        <button id="pcDel" class="danger" data-icon="trash" title="Delete part, its faces join the neighboring part (Del)"></button>
       </div>
       <div class="sub">
         <h2>Transform</h2>
@@ -243,7 +243,7 @@
         <label class="small" title="Scale X/Y/Z together"><input id="xfLock" type="checkbox" checked> uniform</label>
         <button id="xfReset" data-icon="reset" title="Reset this part's transform"></button>
       </div>
-      <div id="xfPanel" class="xf" title="Applies to this part: view, Part STLs, Merged STL and AI review. Pivot is the part's centre.">
+      <div id="xfPanel" class="xf" title="Applies to this part: view, Part STLs, Merged STL and AI review. Pivot is the part's center.">
         <span></span><span class="ax">X</span><span class="ax">Y</span><span class="ax">Z</span>
         <span data-icon-span="scale" title="Scale %"></span><input id="xfS0" type="number" step="1"><input id="xfS1" type="number" step="1"><input id="xfS2" type="number" step="1">
         <span data-icon-span="rotate" title="Rotate °"></span><input id="xfR0" type="number" step="5"><input id="xfR1" type="number" step="5"><input id="xfR2" type="number" step="5">
@@ -636,7 +636,7 @@ const creaseStep = () => +$("lambda").value;
 function barrierQ(e, step) { return Math.floor(S.G.bar[e] / step); }
 
 // Smoothed concavity per face: signed dihedral (concave < 0) averaged over the face's edges, then
-// Laplacian-smoothed over neighbours so triangle noise cancels while real fillets/creases remain.
+// Laplacian-smoothed over neighbors so triangle noise cancels while real fillets/creases remain.
 // Edge barrier = the larger concavity of its two faces (degrees).
 function computeBarrier(iters) {
   const G = S.G, h = new Float32Array(G.nF), cnt = new Float32Array(G.nF);
@@ -703,7 +703,7 @@ function segmentFromSeeds(opts = {}) {
 
 // Seeds by farthest-point sampling, then Lloyd-style refinement: each region's seed moves to its
 // deepest face (farthest from the region boundary), regions are re-grown, repeat.
-// k = 0 picks the count: over-split, then merge neighbours whose shared boundary is not a crease.
+// k = 0 picks the count: over-split, then merge neighbors whose shared boundary is not a crease.
 function autoSplit(k, scopeAll = false) {
   const scope = !scopeAll && $("autoScope").checked ? S.active : -1;
   const mask = new Uint8Array(S.nF);
@@ -777,7 +777,7 @@ function mergeWeak(lab, mask, seeds) {
   for (let f = 0; f < S.nF; f++) if (mask[f] && lab[f] >= 0) lab[f] = find(lab[f]);
 }
 
-// Regions smaller than minSize (pits, noise) are re-grown from their neighbours.
+// Regions smaller than minSize (pits, noise) are re-grown from their neighbors.
 function absorbTiny(lab, mask, minSize) {
   const size = new Map();
   for (let f = 0; f < S.nF; f++) if (mask[f] && lab[f] >= 0) size.set(lab[f], (size.get(lab[f]) || 0) + 1);
@@ -1005,12 +1005,12 @@ function pinches(f, to) {
 // is unchanged. A crossing is clamped to [CUT_T, 1-CUT_T] along its edge to avoid slivers. Faces at a junction of
 // three parts get a centroid vertex. A face sharing an edge it would cut with a face that may not change (outside
 // the mask) stays whole, so no T-junctions are made. mask: only these faces may change. Returns faces split.
-// Crease snapping. Watershed boundaries can leave a flap of one part lying on its neighbour's smooth surface,
+// Crease snapping. Watershed boundaries can leave a flap of one part lying on its neighbor's smooth surface,
 // short of the crease where the two actually meet; smoothing alone only rounds the flap off. For every pair of
-// touching parts, faces within SNAP_RINGS of their shared boundary are relabelled by an s-t minimum cut on the
+// touching parts, faces within SNAP_RINGS of their shared boundary are relabeled by an s-t minimum cut on the
 // face graph, where cutting edge e costs len(e) * (SNAP_EPS + exp(-crease(e) / SNAP_DEG)): a boundary along a
 // concave crease is nearly free, one across a smooth surface costs its length. Faces outside the band, seed
-// faces, and other parts stay put. mask: only these faces may change. Returns faces relabelled.
+// faces, and other parts stay put. mask: only these faces may change. Returns faces relabeled.
 const SNAP_RINGS = 12, SNAP_EPS = 0.03, SNAP_DEG = 10;
 function maxflowCut(n, eu, ev, cap, src, snk) { // Dinic on an undirected graph; returns 1 for nodes on the source side
   const m = eu.length, head = new Int32Array(n).fill(-1), nxt = new Int32Array(4 * m), to = new Int32Array(4 * m), c = new Float64Array(4 * m);
@@ -1086,7 +1086,7 @@ function snapCreases(mask = null) {
     for (const f of band) for (let k = G.adjS[f]; k < G.adjS[f + 1]; k++) {
       const g = G.adjN[k], e = G.adjE[k];
       if (ring[g] >= 0) { if (f < g) { eu.push(idx[f]); ev.push(idx[g]); cap.push(cost(e)); } }
-      else if (L[g] === A) { eu.push(idx[f]); ev.push(src); cap.push(cost(e)); }   // neighbour outside the band keeps its label
+      else if (L[g] === A) { eu.push(idx[f]); ev.push(src); cap.push(cost(e)); }   // neighbor outside the band keeps its label
       else if (L[g] === B) { eu.push(idx[f]); ev.push(snk); cap.push(cost(e)); }
     }
     const side = maxflowCut(n, eu, ev, cap, src, snk);
@@ -1320,7 +1320,7 @@ function applyXf() {
   render();
 }
 
-let orcaFil = null; // OrcaSlicer's filament colours by slot (plugin), used by the filament view
+let orcaFil = null; // OrcaSlicer's filament colors by slot (plugin), used by the filament view
 let byFilament = false; try { byFilament = localStorage.getItem("meshsplit:byFil") === "1"; } catch {}
 // Display color of part i: its own color, or (filament view) the color of the first part on the same slot.
 function shownColor(i, plain) {
@@ -1388,7 +1388,7 @@ function frame() {
   camera.updateProjectionMatrix(); controls.update(); render();
 }
 
-// Keep the view direction, centre on box b and fit it.
+// Keep the view direction, center on box b and fit it.
 function frameBox(b) {
   if (!isFinite(b[0])) return;
   const c = new THREE.Vector3((b[0]+b[3])/2, (b[1]+b[4])/2, (b[2]+b[5])/2), d = Math.max(1e-3, Math.hypot(b[3]-b[0], b[4]-b[1], b[5]-b[2]));
@@ -1599,7 +1599,7 @@ function openCtx(ev) {
     it("eyeOff", "Hide", () => { p.visible = false; afterEdit(); });
     it("replace", p.rep ? "Replace with another…" : "Replace with…", () => replaceWith(l));
     if (p.rep) it("reset", "Remove replacement", () => { selectPart(l); $("repDel").click(); });
-    it("trash", "Delete (merge into neighbour)", () => deletePart(l), "danger");
+    it("trash", "Delete (merge into neighbor)", () => deletePart(l), "danger");
   }
   if (anyUn && l !== 0) it("fill", "Fill all unassigned", () => fillUnassigned(-1));
   else if (l === 0) it("fill", "Fill all unassigned", () => fillUnassigned(-1));
@@ -1635,7 +1635,7 @@ function openPartMenu(ev, i) {
     it("solo", "Show only these", () => { S.parts.forEach((q, j) => (q.visible = sel.includes(j))); afterEdit(); });
     it("eyeOff", "Hide these", () => { sel.forEach((j) => (S.parts[j].visible = false)); afterEdit(); });
     items.push("-");
-    it("trash", `Delete ${sel.length} parts (merge into neighbours)`, () => { const ps = sel.map((j) => S.parts[j]); mergeSel.clear(); for (const q of ps) { const j = S.parts.indexOf(q); if (j > 0) deletePart(j); } }, "danger");
+    it("trash", `Delete ${sel.length} parts (merge into neighbors)`, () => { const ps = sel.map((j) => S.parts[j]); mergeSel.clear(); for (const q of ps) { const j = S.parts.indexOf(q); if (j > 0) deletePart(j); } }, "danger");
     showMenu(ev, `${sel.length} parts selected`, items); return;
   }
   it("text", "Rename", () => startRename(i));
@@ -1645,7 +1645,7 @@ function openPartMenu(ev, i) {
   if (p.seeds.length) it("eraser", "Clear points", () => { pushUndo(); p.seeds = []; afterEdit(); });
   items.push("-");
   if (i > 0) it("replace", p.rep ? "Replace with another…" : "Replace with…", () => replaceWith(i));
-  it("trash", "Delete (merge into neighbour)", () => deletePart(i), "danger");
+  it("trash", "Delete (merge into neighbor)", () => deletePart(i), "danger");
   showMenu(ev, `<span class="sw" style="background:${p.color}"></span>${esc(p.name)} · F${p.filament}`, items);
 }
 
@@ -2171,7 +2171,7 @@ $("repFit").onchange = () => repEdit((r) => { r.fit = $("repFit").checked; }, $(
 $("repEmbed").onchange = () => repEdit((r) => { r.embed = Math.max(0, +$("repEmbed").value || 0); }, "Embed changed");
 
 // ---------------------------------------------------------------- AI review
-// Layer 2 on top of the geometric split: renders labelled views + per-part stats, asks a vision model
+// Layer 2 on top of the geometric split: renders labeled views + per-part stats, asks a vision model
 // (via the local server -> OpenRouter, key stays server-side) to name parts and flag segmentation problems.
 const VIEWS = [
   { name: "front (camera at -Y)", d: [0, -1, 0.12] }, { name: "back (+Y)", d: [0, 1, 0.12] },
@@ -2215,7 +2215,7 @@ const idMat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: fals
 
 // Per part: visible pixel count and the most interior visible pixel (label anchor), via a chamfer
 // distance transform over the ID image; anti-aliased edge pixels sit at distance ~1 and never win.
-function idAnalyse(cv, nParts) {
+function idAnalyze(cv, nParts) {
   const w = cv.width, h = cv.height, c2 = document.createElement("canvas"); c2.width = w; c2.height = h;
   const cx = c2.getContext("2d"); cx.drawImage(cv, 0, 0);
   const px = cx.getImageData(0, 0, w, h).data, id = new Int32Array(w * h), D = new Float32Array(w * h);
@@ -2249,7 +2249,7 @@ function captureForReview(stats) {
     const T = 448, cols = 3, over = document.createElement("canvas"); over.width = T * cols; over.height = T * 2;
     const ox = over.getContext("2d"), perView = [];
     VIEWS.forEach((v, n) => {
-      const a = idAnalyse(shoot(v, T, T, "id"), nP); perView.push(a);
+      const a = idAnalyze(shoot(v, T, T, "id"), nP); perView.push(a);
       const x0 = (n % cols) * T, y0 = Math.floor(n / cols) * T;
       ox.drawImage(shoot(v, T, T, "color"), x0, y0);
       ox.strokeStyle = "#555"; ox.strokeRect(x0 + 0.5, y0 + 0.5, T - 1, T - 1);
@@ -2279,8 +2279,8 @@ function captureForReview(stats) {
     updateColors();
     return {
       images: [over.toDataURL("image/jpeg", 0.85), sheet.toDataURL("image/jpeg", 0.85)],
-      captions: ["Image 1: six views, every part in its own colour, labelled #id at its most visible spot.",
-                 "Image 2: one tile per part (#id + current name), that part in colour, the rest dark grey."],
+      captions: ["Image 1: six views, every part in its own color, labeled #id at its most visible spot.",
+                 "Image 2: one tile per part (#id + current name), that part in color, the rest dark gray."],
     };
   } finally {
     S.parts.forEach((p, i) => (p.visible = vis[i])); updateVisibility(); render();
@@ -2319,7 +2319,7 @@ function partStats() {
   }).filter(Boolean);
   return {
     file: S.name, faces: S.nF, shells: G.shells, model_bbox_mm: [r(gs.x), r(gs.y), r(gs.z)],
-    axes: "Z up; front faces -Y; center_frac is the part centre as 0..1 of the model bbox (x right, y back, z up)",
+    axes: "Z up; front faces -Y; center_frac is the part center as 0..1 of the model bbox (x right, y back, z up)",
     parts,
   };
 }
@@ -2333,9 +2333,9 @@ function localChecks(st) {
     if (p.id === 0) continue;
     if (p.fragments > 1) out.push({ severity: p.stray_area_pct_of_part > 2 ? "high" : p.stray_area_pct_of_part > 0.2 ? "medium" : "low", parts: [p.id],
       problem: `#${p.id} ${p.name} is in ${p.fragments} disconnected pieces (${p.stray_area_pct_of_part}% of its area is stray)`,
-      fix: "Smooth, or Brush/Fill the stray pieces into the neighbour; each piece becomes its own body in Part STLs" });
+      fix: "Smooth, or Brush/Fill the stray pieces into the neighbor; each piece becomes its own body in Part STLs" });
     if (p.area_pct < 0.2) out.push({ severity: "low", parts: [p.id], problem: `#${p.id} ${p.name} is a sliver (${p.area_pct}% of area, ${p.faces} faces)`,
-      fix: "Merge it into its neighbour unless it is a real detail" });
+      fix: "Merge it into its neighbor unless it is a real detail" });
   }
   return out;
 }
@@ -2836,7 +2836,7 @@ if (ORCA.on) {
     if (!m || typeof m !== "object") return;
     if (m.cmd === "objects") {
       ORCA.objects = m.objects || []; orcaRenderObjects();
-      if (Array.isArray(m.filament_colours) && m.filament_colours.length) { orcaFil = m.filament_colours; updateColors(); }
+      if (Array.isArray(m.filament_colors) && m.filament_colors.length) { orcaFil = m.filament_colors; updateColors(); }
       if (m.auto && !S.G && ORCA.objects.length === 1) orcaLoad(ORCA.objects[0]);
     } else if (m.cmd === "mesh") orcaMesh(m);
     else if (m.cmd === "plate_changed") orcaPlateChanged(m);

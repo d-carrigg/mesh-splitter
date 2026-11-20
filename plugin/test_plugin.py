@@ -102,7 +102,7 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(objs, [{"index": 0, "name": "cube", "parts": 1, "faces": 4, "ignored": 0},
                                 {"index": 1, "name": "Object 2", "parts": 0, "faces": 0, "ignored": 0}])
         self.assertNotEqual(m["objects"][0]["id"], m["objects"][1]["id"])
-        self.assertEqual(m["filament_colours"], ["#FF0000", "#00AE42"])
+        self.assertEqual(m["filament_colors"], ["#FF0000", "#00AE42"])
 
     def test_mesh_and_errors(self):
         self.b.handle({"cmd": "mesh", "index": 0, "req": "r1"})
