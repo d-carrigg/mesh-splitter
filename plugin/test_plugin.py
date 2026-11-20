@@ -203,5 +203,21 @@ class BuildTests(unittest.TestCase):
             self.assertLess(len(html.encode()), 1_800_000)
 
 
+class ReleaseNotesTests(unittest.TestCase):
+    def test_release_please_notes_become_plain_lines(self):
+        from release_notes import plain_changelog
+        md = ("## [0.3.7](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.6...v0.3.7) (2026-11-20)\n\n\n"
+              "### Features\n\n* **app:** add `undo` ([#20](https://github.com/x/y/issues/20)) "
+              "([abc1234](https://github.com/x/y/commit/abc1234def))\n\n"
+              "### Bug Fixes\n\n* send OrcaCloud release metadata with --form-string "
+              "([#17](https://github.com/x/y/issues/17)) ([cbb5cd1](https://github.com/x/y/commit/cbb5cd1a4aa0))")
+        self.assertEqual(plain_changelog(md),
+                         "- New: App: add undo\n- Fix: Send OrcaCloud release metadata with --form-string")
+
+    def test_plain_lines_pass_through(self):
+        from release_notes import plain_changelog
+        self.assertEqual(plain_changelog("- Faster splitting\n- Fix crash"), "- Faster splitting\n- Fix crash")
+
+
 if __name__ == "__main__":
     unittest.main()
