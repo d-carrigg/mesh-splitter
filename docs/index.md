@@ -27,7 +27,9 @@ The tab lists the objects on your plate, and a single object opens automatically
 
 ## Run in a browser
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run:
+Open **[splitmesh.carrigg.dev](https://splitmesh.carrigg.dev)**. Nothing to install. Your model is split in your browser and is never uploaded.
+
+To run it on your own computer instead, install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run:
 
 ```
 uv run mesh-splitter
