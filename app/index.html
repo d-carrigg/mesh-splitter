@@ -2074,7 +2074,12 @@ function renderPaintSw() {
   box.appendChild(add);
 }
 // review card
-const showAi = (on) => { $("aiCard").hidden = !on; $("aiToggle").classList.toggle("on", on); if (on && LLM.st && !LLM.st.configured && !LLM.job) llmSettings(true); };
+// The card sits under the tool panels (Split, Transform) at the top right, so opening it closes them as Done does.
+const showAi = (on, connect = true) => { // connect: open the Connect step when no AI model is set up
+  if (on) { if (!$("splitPanel").hidden) closeAuto(); if (gzOn) setGizmo("off"); }
+  $("aiCard").hidden = !on; $("aiToggle").classList.toggle("on", on);
+  if (on && connect && LLM.st && !LLM.st.configured && !LLM.job) llmSettings(true);
+};
 $("aiToggle").onclick = () => showAi($("aiCard").hidden);
 $("aiClose").onclick = () => showAi(false);
 $("fileIn").onchange = async () => { const f = $("fileIn").files[0]; if (f) openFile(f); };
@@ -2955,7 +2960,10 @@ function renderNaming(R) {
 
 function runChecks() {
   if (!S.G) return;
-  const st = partStats(); renderNaming({ checks: localChecks(st) }); status("Local checks done");
+  const st = partStats(), checks = localChecks(st); renderNaming({ checks });
+  const o = $("aiOut"); o.style.animation = "none"; void o.offsetWidth; o.style.animation = "msFade .3s ease-out"; // shows a re-run with the same result
+  o.scrollIntoView({ block: "nearest" });
+  status(checks.length ? `Check parts: ${checks.length} issue${checks.length > 1 ? "s" : ""} found` : "Check parts: no issues found");
 }
 const mmss = (ms) => { const t = Math.floor(ms / 1000); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`; };
 function aiProgress(job) { // the progress box: what is happening now, for how long, and Cancel
@@ -3001,7 +3009,7 @@ async function runNaming() {
 }
 $("aiStop").onclick = () => LLM.job?.ac.abort();
 $("aiBtn").onclick = runNaming;
-$("aiChk").onclick = () => { if (S.G) { showAi(true); runChecks(); } };
+$("aiChk").onclick = () => { if (S.G) { showAi(true, false); runChecks(); } }; // local checks need no AI model
 
 // ---------------------------------------------------------------- export
 function download(name, data, type = "application/octet-stream") {
