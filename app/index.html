@@ -1632,7 +1632,10 @@ function setTool(t) {
 let down = null, painting = false;
 const canvas = renderer.domElement;
 let rdown = null;
-canvas.addEventListener("contextmenu", (ev) => ev.preventDefault());
+// Block the browser's own menu (Back/Refresh/Save as/Print) everywhere but text fields. It can't be done on the
+// canvas alone: on Windows (OrcaSlicer's WebView2) contextmenu fires after pointerup, which already opened our
+// menu under the cursor, so the event lands on #ctxMenu instead of the canvas.
+document.addEventListener("contextmenu", (ev) => { if (!ev.target.closest?.("input, textarea, [contenteditable]")) ev.preventDefault(); });
 canvas.addEventListener("pointerdown", (ev) => {
   if (ev.button === 2) { rdown = { x: ev.clientX, y: ev.clientY }; return; }
   closeCtx();
