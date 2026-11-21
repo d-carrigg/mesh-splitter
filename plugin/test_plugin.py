@@ -237,21 +237,24 @@ class AiNamingTests(unittest.TestCase):
 
 
 class RegistrationTests(unittest.TestCase):
-    def test_declares_downloads_ai_hosts_and_threads_at_load(self):
+    def register(self, ai_settings):
         p = load_plugin([])
         import orca
+        p.load_ai_settings = lambda: ai_settings
         with mock.patch.object(os.path, "expanduser", return_value=os.path.join("C:", "Users", "d")):
             p.MeshSplitterPlugin().register_capabilities()
-        st = orca._state
-        self.assertEqual(st["permissions"], [{
-            "fs_readwrite": [os.path.join("C:", "Users", "d", "Downloads", "*")],
-            "network": ["https://openrouter.ai", "https://api.openai.com", "https://api.anthropic.com"],
-            "threading": True}])
+        return orca._state["permissions"]
 
-    def test_declared_hosts_cover_every_builtin_provider(self):
-        p = load_plugin([])
-        cloud = {p.network_origin(d["base_url"]) for d in p.LLM_PROVIDERS.values() if d["needs_key"]}
-        self.assertEqual(cloud, set(p.AI_PROVIDER_HOSTS))
+    def test_no_network_declared_until_ai_naming_is_set_up(self):
+        self.assertEqual(self.register({}), [{
+            "fs_readwrite": [os.path.join("C:", "Users", "d", "Downloads", "*")], "network": [], "threading": False}])
+
+    def test_declares_only_the_saved_provider_host(self):
+        perms = self.register({"provider": "openrouter", "providers": {"openrouter": {"api_key": "k"}}})
+        self.assertEqual(perms[0]["network"], ["https://openrouter.ai"])
+        self.assertTrue(perms[0]["threading"])
+        custom = self.register({"provider": "custom", "providers": {"custom": {"base_url": "http://localhost:1234/v1"}}})
+        self.assertEqual(custom[0]["network"], ["http://localhost"])
 
     def test_window_and_page_share_bridge(self):
         p = load_plugin([fake_orca.FakeObject("cube", [fake_orca.FakeVolume(TET_V, TET_F)])])

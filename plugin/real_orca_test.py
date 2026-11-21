@@ -5,7 +5,8 @@
 
 Needs an X display (CI runs it under xvfb-run). Uses a fresh OrcaSlicer data folder, installs
 PLUGIN.py the way Plugins > Install local plugin does (orca_plugins/<file>/<file> + .install_state.json),
-with the permissions it declares at load already granted (a modal prompt would block a headless run), plus the CI-only real_orca_probe.py. OrcaSlicer opens MESH.stl and SPLIT.3mf from its
+with the ~/Downloads write permission it asks for at load already granted (a modal prompt would block a
+headless run), plus the CI-only real_orca_probe.py. OrcaSlicer opens MESH.stl and SPLIT.3mf from its
 command line; the probe drives the plugin's Bridge with the real `orca` bindings and reports back.
 
 Fails unless OrcaSlicer logs a successful load of the plugin, the probe gets the right mesh back from
@@ -79,11 +80,7 @@ def main():
     plugins = data / "orca_plugins"
     downloads = Path.home() / "Downloads"
     downloads.mkdir(exist_ok=True)
-    # What a user grants by clicking Yes on the plugin's one install prompt (register_capabilities).
-    install(plugins, a.plugin.resolve(), "Mesh Splitter", {
-        "fs_readwrite": [str(downloads / "*")],
-        "network_http": ["https://openrouter.ai", "https://api.openai.com", "https://api.anthropic.com"],
-        "threading": True})
+    install(plugins, a.plugin.resolve(), "Mesh Splitter", {"fs_readwrite": [str(downloads / "*")]})
     install(plugins, HERE / "real_orca_probe.py", "Mesh Splitter CI probe", {"full_access": True})
 
     report = a.out / "probe.json"

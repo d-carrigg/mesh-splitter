@@ -21,9 +21,9 @@ file (dist/mesh_splitter_any.py) from Plugins > Install local plugin, then tick 
 
 Internet access: only AI part naming connects, and only when the user clicks Connect or Name parts. It sends the
 part images and stats to the provider the user picked (OpenRouter, OpenAI, Anthropic, or a base URL they enter,
-such as LM Studio on their own computer). The plugin declares the three built-in provider hosts with
-orca.request_permissions (register_capabilities below), so OrcaSlicer asks the user at install; a base URL the user
-enters is asked for when first used (ask_network_permission). Nothing else in the plugin uses the network.
+such as LM Studio on their own computer). OrcaSlicer asks the user's permission for that host before the first
+request (ask_network_permission), and once AI naming is set up the plugin declares that one host with
+orca.request_permissions at load (register_capabilities below). Nothing else in the plugin uses the network.
 
 OrcaSlicer 2.5's plugin API reads the model but cannot add or replace objects, so the split comes back as
 a 3MF (one object, one part per split part, filament slot per part) that you import with Ctrl+I.
@@ -45,7 +45,7 @@ try:
 except Exception:  # numpy is declared above; uv installs it when the plugin loads
     np = None
 
-from llm_providers import PROVIDERS as LLM_PROVIDERS, abort as llm_abort, call as llm_call, check as llm_check, resolve as llm_resolve, status as llm_status, update as llm_update  # noqa: E402  __LLM_PROVIDERS__
+from llm_providers import abort as llm_abort, call as llm_call, check as llm_check, resolve as llm_resolve, status as llm_status, update as llm_update  # noqa: E402  __LLM_PROVIDERS__
 
 # The plugin's page: app/index.html with three.js, three-mesh-bvh and fflate, bundled and minified by esbuild,
 # then zlib-compressed and base64-encoded by plugin/build.py (the plain page is about 0.9 MB). page_html()
@@ -54,10 +54,6 @@ from llm_providers import PROVIDERS as LLM_PROVIDERS, abort as llm_abort, call a
 # Inside OrcaSlicer the page sends every request through this plugin (window.orca.postMessage). Its fetch() calls
 # are used only when the same page runs as the separate Mesh Splitter web app, never inside OrcaSlicer.
 PAGE_Z = "__PAGE_Z__"
-
-# The built-in AI naming providers (PROVIDERS in llm_providers): the only internet hosts the plugin connects to
-# besides a custom base URL the user enters.
-AI_PROVIDER_HOSTS = ("https://openrouter.ai", "https://api.openai.com", "https://api.anthropic.com")
 CHUNK = 512 * 1024
 
 
@@ -95,6 +91,17 @@ def save_ai_settings(store):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(store, f, indent=2)
+
+
+def ai_naming_host():
+    """'https://openrouter.ai' for the AI naming provider the user saved, or None if AI naming isn't set up."""
+    store = load_ai_settings()
+    if not store.get("provider"):
+        return None
+    try:
+        return network_origin(llm_resolve(store)["base_url"])
+    except ValueError:
+        return None
 
 
 def network_origin(url):
@@ -412,16 +419,17 @@ class OpenMeshSplitter(orca.script.ScriptPluginCapabilityBase):
 @orca.plugin
 class MeshSplitterPlugin(orca.base):
     def register_capabilities(self):
-        # Declared up front, so OrcaSlicer asks the user once, at install, in one prompt:
+        # Declared at load, so OrcaSlicer asks the user before the plugin uses them:
         #  - write files in ~/Downloads: Send to Orca saves the split 3MF there
-        #  - connect to the AI naming providers' hosts (used only when the user clicks Connect or Name parts)
-        #  - start background threads: AI naming runs its request off the UI thread
-        # A custom AI base URL the user types in later is asked for by OrcaSlicer when it is first used.
+        #  - only once the user has set up AI part naming: connect to that one provider's host, and start
+        #    background threads (the request runs off the UI thread). Nothing is declared or sent before that;
+        #    the first Connect or Name parts click asks OrcaSlicer's permission for the host (ask_network_permission).
+        storage_dir()
+        ai_host = ai_naming_host()
         orca.request_permissions(
             fs_readwrite=[os.path.join(downloads_dir(), "*")],
-            network=list(AI_PROVIDER_HOSTS),
-            threading=True,
+            network=[ai_host] if ai_host else [],
+            threading=bool(ai_host),
         )
-        storage_dir()
         orca.register_capability(MeshSplitterPage)
         orca.register_capability(OpenMeshSplitter)
