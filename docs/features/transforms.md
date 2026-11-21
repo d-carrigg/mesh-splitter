@@ -39,7 +39,7 @@ Each part can be moved, rotated and scaled on its own. The change shows in the v
 
 Spins a part about its cut instead of the world axes. The axis is the cut's normal and the pivot is the cut's center, so a part on an angled surface stays seated on the part it joins. Added in [#23](https://github.com/d-carrigg/mesh-splitter/pull/23).
 
-![The handle rotated 90° with E (it tilts off the stone) and with J (it stays seated)](img/rotate-on-joint.png)
+![The handle rotated 90° with E: it tilts off the stone](img/rotate-e.gif){ width="49%" } ![The handle rotated 90° with J: it stays seated](img/rotate-j.gif){ width="49%" }
 
 ### How to use it
 

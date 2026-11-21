@@ -1,0 +1,36 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "curler.stl",
+ "out": null,
+ "viewport": {
+  "width": 1600,
+  "height": 760
+ },
+ "deviceScaleFactor": 1.5,
+ "camera": {
+  "az": 20,
+  "el": 22,
+  "dist": 0.55,
+  "lift": 0.22
+ },
+ "css": "#__cursor { display: none !important }",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "eval",
+   "js": "app.S.active = 4; app.refreshUI(); app.setGizmo('rotate'); app.setGizmoJoint(true)"
+  },
+  {
+   "do": "shot",
+   "name": "rotate-joint-ui",
+   "clip": [
+    660,
+    80,
+    930,
+    480
+   ]
+  }
+ ]
+}
