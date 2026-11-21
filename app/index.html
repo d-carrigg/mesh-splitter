@@ -2866,7 +2866,7 @@ function encodeSession() {
   return core.encodeSession(S, reps, sessCache);
 }
 function applySession(txt) {
-  const d = core.decodeSession(txt, S.mesh0[1].length / 3);
+  const d = core.decodeSession(txt, S.mesh0[1].length / 3, S.coarse);
   S.labels = d.labels; S.parts = d.parts; S.active = 0;
   if (d.mesh) setMesh(d.mesh.pos, d.mesh.tri);
   else if (S.tri !== S.mesh0[1]) setMesh(...S.mesh0);
@@ -2883,7 +2883,7 @@ const autosaveKey = () => `meshsplit:${S.name}:${S.mesh0[1].length / 3}`;
 function autosave() { try { localStorage.setItem(autosaveKey(), encodeSession()); } catch {} }
 function restoreAutosave() {
   let txt = null;
-  try { txt = localStorage.getItem(autosaveKey()); } catch {}
+  try { txt = localStorage.getItem(autosaveKey()) || (S.coarse && localStorage.getItem(`meshsplit:${S.name}:${S.coarse.faces}`)); } catch {}
   if (!txt) return false;
   try { applySession(txt); afterEdit(`Restored your last session on ${S.name}. Auto split (A) starts over.`); return true; } catch (e) { console.warn("autosave ignored:", e.message); return false; }
 }

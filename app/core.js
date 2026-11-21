@@ -117,11 +117,11 @@ export const soupIndex = (v) => Uint32Array.from({ length: v.length / 3 }, (_, i
 // A new split of a loaded mesh (raw = { pos, tri, source }), welded, with its face graph, all faces Unassigned.
 export function newSplit(name, raw) {
   let w = weld(raw.pos, raw.tri);
-  const S = { name: name.replace(/\.[^.]+$/, ""), source: raw.source, active: 0, flipped: 0, refined: 0 };
+  const S = { name: name.replace(/\.[^.]+$/, ""), source: raw.source, active: 0, flipped: 0, refined: 0, coarse: null };
   // Long, thin triangles (CAD exports: a box face is two triangles) hide creases from the splitter; split long
   // edges first. The surface is unchanged. The faces no longer match a source 3MF, so paint can't go back into it.
   const r = refineLong(w.pos, w.tri);
-  if (r) { w = r; S.refined = r.added; if (S.source?.type === "3mf") S.source = { type: "refined" }; }
+  if (r) { S.coarse = { faces: w.tri.length / 3, parent: r.parent }; w = r; S.refined = r.added; if (S.source?.type === "3mf") S.source = { type: "refined" }; }
   setMesh(S, w.pos, w.tri);
   // Inside-out shells (normals pointing in) swap concave and convex: turn them right side out.
   const fl = flipInsideOut(S.pos, S.tri, S.G);
@@ -155,7 +155,7 @@ export function flipInsideOut(pos, tri, G) {
 // two or three long edges becomes two, three or four). maxLen defaults to 1/50 of the box diagonal, raised if the
 // result would pass MAX_REFINE faces; with the default, only a mesh with many long edges (over REFINE_SHARE of its
 // edges longer than both that and 8x the median edge) is refined, so finely meshed models are left as they are.
-// Returns null when nothing is refined, else { pos, tri, added }.
+// Returns null when nothing is refined, else { pos, tri, added, parent } (parent: the input face each output face came from).
 const MAX_REFINE = 600000, REFINE_SHARE = 0.02;
 export function refineLong(pos, tri, maxLen = 0) {
   let mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
@@ -175,7 +175,7 @@ export function refineLong(pos, tri, maxLen = 0) {
     if (!any) return null;
   }
   for (let attempt = 0; attempt < 8; attempt++, L *= 1.5) {
-    let P = Array.from(pos), T = Array.from(tri), ok = true;
+    let P = Array.from(pos), T = Array.from(tri), Par = Array.from({ length: tri.length / 3 }, (_, f) => f), ok = true;
     for (let pass = 0; pass < 24; pass++) {
       const nV = P.length / 3, mid = new Map();
       const m = (a, b) => {
@@ -184,30 +184,32 @@ export function refineLong(pos, tri, maxLen = 0) {
         if (v === undefined) { v = P.length / 3; P.push((P[3*a]+P[3*b])/2, (P[3*a+1]+P[3*b+1])/2, (P[3*a+2]+P[3*b+2])/2); mid.set(key, v); }
         return v;
       };
-      const out = []; let split = false;
+      const out = [], par = []; let split = false;
       for (let f = 0; f < T.length; f += 3) {
         const v = [T[f], T[f+1], T[f+2]], long = [0, 1, 2].map((e) => len(P, v[e], v[(e+1)%3]) > L);
         const k = long.filter(Boolean).length;
-        if (!k) { out.push(...v); continue; }
-        split = true;
+        const n0 = out.length;
+        if (!k) out.push(...v);
+        else split = true;
         if (k === 3) {
           const ab = m(v[0], v[1]), bc = m(v[1], v[2]), ca = m(v[2], v[0]);
           out.push(v[0], ab, ca, ab, v[1], bc, ca, bc, v[2], ab, bc, ca);
         } else if (k === 1) {
           const e = long.indexOf(true), a = v[e], b = v[(e+1)%3], c = v[(e+2)%3], x = m(a, b);
           out.push(a, x, c, x, b, c);
-        } else { // two long edges: the corner between them is cut off, the rest split by its shorter diagonal
+        } else if (k === 2) { // two long edges: the corner between them is cut off, the rest split by its shorter diagonal
           const e = long.indexOf(false), a = v[(e+2)%3], b = v[e], c = v[(e+1)%3]; // b->c is the short edge; a is the corner
           const x = m(a, b), y = m(c, a);
           out.push(a, x, y);
           if (len(P, x, c) <= len(P, b, y)) out.push(x, b, c, x, c, y); else out.push(x, b, y, b, c, y);
         }
+        for (let j = n0; j < out.length; j += 3) par.push(Par[f / 3]);
       }
-      T = out;
+      T = out; Par = par;
       if (T.length / 3 > MAX_REFINE) { ok = false; break; }
       if (!split) break;
     }
-    if (ok) return { pos: Float32Array.from(P), tri: Uint32Array.from(T), added: T.length / 3 - tri.length / 3 };
+    if (ok) return { pos: Float32Array.from(P), tri: Uint32Array.from(T), added: T.length / 3 - tri.length / 3, parent: Uint32Array.from(Par) };
   }
   return null;
 }
@@ -496,13 +498,13 @@ function absorbTiny(G, lab, mask, minSize, smooth) {
   for (let f = 0; f < nF; f++) if (mask[f] && lab[f] >= 0) size.set(lab[f], (size.get(lab[f]) || 0) + 1);
   const tiny = new Set([...size].filter(([, n]) => n < minSize).map(([l]) => l));
   if (!tiny.size || tiny.size === size.size) return;
-  const m2 = new Uint8Array(nF), src = [];
+  const m2 = new Uint8Array(nF), src = [], was = Int32Array.from(lab);
   for (let f = 0; f < nF; f++) if (mask[f] && tiny.has(lab[f])) { m2[f] = 1; lab[f] = -1; }
   for (let f = 0; f < nF; f++) if (m2[f]) for (let k = G.adjS[f]; k < G.adjS[f + 1]; k++) {
     const g = G.adjN[k]; if (mask[g] && !m2[g] && lab[g] >= 0) { src.push([g, lab[g]]); m2[g] = 1; }
   }
   const r = grow(G, src, m2, 0, smooth).lab;
-  for (let f = 0; f < nF; f++) if (m2[f] && lab[f] < 0 && r[f] >= 0) lab[f] = r[f];
+  for (let f = 0; f < nF; f++) if (m2[f] && lab[f] < 0) lab[f] = r[f] >= 0 ? r[f] : was[f]; // a small separate shell stays a part
 }
 
 function argmaxFinite(d, mask) {
@@ -1057,15 +1059,24 @@ ${cfg.join("\n")}
 export function b64(b) { let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }
 export function unb64(t) { const bin = atob(t), b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return b; }
 // Labels, parts, replacement meshes and (after boundary smoothing) the cut mesh of a saved session.
-// nF0: face count of the mesh as loaded; a session only fits the mesh it was made on.
-export function decodeSession(txt, nF0) {
+// nF0: face count of the mesh as loaded; a session only fits the mesh it was made on. coarse (S.coarse): the face
+// count before long edges were split and each face's parent, so a session saved before that refinement still loads.
+export function decodeSession(txt, nF0, coarse = null) {
   const j = typeof txt === "string" ? JSON.parse(txt) : txt;
-  if (j.faces !== nF0) throw new Error(`Session is for a mesh with ${j.faces} faces; this one has ${nF0}.`);
+  const old = j.faces !== nF0 && coarse && j.faces === coarse.faces;
+  if (j.faces !== nF0 && !old) throw new Error(`Session is for a mesh with ${j.faces} faces; this one has ${nF0}.`);
   let b = unb64(j.labels);
   if (j.version >= 2) b = unzlibSync(b);
   const mesh = j.mesh ? { pos: new Float32Array(unzlibSync(unb64(j.mesh.pos)).buffer), tri: new Uint32Array(unzlibSync(unb64(j.mesh.tri)).buffer) } : null;
   const reps = Object.entries(j.reps || {}).map(([id, r]) => ({ id, name: r.name, pos: new Float32Array(unzlibSync(unb64(r.pos)).buffer) }));
-  return { labels: new Int32Array(b.slice().buffer), parts: j.parts, mesh, reps };
+  let labels = new Int32Array(b.slice().buffer), parts = j.parts;
+  if (old && !mesh) { // labels and seed faces are on the unrefined faces: carry them to their pieces
+    const child = new Int32Array(coarse.faces).fill(-1);
+    coarse.parent.forEach((p, f) => { if (child[p] < 0) child[p] = f; });
+    labels = Int32Array.from(coarse.parent, (p) => labels[p]);
+    parts = parts.map((p) => ({ ...p, seeds: (p.seeds || []).map((f) => child[f] ?? -1).filter((f) => f >= 0) }));
+  }
+  return { labels, parts, mesh, reps };
 }
 
 // reps: { id: { name, pos } } replacement meshes the parts use. cache: reused between calls so an autosave does not

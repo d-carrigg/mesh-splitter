@@ -178,7 +178,7 @@ function seedSplit(S, spec, opts) {
 }
 
 function applySession(S, txt, log) {
-  const d = core.decodeSession(txt, S.mesh0[1].length / 3);
+  const d = core.decodeSession(txt, S.mesh0[1].length / 3, S.coarse);
   S.labels = d.labels; S.parts = d.parts; S.reps = Object.fromEntries(d.reps.map((r) => [r.id, r]));
   if (d.mesh) core.setMesh(S, d.mesh.pos, d.mesh.tri);
   const moved = S.parts.filter((p, i) => i > 0 && (p.rep || (p.xf && !(p.xf.s.every((v) => v === 1) && p.xf.r.every((v) => v === 0) && p.xf.t.every((v) => v === 0)))));
