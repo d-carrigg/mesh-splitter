@@ -42,6 +42,14 @@ def save(man, name, edge=None):
           f"watertight={tm.is_watertight}, size={np.round(tm.extents, 1)} mm")
 
 
+def wrench():
+    """Open-end wrench gripped in the left fist: handle out to the side, open jaw at the far end, flat to the front."""
+    handle = box(24, 4, 5, (-44, 0, 39))  # from inside the fist (x = -32) out to the head
+    jaw = box(10, 8, 6, (0, 0, 0)).rotate([0, -30, 0]).translate([-64, 0, 42])  # opening, tilted up and out
+    head = cyl(7.5, 4, (-60, 0, 39), (90, 0, 0)) - jaw
+    return handle + head
+
+
 def robot():
     """Waving robot: box body, cylinder joints. Right arm raised, left arm holds a wrench."""
     parts = [
@@ -55,9 +63,8 @@ def robot():
     ]
     for s in (-1, 1):  # legs + feet
         parts += [cyl(6, 34, (s * 9, 0, 21)), box(16, 26, 6, (s * 9, -3, 3))]
-    # left arm (x<0): hangs down, holding a wrench
-    parts += [sphere(7, (-21, 0, 76)), cyl(5, 34, (-26, 0, 58), (0, -14, 0)), box(10, 10, 10, (-31, 0, 39)),
-              box(4, 6, 30, (-31, -8, 39)), cyl(5, 4, (-31, -8, 55), (90, 0, 0)), cyl(5, 4, (-31, -8, 23), (90, 0, 0))]
+    # left arm (x<0): hangs down, holding a wrench out to the side
+    parts += [sphere(7, (-21, 0, 76)), cyl(5, 34, (-26, 0, 58), (0, -14, 0)), box(10, 10, 10, (-31, 0, 39)), wrench()]
     # right arm (x>0): raised and waving
     parts += [sphere(7, (21, 0, 76)), cyl(5, 34, (34, 0, 92), (0, 40, 0)), box(10, 10, 10, (45, 0, 106))]
     for k in range(3):
