@@ -179,12 +179,16 @@
   @keyframes msToast { from { opacity:0; transform:translate(-50%, 8px); } }
   @media (prefers-reduced-motion: no-preference) {
     .gp, .menu, #aiCard, #flowPop, #hitRow { animation:msDrop .18s ease-out; }
-    #partCard, #info, #mergeBtn, #followRow, #splitPanel [data-m].show, #repOpts { animation:msFade .18s ease-out; }
+    #xfCard [data-for], #partCard, #info, #mergeBtn, #followRow, #splitPanel [data-m].show, #repOpts { animation:msFade .18s ease-out; }
     #toast { animation:msToast .18s ease-out; }
     .gp, .menu, #aiCard, #flowPop, #toast { transition:opacity .12s ease-in, transform .12s ease-in, display .12s allow-discrete; }
     .gp[hidden], .menu[hidden], #aiCard[hidden], #flowPop[hidden] { opacity:0; transform:translateY(-6px); }
     #toast[hidden] { opacity:0; transform:translate(-50%, 8px); }
   }
+  /* Transform panel: only the rows for the active gizmo tool (Move, Rotate or Scale) show. */
+  #xfCard[data-mode="translate"] [data-for]:not([data-for~="translate"]),
+  #xfCard[data-mode="rotate"] [data-for]:not([data-for~="rotate"]),
+  #xfCard[data-mode="scale"] [data-for]:not([data-for~="scale"]) { display:none !important; }
   table.parts.ghost { position:fixed; pointer-events:none; z-index:1; }
 </style>
 </head>
@@ -311,14 +315,14 @@
     <h3>Transform</h3>
     <div id="xfPanel" class="xf" title="Applies to this part: view, Part STLs, Merged STL and AI part naming.">
       <span></span><span class="ax" style="color:#E04040">X</span><span class="ax" style="color:#3FBF4F">Y</span><span class="ax" style="color:#3B6CF0">Z</span><span></span>
-      <span>Position</span><input id="xfT0" type="number" step="0.5"><input id="xfT1" type="number" step="0.5"><input id="xfT2" type="number" step="0.5"><span class="u">mm</span>
-      <span>Rotation</span><input id="xfR0" type="number" step="5"><input id="xfR1" type="number" step="5"><input id="xfR2" type="number" step="5"><span class="u">°</span>
-      <span>Scale</span><input id="xfS0" type="number" step="1"><input id="xfS1" type="number" step="1"><input id="xfS2" type="number" step="1"><span class="u">%</span>
+      <span data-for="translate">Position</span><input data-for="translate" id="xfT0" type="number" step="0.5"><input data-for="translate" id="xfT1" type="number" step="0.5"><input data-for="translate" id="xfT2" type="number" step="0.5"><span data-for="translate" class="u">mm</span>
+      <span data-for="rotate">Rotation</span><input data-for="rotate" id="xfR0" type="number" step="5"><input data-for="rotate" id="xfR1" type="number" step="5"><input data-for="rotate" id="xfR2" type="number" step="5"><span data-for="rotate" class="u">°</span>
+      <span data-for="scale">Scale</span><input data-for="scale" id="xfS0" type="number" step="1"><input data-for="scale" id="xfS1" type="number" step="1"><input data-for="scale" id="xfS2" type="number" step="1"><span data-for="scale" class="u">%</span>
     </div>
-    <label class="lbl" title="Scale X/Y/Z together"><input id="xfLock" type="checkbox" checked> Uniform scale</label>
-    <div class="row" style="margin:0;justify-content:space-between"><span class="lbl">Rotate around</span>
+    <label class="lbl" data-for="scale" title="Scale X/Y/Z together"><input id="xfLock" type="checkbox" checked> Uniform scale</label>
+    <div class="row" data-for="rotate" style="margin:0;justify-content:space-between"><span class="lbl">Rotate around</span>
       <span class="seg"><button id="gzCenter" title="Rotate about the part's center">Part center</button><button id="gzJoint" title="Rotate on joint (J): one ring spins the part about its cut's axis, pivoting at the cut's center, so it stays seated on the part it joins. Shift snaps to 15°">Joint</button></span></div>
-    <div id="stretchRow" style="display:flex;flex-direction:column;gap:6px" title="Stretch: lengthen (over 100%) or shorten this part along its length, from its joint with the rest, e.g. an arm from the shoulder. What it holds or carries moves out with its end. Applies to all selected parts.">
+    <div id="stretchRow" data-for="scale" style="display:flex;flex-direction:column;gap:6px" title="Stretch: lengthen (over 100%) or shorten this part along its length, from its joint with the rest, e.g. an arm from the shoulder. What it holds or carries moves out with its end. Applies to all selected parts.">
       <div class="row" style="margin:0"><span class="lbl" style="flex:1">Stretch</span><label class="lbl" title="Auto: the smallest stretch that keeps what this part holds or carries at least the gap away from other parts"><input id="stretchAuto" type="checkbox"> Auto</label><input id="stretchPct" type="number" min="20" max="500" step="5"><span class="small">%</span></div>
       <div class="row" id="stretchGapRow" style="margin:0"><span class="lbl" style="flex:1">Gap</span><input id="stretchGap" type="number" min="0" step="0.5"><span class="small">mm</span></div>
     </div>
@@ -2446,7 +2450,7 @@ function syncGizmo() {
   document.querySelectorAll("#gzModes [data-gz]").forEach((b) => b.classList.toggle("on", gzOn && b.dataset.gz === gzMode));
   $("gzJoint").classList.toggle("on", gzJointOn);
   const card = $("xfCard"), show = gzOn && i >= 0 && S.tool === "orbit" && !placing && !pickingJoint && $("splitPanel").hidden;
-  card.hidden = !show;
+  card.hidden = !show; card.dataset.mode = gzMode;
   fitViewToPanels();
   $("gzCenter").classList.toggle("on", !gzJointOn);
   if (!gzOn || i < 0 || S.tool !== "orbit" || placing || pickingJoint) { jointAxis.visible = false; if (gizmo.object) { gizmo.detach(); render(); } return; }
