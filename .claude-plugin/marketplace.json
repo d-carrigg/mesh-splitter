@@ -1,0 +1,12 @@
+{
+  "name": "mesh-splitter",
+  "owner": { "name": "d-carrigg", "url": "https://github.com/d-carrigg" },
+  "metadata": { "description": "Mesh Splitter for Claude Code" },
+  "plugins": [
+    {
+      "name": "mesh-splitter",
+      "source": "./",
+      "description": "Split a single-shell mesh (STL or 3MF) into separate parts for multi-color or multi-piece 3D printing."
+    }
+  ]
+}
