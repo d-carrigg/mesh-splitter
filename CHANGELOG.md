@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.13](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.12...v0.3.13) (2026-11-21)
+
+
+### Documentation
+
+* move Docs links above the plugin description intro ([#62](https://github.com/d-carrigg/mesh-splitter/issues/62)) ([09264eb](https://github.com/d-carrigg/mesh-splitter/commit/09264eb61b647ac8366b0e0f07a39b096583c7f7))
+
 ## [0.3.12](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.11...v0.3.12) (2026-11-21)
 
 
