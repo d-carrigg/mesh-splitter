@@ -30,6 +30,8 @@ The arrow next to the main button (in the plugin and the browser) also offers:
 
 - **Painted 3MF:** the same mesh, each triangle painted with its part's filament.
 - **Part STLs (.zip):** one closed STL per part, cut faces capped.
+
+A part that is a recess (a porthole, an eye socket) can't be capped flat: that would make a solid of the air in it. Instead it gets a 1 mm skin of material behind its surface, and the part around it is closed over that skin, so the parts still add up to the original model. This applies to the multi-part 3MF and the part STLs while both parts are in place.
 - **Merged STL:** the whole model as one STL, with moved and replaced parts where you put them.
 
 In the browser version the main button is **Export 3MF** and downloads the same multi-part 3MF.

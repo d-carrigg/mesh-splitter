@@ -20,12 +20,17 @@ Method (pick one; default --auto):
   --seeds FILE          grow parts from seed points (JSON, see below)
   --session FILE        apply a .split.json saved from the app (Export > Save session)
 
+Combine and rename (after the method, any number of times):
+  --merge "NAME=A,B"    join parts A and B (by name, such as "Part 3") into one part called NAME;
+                        with one part it just renames it: --merge "Head=Part 3"
+
 Outputs (default: MESH_parts.3mf next to MESH):
   -o, --out FILE        multi-part 3MF: one object, one part per split part with its filament slot
   --painted FILE        painted 3MF: one mesh, each face painted with its part's filament slot
   --stl DIR             one closed STL per part
   --merged FILE         all parts in one STL
   --save-session FILE   .split.json to open in the app and keep editing
+  --report FILE         JSON summary: the mesh's bounds and each part's name, filament, faces, bounds and center
 
 Options:
   --crease DEG          crease step, the app's Crease slider (default ${core.DEFAULTS.step})
@@ -36,7 +41,7 @@ Options:
 Seeds file: a list of parts, each with seed points (x, y, z in the mesh's units) and/or face indices:
   [{ "name": "Head", "filament": 2, "points": [[0, 0, 40]] },
    { "name": "Body", "points": [[0, 0, 10], [0, 5, 0]] }]
-Each point picks the face whose center is nearest. Parts without a filament get the next free slot.`;
+Each point picks the nearest face. Parts without a filament get the next free slot.`;
 
 const fail = (msg) => { console.error(`mesh-splitter: ${msg}`); process.exit(1); };
 
@@ -51,7 +56,7 @@ export function main(argv) {
       args: argv, allowPositionals: true, options: {
         auto: { type: "string" }, shells: { type: "boolean" }, seeds: { type: "string" }, session: { type: "string" },
         out: { type: "string", short: "o" }, painted: { type: "string" }, stl: { type: "string" }, merged: { type: "string" },
-        "save-session": { type: "string" }, crease: { type: "string" }, denoise: { type: "string" },
+        "save-session": { type: "string" }, report: { type: "string" }, merge: { type: "string", multiple: true }, crease: { type: "string" }, denoise: { type: "string" },
         quiet: { type: "boolean", short: "q" }, help: { type: "boolean", short: "h" },
       },
     });
@@ -73,6 +78,8 @@ export function main(argv) {
   if (!fs.existsSync(file)) fail(`${file}: no such file`);
   const S = load(file);
   log(`${path.basename(file)}: ${S.nF.toLocaleString()} faces, ${S.G.shells} shell${S.G.shells > 1 ? "s" : ""}`);
+  if (S.refined) log(`  split long edges: +${S.refined.toLocaleString()} faces, so the creases show`);
+  if (S.flipped) log(`  turned ${S.flipped} inside-out shell${S.flipped > 1 ? "s" : ""} right side out`);
 
   const opts = { step, smooth };
   try {
@@ -80,18 +87,20 @@ export function main(argv) {
     else if (o.seeds) seedSplit(S, JSON.parse(read(o.seeds, "utf8")), opts);
     else if (o.session) applySession(S, read(o.session, "utf8"), log);
     else core.autoSplit(S, +(o.auto ?? 0), opts);
+    for (const m of o.merge ?? []) merge(S, m);
   } catch (e) { fail(e.message); }
 
   const cnt = core.partCounts(S), used = S.parts.map((p, i) => [p, i]).filter(([, i]) => cnt[i] > 0);
   log(`${used.length} part${used.length > 1 ? "s" : ""}:`);
   for (const [p, i] of used) log(`  ${p.name.padEnd(16)} filament ${String(p.filament).padStart(2)}  ${cnt[i].toLocaleString()} faces`);
 
-  const outs = ["out", "painted", "stl", "merged", "save-session"].some((k) => o[k] !== undefined);
+  const outs = ["out", "painted", "stl", "merged", "save-session", "report"].some((k) => o[k] !== undefined);
   const base = path.join(path.dirname(file), S.name);
   write(o.out ?? (outs ? null : `${base}_parts.3mf`), () => core.parts3MF(S.name, soups(S, used)).out, log);
   write(o.painted, () => core.painted3MF(S.name, S, (f) => S.parts[S.labels[f]].filament, S.tri === S.mesh0[1] ? S.source : null), log);
   write(o.merged, () => core.stlBinary(concat(soups(S, used).map((p) => p.soup))), log);
   write(o["save-session"], () => core.encodeSession(S, S.reps), log);
+  write(o.report, () => JSON.stringify(report(S, used, cnt), null, 2) + "\n", log);
   if (o.stl) {
     const names = new Set();
     for (const p of soups(S, used)) {
@@ -99,6 +108,48 @@ export function main(argv) {
       write(path.join(o.stl, `${nm}.stl`), () => core.stlBinary(p.soup), log);
     }
   }
+}
+
+// --merge "NAME=A,B,...": relabel parts B... into A, then call A NAME. Names are matched before any rename in this call.
+function merge(S, spec) {
+  const eq = spec.indexOf("=");
+  const name = spec.slice(0, eq).trim(), list = spec.slice(eq + 1).split(",").map((t) => t.trim()).filter(Boolean);
+  if (eq < 1 || !name || !list.length) throw new Error(`--merge "${spec}": expected NAME=PART[,PART...]`);
+  const idx = list.map((t) => {
+    const i = S.parts.findIndex((p, j) => j > 0 && p.name === t);
+    if (i < 0) throw new Error(`--merge "${spec}": no part named "${t}" (parts: ${S.parts.slice(1).map((p) => p.name).join(", ")})`);
+    return i;
+  });
+  const [keep, ...rest] = [...new Set(idx)], gone = new Set(rest);
+  for (let f = 0; f < S.nF; f++) if (gone.has(S.labels[f])) S.labels[f] = keep;
+  for (const i of gone) S.parts[i].seeds = [];
+  if (S.parts.some((p, j) => j !== keep && !gone.has(j) && p.name === name)) throw new Error(`--merge "${spec}": another part is already called "${name}"`);
+  S.parts[keep].name = name;
+  if (gone.has(S.active)) S.active = keep;
+  core.dropEmptyParts(S);
+}
+
+// Bounds and center of the whole mesh and of each part, so a script (or Claude) can tell the parts apart.
+function report(S, used, cnt) {
+  const r3 = (v) => v.map((x) => Math.round(x * 100) / 100);
+  const box = () => ({ min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity], sum: [0, 0, 0], n: 0 });
+  const all = box(), per = new Map(used.map(([, i]) => [i, box()]));
+  for (let f = 0; f < S.tri.length / 3; f++) {
+    const b = per.get(S.labels[f]);
+    for (let c = 0; c < 3; c++) {
+      const v = S.tri[3 * f + c];
+      for (const t of b ? [all, b] : [all]) for (let k = 0; k < 3; k++) {
+        const x = S.pos[3 * v + k];
+        if (x < t.min[k]) t.min[k] = x; if (x > t.max[k]) t.max[k] = x; t.sum[k] += x;
+      }
+      all.n++; if (b) b.n++;
+    }
+  }
+  const out = (t) => ({ min: r3(t.min), max: r3(t.max), size: r3(t.max.map((x, k) => x - t.min[k])), center: r3(t.sum.map((x) => x / t.n)) });
+  return {
+    file: S.name, faces: S.tri.length / 3, shells: S.G.shells, ...out(all),
+    parts: used.map(([p, i]) => ({ name: p.name, filament: p.filament, faces: cnt[i], ...out(per.get(i)) })),
+  };
 }
 
 function read(f, enc) { try { return fs.readFileSync(f, enc); } catch (e) { fail(`${f}: ${e.code === "ENOENT" ? "no such file" : e.message}`); } }
@@ -114,10 +165,35 @@ function load(file) {
   return core.newSplit(path.basename(file), raw);
 }
 
-function nearestFace(S, [x, y, z]) {
-  const c = S.G.cen; let best = -1, bd = Infinity;
-  for (let f = 0; f < S.nF; f++) { const d = (c[3*f]-x)**2 + (c[3*f+1]-y)**2 + (c[3*f+2]-z)**2; if (d < bd) { bd = d; best = f; } }
+// The face nearest to a point: distance to the triangle itself, not its center, so a point on a big flat face
+// (CAD-style meshes with long thin triangles) doesn't pick a small face nearby whose center happens to be closer.
+function nearestFace(S, p) {
+  let best = -1, bd = Infinity;
+  for (let f = 0; f < S.nF; f++) {
+    const d = triDist2(p, ...[0, 1, 2].map((c) => { const v = S.tri[3 * f + c]; return [S.pos[3 * v], S.pos[3 * v + 1], S.pos[3 * v + 2]]; }));
+    if (d < bd) { bd = d; best = f; }
+  }
   return best;
+}
+// Squared distance from point p to triangle abc (closest-point regions, Ericson, Real-Time Collision Detection 5.1.5).
+function triDist2(p, a, b, c) {
+  const sub = (u, v) => [u[0] - v[0], u[1] - v[1], u[2] - v[2]], dot = (u, v) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+  const at = (o, u, s, w, t) => [o[0] + u[0] * s + w[0] * t, o[1] + u[1] * s + w[1] * t, o[2] + u[2] * s + w[2] * t];
+  const d2 = (q) => { const d = sub(p, q); return dot(d, d); };
+  const ab = sub(b, a), ac = sub(c, a), ap = sub(p, a), d1 = dot(ab, ap), d2_ = dot(ac, ap);
+  if (d1 <= 0 && d2_ <= 0) return d2(a);
+  const bp = sub(p, b), d3 = dot(ab, bp), d4 = dot(ac, bp);
+  if (d3 >= 0 && d4 <= d3) return d2(b);
+  const vc = d1 * d4 - d3 * d2_;
+  if (vc <= 0 && d1 >= 0 && d3 <= 0) return d2(at(a, ab, d1 / (d1 - d3), ac, 0));
+  const cp = sub(p, c), d5 = dot(ab, cp), d6 = dot(ac, cp);
+  if (d6 >= 0 && d5 <= d6) return d2(c);
+  const vb = d5 * d2_ - d1 * d6;
+  if (vb <= 0 && d2_ >= 0 && d6 <= 0) return d2(at(a, ab, 0, ac, d2_ / (d2_ - d6)));
+  const va = d3 * d6 - d5 * d4;
+  if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) { const w = (d4 - d3) / ((d4 - d3) + (d5 - d6)); return d2(at(b, sub(c, b), w, ab, 0)); }
+  const den = 1 / (va + vb + vc);
+  return d2(at(a, ab, vb * den, ac, vc * den));
 }
 
 function seedSplit(S, spec, opts) {
@@ -151,16 +227,17 @@ function seedSplit(S, spec, opts) {
 }
 
 function applySession(S, txt, log) {
-  const d = core.decodeSession(txt, S.mesh0[1].length / 3);
+  const d = core.decodeSession(txt, S.mesh0[1].length / 3, S.coarse);
   S.labels = d.labels; S.parts = d.parts; S.reps = Object.fromEntries(d.reps.map((r) => [r.id, r]));
   if (d.mesh) core.setMesh(S, d.mesh.pos, d.mesh.tri);
   const moved = S.parts.filter((p, i) => i > 0 && (p.rep || (p.xf && !(p.xf.s.every((v) => v === 1) && p.xf.r.every((v) => v === 0) && p.xf.t.every((v) => v === 0)))));
   if (moved.length) log(`Note: ${moved.map((p) => p.name).join(", ")} moved or replaced in the app; written here in the original position and shape.`);
 }
 
-// Closed triangle soup per part: its faces plus caps over the cut openings.
+// Closed triangle soup per part: its faces plus caps over the cut openings (a recess gets a skin, see core.pocketShell).
 function soups(S, used) {
-  return used.map(([p, i]) => ({ name: p.name, filament: p.filament, soup: Float32Array.from(core.meshOf(S, (l) => l === i).verts) }));
+  const pockets = new Map();
+  return used.map(([p, i]) => ({ name: p.name, filament: p.filament, soup: core.closedPart(S, i, pockets) }));
 }
 function concat(arrs) { const v = new Float32Array(arrs.reduce((n, a) => n + a.length, 0)); let o = 0; for (const a of arrs) { v.set(a, o); o += a.length; } return v; }
 

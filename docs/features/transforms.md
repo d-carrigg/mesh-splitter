@@ -54,6 +54,7 @@ Spins a part about its cut instead of the world axes. The axis is the cut's norm
 ### Tips
 
 - A part with no cut (a separate shell) rotates on the world axes instead, and the status bar says so.
+- A part with several cuts (an arm with a hand) turns on the cut toward the body: cuts to parts it carries, holds or reaches for are skipped, then the cut to the biggest neighbor that is bigger than the part wins (the shoulder, not the wrist).
 - The rotation is stored as a normal rotation plus move, so its values stay editable in the Transform panel.
 - If a rotated part still doesn't meet its neighbor exactly (an oval cut, for example), turn on [heal joint](#heal-joint).
 
@@ -83,9 +84,9 @@ When a part moves away from the part it joined, the cut opens and both sides sho
 - **Fill** (default): the hole is patched. The bigger side (the body) gets a patch that follows its own curve, so the body stays smooth where a hand used to rest. The smaller side gets a flat face.
 - **Anchor**: the part stays joined where it attaches. New material sweeps from the neighbor's rim to the part's moved cut, along the same turn, so an arm raised at the shoulder stays on the body instead of lifting off.
 
-![An arm turned 55°: holes in the body, then patched with Fill](img/gap-fill.png)
+![The front arm turned up, carrying the hand, stick, broom and back arm: holes in the body, then closed with Fill](img/gap-fill.png)
 
-![Fill lets the arm lift off the body; Anchor keeps it joined with new material](img/gap-anchor.png)
+![Side view of the back arm: the hole at its shoulder, Fill closing the body while the arm floats off, and Anchor keeping it joined with new material](img/gap-anchor.png)
 
 ### How to use it
 

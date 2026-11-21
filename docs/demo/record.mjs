@@ -206,6 +206,11 @@ const steps = {
     if (!(s.split ?? true)) await steps.unsplit();
     await setCam(cam);
   },
+  async session(s) { // load a .split.json saved from the app (Save session), as Load session does
+    await page.setInputFiles("#sessIn", asset(s.file));
+    await page.waitForFunction(() => /Session loaded/.test(document.getElementById("status").textContent), null, { timeout: 60000 });
+    await idle();
+  },
   async unsplit() { // back to one unassigned part
     await page.evaluate(() => { app.S.labels.fill(0); app.S.parts.splice(1); app.S.active = 0; app.S.hist = { past: [], future: [] }; app.afterEdit(""); document.getElementById("status").textContent = ""; });
   },
@@ -285,13 +290,14 @@ const steps = {
     shots.set(s.name, f);
     console.log(`  ${path.relative(root, f)}`);
   },
-  // Put two shots side by side with a label over each, e.g. a before / after pair: {left, right, name, labels}.
+  // Put shots side by side with a label over each, e.g. a before / after pair: {left, right, name, labels},
+  // or more: {shots: [a, b, c], name, labels}.
   async compare(s) {
     const img = (k) => "data:image/png;base64," + readFileSync(shots.get(k) || path.join(shotsDir, `${k}.png`)).toString("base64");
-    const [la, lb] = s.labels || ["Before", "After"];
+    const ks = s.shots || [s.left, s.right], ls = s.labels || ["Before", "After"]; // shots: 2 or more side by side
     const p2 = await browser.newPage({ viewport: { width: 4000, height: 3000 }, deviceScaleFactor: cfg.deviceScaleFactor ?? 1 });
     await p2.setContent(`<body style="margin:0;background:#1b1d22;display:inline-flex;gap:6px;padding:6px">
-      ${[[img(s.left), la], [img(s.right), lb]].map(([u, l]) => `<figure style="margin:0;position:relative">
+      ${ks.map((k, i) => [img(k), ls[i] || ""]).map(([u, l]) => `<figure style="margin:0;position:relative">
         <img src="${u}" style="display:block;border-radius:6px">
         <figcaption style="position:absolute;left:10px;top:10px;padding:4px 12px;border-radius:6px;background:#000b;color:#fff;
           font:600 18px system-ui,sans-serif">${l}</figcaption></figure>`).join("")}</body>`);
