@@ -9,7 +9,7 @@
 //
 // The code lives in the modules below; this file is the one entry point the app, the command line and the
 // plugin build import.
-export { parseSTL, parse3MF, weld, soupIndex, newSplit, flipInsideOut, refineLong, setMesh } from "./mesh.js";
+export { parseSTL, parse3MF, weld, soupIndex, newSplit, flipInsideOut, refineLong, setMesh, toPlate } from "./mesh.js";
 export { DEFAULTS, buildGraph, components, Heap, computeBarrier, ensureBarrier } from "./graph.js";
 export { grow, segmentFromSeeds, autoSplit, splitShells } from "./segment.js";
 export { PALETTE, UNASSIGNED_COLOR, newPart, dropEmptyParts, partCounts } from "./parts.js";

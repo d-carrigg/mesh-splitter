@@ -83,33 +83,33 @@
   }
  },
  "rocket auto (recesses)": {
-  "log": "804f2c914a484dd5",
+  "log": "88785efef9fad2a1",
   "files": {
    "rocket.3mf": {
     "_rels/.rels": "465f67e7a55f044d",
     "[Content_Types].xml": "e1c3af6da2b2500c",
-    "3D/3dmodel.model": "1bb7887214ee211d",
+    "3D/3dmodel.model": "99d421dce5dbf52b",
     "Metadata/model_settings.config": "6ed4834cb7a1a334"
    },
    "rocket_stl": {
-    "rocket_Part_1.stl": "ee5d041114619f75",
-    "rocket_Part_2.stl": "029c35380f229a2e",
-    "rocket_Part_3.stl": "2d83594d85d4d2f7",
-    "rocket_Part_4.stl": "48149234a191c618",
-    "rocket_Part_5.stl": "16571b5e631605c6",
-    "rocket_Part_6.stl": "361d179bf35607b0",
-    "rocket_Part_7.stl": "9853f147ea5e7f7a"
+    "rocket_Part_1.stl": "8950560010a77202",
+    "rocket_Part_2.stl": "349115ba2ec66bec",
+    "rocket_Part_3.stl": "3e091fa5ed47f600",
+    "rocket_Part_4.stl": "996011c0b9b94cf4",
+    "rocket_Part_5.stl": "2353e90e9b109954",
+    "rocket_Part_6.stl": "5808887352241224",
+    "rocket_Part_7.stl": "3e07e8c4ea6a9953"
    },
-   "rocket.json": "0f6146f15d47354d"
+   "rocket.json": "e69d0d1726773a70"
   }
  },
  "rocket session": {
-  "log": "3ba0d6de663a0127",
+  "log": "a99aa3db34335907",
   "files": {
    "rocket_session.3mf": {
     "_rels/.rels": "465f67e7a55f044d",
     "[Content_Types].xml": "e1c3af6da2b2500c",
-    "3D/3dmodel.model": "089dcd1ba55ac74b",
+    "3D/3dmodel.model": "beacc08c4e4214d7",
     "Metadata/model_settings.config": "f936e688d4e131ea"
    }
   }
@@ -144,20 +144,20 @@
   }
  },
  "shells (bear and rocket side by side)": {
-  "log": "beb7a369c21f54f0",
+  "log": "73fbe10a290b4b36",
   "files": {
    "two_shells.3mf": {
     "_rels/.rels": "465f67e7a55f044d",
     "[Content_Types].xml": "e1c3af6da2b2500c",
-    "3D/3dmodel.model": "be5f886f584e148b",
+    "3D/3dmodel.model": "02e086179d7d055a",
     "Metadata/model_settings.config": "1a226893c0ee1399"
    },
    "two_shells_stl": {
-    "two_shells_Shell_1.stl": "59e34882a5922e5e",
-    "two_shells_Shell_2.stl": "7de17927b13791ed",
-    "two_shells_Shell_3.stl": "420131c7df29ad56"
+    "two_shells_Shell_1.stl": "e087a21712839491",
+    "two_shells_Shell_2.stl": "8803201d58ef8b0e",
+    "two_shells_Shell_3.stl": "9873a3296f513c4d"
    },
-   "two_shells.json": "30e5a5f609acaae3"
+   "two_shells.json": "43879e28ff009b58"
   }
  },
  "inside-out input (bear, flipped)": {
@@ -189,7 +189,7 @@
   }
  },
  "core functions": {
-  "exports": "100140cdf7812c3d",
+  "exports": "2349026883fe43cb",
   "meshOf": "a8cec2875bea7a27",
   "soupVolume": "13896.868176",
   "reverseSoup": "02bb4e706b840986",

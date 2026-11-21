@@ -86,6 +86,7 @@ export function main(argv) {
   log(`${path.basename(file)}: ${S.nF.toLocaleString()} faces, ${S.G.shells} shell${S.G.shells > 1 ? "s" : ""}`);
   if (S.refined) log(`  split long edges: +${S.refined.toLocaleString()} faces, so the creases show`);
   if (S.flipped) log(`  turned ${S.flipped} inside-out shell${S.flipped > 1 ? "s" : ""} right side out`);
+  if (Math.abs(S.lowered) >= 0.01) log(`  moved the model ${S.lowered > 0 ? "down" : "up"} ${Math.abs(S.lowered).toFixed(2)} mm onto the plate`);
 
   const opts = { step, smooth };
   try {

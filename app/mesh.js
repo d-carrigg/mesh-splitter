@@ -108,6 +108,7 @@ export const soupIndex = (v) => Uint32Array.from({ length: v.length / 3 }, (_, i
 export function newSplit(name, raw) {
   let w = weld(raw.pos, raw.tri);
   const S = { name: name.replace(/\.[^.]+$/, ""), source: raw.source, active: 0, flipped: 0, refined: 0, coarse: null };
+  S.lowered = toPlate(w.pos); // first, before anything else: the whole model, as one piece
   // Long, thin triangles (CAD exports: a box face is two triangles) hide creases from the splitter; split long
   // edges first. The surface is unchanged. The faces no longer match a source 3MF, so paint can't go back into it.
   const r = refineLong(w.pos, w.tri);
@@ -202,6 +203,15 @@ export function refineLong(pos, tri, maxLen = 0) {
     if (ok) return { pos: Float32Array.from(P), tri: Uint32Array.from(T), added: T.length / 3 - tri.length / 3, parent: Uint32Array.from(Par) };
   }
   return null;
+}
+// Model files often sit above (or below) the plate. Move the whole mesh along Z, as one rigid piece, so its lowest
+// point is at Z = 0, where a slicer puts it. In place; returns how far it moved down (mm, negative = up).
+export function toPlate(pos) {
+  let z0 = Infinity;
+  for (let i = 2; i < pos.length; i += 3) z0 = Math.min(z0, pos[i]);
+  if (!isFinite(z0) || z0 === 0) return 0;
+  for (let i = 2; i < pos.length; i += 3) pos[i] -= z0;
+  return z0;
 }
 export function setMesh(S, pos, tri, G = null) {
   S.pos = pos; S.tri = tri; S.nV = pos.length / 3; S.nF = tri.length / 3;

@@ -1,5 +1,6 @@
 // Sessions (.split.json): save and load a split to keep editing it later.
 import { zlibSync, unzlibSync } from "fflate";
+import { toPlate } from "./mesh.js";
 
 // ---------------------------------------------------------------- sessions (.split.json)
 // v2 zlib-compresses labels so large meshes still fit the browser's localStorage quota; v1 files still load.
@@ -15,6 +16,7 @@ export function decodeSession(txt, nF0, coarse = null) {
   let b = unb64(j.labels);
   if (j.version >= 2) b = unzlibSync(b);
   const mesh = j.mesh ? { pos: new Float32Array(unzlibSync(unb64(j.mesh.pos)).buffer), tri: new Uint32Array(unzlibSync(unb64(j.mesh.tri)).buffer) } : null;
+  if (mesh) toPlate(mesh.pos); // sessions saved before models were moved onto the plate on open
   const reps = Object.entries(j.reps || {}).map(([id, r]) => ({ id, name: r.name, pos: new Float32Array(unzlibSync(unb64(r.pos)).buffer) }));
   let labels = new Int32Array(b.slice().buffer), parts = j.parts;
   if (old && !mesh) { // labels and seed faces are on the unrefined faces: carry them to their pieces

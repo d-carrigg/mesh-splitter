@@ -514,7 +514,8 @@ function loadRaw(name, raw) {
   syncSliders();
   lastActive = -1;
   if (!restoreAutosave() && S.nF >= 200) { autoSplit(0, true); S.hist = { past: [], future: [] }; refreshUI(); }
-  const fixes = [S.refined && `split long edges (+${S.refined.toLocaleString()} faces) so creases show`, S.flipped && `turned ${S.flipped} inside-out shell${S.flipped > 1 ? "s" : ""} right side out`].filter(Boolean);
+  const fixes = [S.refined && `split long edges (+${S.refined.toLocaleString()} faces) so creases show`, S.flipped && `turned ${S.flipped} inside-out shell${S.flipped > 1 ? "s" : ""} right side out`,
+    Math.abs(S.lowered) >= 0.01 && `moved the model ${S.lowered > 0 ? "down" : "up"} ${Math.abs(S.lowered).toFixed(2)} mm onto the plate`].filter(Boolean);
   if (fixes.length) status(`${$("status").textContent} · On open: ${fixes.join("; ")}`);
 }
 
@@ -1530,7 +1531,7 @@ function drawSeeds() {
 }
 
 // Print plate under the model, like OrcaSlicer's: 256 mm (an X1/P1 bed) or larger, under the model's footprint
-// with its top at the model's lowest point. Display only: the mesh and every export keep their coordinates.
+// with its top at the model's lowest point (Z = 0: opening a model moves it down onto the plate, see core.toPlate).
 let plate = null;
 function updatePlate() {
   if (plate) { scene.remove(plate); plate.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); }); plate = null; }
