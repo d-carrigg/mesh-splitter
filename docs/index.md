@@ -10,7 +10,7 @@ For the example photo, I made the eyes 1 part, then replaced them with a flipped
 
 - **[Splitting](features/splitting.md):** auto split, split by shells, seeds and Add part
 - **[Editing parts](features/editing-parts.md):** fill, brush, merge, Replace with…, show only, rename, AI part naming
-- **[Move, rotate, scale and heal](features/transforms.md):** handles, snapping, undo, rotate on joint, heal joint
+- **[Move, rotate, scale and heal](features/transforms.md):** handles, snapping, undo, rotate on joint, heal joint, fill and anchor
 - **[Exporting](features/exporting.md):** Send to Orca, painted 3MF, part STLs, merged STL
 - **[Command line](features/command-line.md):** split and export from a script with `uv run mesh-splitter split`
 - **[How it works](how-it-works.md):** the splitting algorithm, the shared core, and the math behind joint transforms

@@ -173,6 +173,25 @@ console.log("heal:", JSON.stringify(hl));
 if (!hl.heal || hl.maxGap > 0.05 || hl.open) errors.push("heal joint failed: " + JSON.stringify(hl));
 await page.keyboard.press("Control+z");
 await page.keyboard.press("Control+z");
+// Fill / Anchor: lift the cap 4 mm off the body. Fill patches the hole on both sides (both parts stay closed);
+// Anchor sweeps new material from the body's rim to the cap instead (closed, more volume, no patch on the body).
+const fa = await page.evaluate(() => {
+  const { S } = app, i = S.active, x = app.ensureXf(i); x.t = [x.t[0], x.t[1], x.t[2] + 4]; app.applyXf();
+  const solid = (v) => { const E = new Map(), k = (o) => [v[o], v[o+1], v[o+2]].map((t) => t.toFixed(4)).join(","); let vol = 0;
+    for (let o = 0; o < v.length; o += 9) { for (let e = 0; e < 3; e++) { const a = k(o + 3*e), b = k(o + 3*((e+1)%3)), kk = a < b ? a + "|" + b : b + "|" + a; E.set(kk, (E.get(kk) || 0) + 1); }
+      vol += (v[o]*(v[o+4]*v[o+8]-v[o+5]*v[o+7]) - v[o+1]*(v[o+3]*v[o+8]-v[o+5]*v[o+6]) + v[o+2]*(v[o+3]*v[o+7]-v[o+4]*v[o+6])) / 6; }
+    return { open: [...E.values()].filter((c) => c !== 2).length, vol: +vol.toFixed(1) }; };
+  const ctx = app.fillCtx(), nb = app.loopPlans(app.partLoops(i, ctx), ctx).find((p) => p.nb > 0)?.nb;
+  const kinds = () => { const c = app.fillCtx(); return app.loopPlans(app.partLoops(i, c), c).map((p) => p.kind).join(","); };
+  const fill = { kinds: kinds(), shown: !!app.fillMesh(), me: solid(app.partSoup(i)), nb: solid(app.partSoup(nb)) };
+  app.setAnchor([i], true);
+  const anchor = { kinds: kinds(), me: solid(app.partSoup(i)), nb: solid(app.partSoup(nb)), saved: S.parts[i].anchor };
+  app.undo(); x.t = [x.t[0], x.t[1], x.t[2] - 4]; app.applyXf();
+  return { fill, anchor, after: !!S.parts[i].anchor };
+});
+console.log("fill/anchor:", JSON.stringify(fa));
+if (!fa.fill.kinds.includes("patch") || !fa.fill.shown || fa.fill.me.open || fa.fill.nb.open || !fa.anchor.kinds.includes("bridge") || fa.anchor.me.open
+  || fa.anchor.nb.open || !(fa.anchor.me.vol > fa.fill.me.vol + 1) || !fa.anchor.saved || fa.after) errors.push("fill/anchor failed: " + JSON.stringify(fa));
 await page.evaluate(() => app.setGizmoJoint(false));
 if (shot) await page.screenshot({ path: shot });
 await page.click("#expMain");
