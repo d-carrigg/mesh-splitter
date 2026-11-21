@@ -121,7 +121,7 @@
    ],
    "labels": [
     "Front arm turned up: holes where the hand and arm were",
-    "Fill (default): the body is closed"
+    "Fill: the body is closed"
    ],
    "name": "gap-fill"
   },

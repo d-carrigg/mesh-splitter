@@ -323,7 +323,7 @@
       <div class="row" id="stretchGapRow" style="margin:0"><span class="lbl" style="flex:1">Gap</span><input id="stretchGap" type="number" min="0" step="0.5"><span class="small">mm</span></div>
     </div>
     <div id="anchorRow" class="row" style="margin:0;justify-content:space-between" title="What happens at the cut when this part moves away from the part it joins. Applies to all selected parts."><span class="lbl">At the cut</span>
-      <span class="seg"><button id="gapFill" title="Fill (default): patch the hole the part leaves in its neighbor, following the surface around it, and close the part's own cut">Fill</button><button id="gapAnchor" title="Anchor: keep the part joined where it attaches. New material sweeps from the neighbor to the moved cut, so a turned arm stays on the body">Anchor</button></span></div>
+      <span class="seg"><button id="gapOpen" title="Open (default): leave the gap visible, as cut. Exports close each side with a flat cap">Open</button><button id="gapFill" title="Fill: patch the hole the part leaves in its neighbor, following the surface around it, and close the part's own cut">Fill</button><button id="gapAnchor" title="Anchor: keep the part joined where it attaches. New material sweeps from the neighbor to the moved cut, so a turned arm stays on the body">Anchor</button></span></div>
     <div id="healRow" style="display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--sep);padding-top:9px" title="Heal joint: after a move or rotate, stretch or squeeze this part near its cut so the cut's edge lands back on the neighbor's edge. Only faces within the blend distance of the cut change shape.">
       <div class="row" style="margin:0"><label class="lbl" style="flex:1"><input id="healOn" type="checkbox"> Heal joint</label><span class="lbl">Blend</span><input id="healR" type="number" min="0.5" step="0.5"><span class="small">mm</span></div>
       <span class="small">Stretches the part near its cut so it stays flush with its neighbor.</span>
@@ -732,7 +732,7 @@ let xfKey = "";
 function applyXf() {
   if (!mesh) return;
   const Ms = S.parts.map(xfMatrix), any = Ms.some(Boolean);
-  const key = any ? JSON.stringify(S.parts.map((p) => [p.xf || 0, p.heal || 0, p.anchor || 0, p.visible !== false])) + "|" + fullHash() : "";
+  const key = any ? JSON.stringify(S.parts.map((p) => [p.xf || 0, p.heal || 0, p.anchor || 0, p.fill || 0, p.visible !== false])) + "|" + fullHash() : "";
   if (key === xfKey) return;
   xfKey = key;
   const geo = mesh.geometry, P = geo.getAttribute("position").array, N = geo.getAttribute("normal").array, { P0, N0 } = mesh.userData;
@@ -1191,6 +1191,7 @@ function fillCtx() {
   return Object.assign(ctx, { mat, heal, wpos, hash, tol: 1e-4 * (S.G?.diag || 100) });
 }
 const anchored = (l) => l > 0 && !!S.parts[l]?.anchor && !hasRep(S.parts[l]);
+const filled = (l) => l > 0 && !!S.parts[l]?.fill && !hasRep(S.parts[l]);
 function partLoops(l, ctx) { // boundary loops of part l (geometry only, cached)
   const key = `${l}|${S.nF}|${ctx.hash}`;
   if (!loopCache.has(key)) { if (loopCache.size > 40) loopCache.clear(); loopCache.set(key, partMesh(l)?.loopList || []); }
@@ -1217,7 +1218,8 @@ function loopPlans(loops, ctx) {
         const rep = hasRep(S.parts[nb]);
         if (!rep && anchored(own) && (!anchored(nb) || own < nb)) kind = "bridge";
         else if (!rep && anchored(nb)) kind = "under";
-        else kind = "patch";
+        else if (rep || filled(own) || filled(nb)) kind = "patch"; // a replaced neighbor always gets Fill
+        // else Open (the default): each side keeps a flat cap and the gap stays visible
       }
     }
     if (kind === "fan" && !ctx.mat(own) && !(nb > 0 && ctx.mat(nb))) { // a recess and its neighbor, both in place: the skin
@@ -1453,14 +1455,17 @@ function smoothNormals(P) { // vertex normals averaged over triangles that share
   for (let o = 0; o < P.length; o += 3) { const v = acc.get(key(o)).clone().normalize(); N[o] = v.x; N[o+1] = v.y; N[o+2] = v.z; }
   return N;
 }
-function setAnchor(js, on) {
+// What happens at the cut of parts js when they move: "open" (the default: the gap shows), "fill" or "anchor".
+function setGap(js, mode) {
   js = js.filter((j) => j > 0 && S.parts[j] && !hasRep(S.parts[j]));
   if (!js.length) return;
   pushUndo();
-  for (const j of js) { if (on) S.parts[j].anchor = true; else delete S.parts[j].anchor; }
-  const names = js.map((j) => S.parts[j].name).join(", ");
-  afterEdit(on ? `Anchor: ${names} stay${js.length > 1 ? "" : "s"} joined to the body; the gap fills with new material` : `Fill: the holes ${names} leave${js.length > 1 ? "" : "s"} are patched`);
+  for (const j of js) { delete S.parts[j].anchor; delete S.parts[j].fill; if (mode === "anchor") S.parts[j].anchor = true; else if (mode === "fill") S.parts[j].fill = true; }
+  const names = js.map((j) => S.parts[j].name).join(", "), s = js.length > 1 ? "" : "s";
+  afterEdit(mode === "anchor" ? `Anchor: ${names} stay${s} joined to the body; the gap fills with new material`
+    : mode === "fill" ? `Fill: the holes ${names} leave${s} are patched` : `Open: the gaps ${names} leave${s} show as cut`);
 }
+const setAnchor = (js, on) => setGap(js, on ? "anchor" : "fill"); // Anchor, or Fill
 
 function filColor(n) { return orcaFil?.[n - 1] || S.parts.find((q) => q.filament === n)?.color || "#666"; }
 let orcaFil = null; // OrcaSlicer's filament colors by slot (plugin), used by the filament view
@@ -2311,7 +2316,8 @@ function refreshXfPanel() {
   $("gzCenter").classList.toggle("on", !gzJointOn);
   $("healRow").classList.toggle("hide", !ok || !!p?.rep);
   $("anchorRow").classList.toggle("hide", !ok || !!p?.rep);
-  $("gapAnchor").classList.toggle("on", ok && !!p?.anchor); $("gapFill").classList.toggle("on", ok && !p?.anchor);
+  $("gapAnchor").classList.toggle("on", ok && !!p?.anchor); $("gapFill").classList.toggle("on", ok && !!p?.fill && !p?.anchor);
+  $("gapOpen").classList.toggle("on", ok && !p?.fill && !p?.anchor);
   $("stretchRow").classList.toggle("hide", !ok || !!p?.rep);
   const au = ok && !!p.xf?.st?.auto;
   if (ok && document.activeElement !== $("stretchPct")) $("stretchPct").value = +((p.xf?.st?.k ?? 1) * 100).toFixed(au ? 0 : 1);
@@ -2373,8 +2379,9 @@ $("healR").onchange = () => {
   const r = +$("healR").value; if (!(r > 0)) { refreshUI(); return; }
   pushUndo(); p.heal = { r }; afterEdit(`Heal blend on ${p.name}: ${r} mm`);
 };
-$("gapFill").onclick = () => { if (S.G && S.active > 0) setAnchor(selected(), false); };
-$("gapAnchor").onclick = () => { if (S.G && S.active > 0) setAnchor(selected(), true); };
+$("gapOpen").onclick = () => { if (S.G && S.active > 0) setGap(selected(), "open"); };
+$("gapFill").onclick = () => { if (S.G && S.active > 0) setGap(selected(), "fill"); };
+$("gapAnchor").onclick = () => { if (S.G && S.active > 0) setGap(selected(), "anchor"); };
 $("stretchAuto").onchange = () => { if (S.G && S.active > 0) setAutoStretch(selected(), $("stretchAuto").checked); };
 $("stretchGap").onchange = () => {
   const g = +$("stretchGap").value; if (!S.G || S.active <= 0 || !(g >= 0)) { refreshUI(); return; }
@@ -3207,7 +3214,7 @@ if (ORCA.on) {
   });
   orcaSend({ cmd: "objects", auto: true });
 }
-window.app = { S, setAnchor, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, setAnchor, setGap, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
 </script>
 </body>
 </html>
