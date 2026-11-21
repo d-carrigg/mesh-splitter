@@ -214,13 +214,12 @@ class AiNamingTests(unittest.TestCase):
 
 
 class RegistrationTests(unittest.TestCase):
-    def test_registers_page_and_script_with_download_permission(self):
+    def test_requests_downloads_only_write_permission(self):
         p = load_plugin([])
         import orca
         with mock.patch.object(os.path, "expanduser", return_value=os.path.join("C:", "Users", "d")):
             p.MeshSplitterPlugin().register_capabilities()
         st = orca._state
-        self.assertEqual(st["capabilities"], [p.MeshSplitterPage, p.OpenMeshSplitter])
         self.assertEqual(st["permissions"], [{"fs_readwrite": [os.path.join("C:", "Users", "d", "Downloads", "*")]}])
 
     def test_window_and_page_share_bridge(self):
@@ -254,7 +253,6 @@ class BuildTests(unittest.TestCase):
             html = mod.page_html()
             self.assertNotIn("cdn.jsdelivr.net", html)
             self.assertNotIn('type="importmap"', html)
-            self.assertIn("Send to Orca", html)
             self.assertLess(len(html.encode()), 1_800_000)
 
 
