@@ -138,6 +138,16 @@
   #drop { position:absolute; inset:20px; pointer-events:none; border:2px dashed #7a7a82; border-radius:8px; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; color:#D0D0D3; font-size:16px; }
   #drop button, #drop #dropRecent { pointer-events:auto; }
   #drop > button { font-size:14px; padding:8px 14px; }
+  #welcome { text-align:center; margin-bottom:14px; }
+  #welcome h1 { margin:0 0 6px; font-size:28px; font-weight:600; color:var(--fg); letter-spacing:.2px; }
+  #welcome p { margin:0; color:var(--lbl); font-size:14px; }
+  #welcomeFoot { display:flex; flex-direction:column; align-items:center; gap:10px; margin-top:22px; padding-top:16px; border-top:1px solid var(--sep); min-width:360px; pointer-events:auto; }
+  #welcomeFoot .local { display:flex; align-items:center; gap:7px; margin:0; color:var(--lbl); font-size:12.5px; }
+  #welcomeFoot svg { width:14px; height:14px; fill:none; stroke:var(--acch); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+  #welcomeFoot nav { display:flex; gap:18px; font-size:13px; }
+  #welcomeFoot a { color:var(--acch); text-decoration:none; }
+  #welcomeFoot a:hover { text-decoration:underline; }
+  body.inOrca #welcome, body.inOrca #welcomeFoot { display:none; }
   body.empty #side, body.empty #toolbar, body.empty #acts, body.empty #rightCol, body.empty .gp, body.empty #info { display:none !important; }
   body.empty #view { grid-column:1 / -1; }
   #placeHint { pointer-events:none; padding:3px 8px; font-size:12px; z-index:7; transform:translate(14px, 14px); white-space:nowrap; }
@@ -246,7 +256,21 @@
 
 <div id="view">
   <div id="toast" hidden title="Click to dismiss"></div>
-  <div id="drop"><span>Drop an STL or 3MF here</span><div id="dropOrca"></div><button id="dropOpen" data-icon="open">Open…</button><div id="dropRecent"></div></div>
+  <div id="drop">
+    <div id="welcome">
+      <h1>Welcome to Mesh Splitter</h1>
+      <p>Split one mesh into color-coded parts for multi-color or multi-piece printing.</p>
+    </div>
+    <span>Drop an STL or 3MF here</span><div id="dropOrca"></div><button id="dropOpen" data-icon="open">Open…</button><div id="dropRecent"></div>
+    <div id="welcomeFoot">
+      <p class="local"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Everything runs locally in your browser. Your models are never uploaded.</p>
+      <nav>
+        <a href="https://github.com/d-carrigg/mesh-splitter#install-in-orcaslicer" target="_blank" rel="noopener">OrcaSlicer plugin</a>
+        <a href="https://d-carrigg.github.io/mesh-splitter/" target="_blank" rel="noopener">Docs</a>
+        <a href="https://github.com/d-carrigg/mesh-splitter" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </div>
 
   <div id="toolbar" class="float">
     <div class="grp" data-tools="orbit"></div>
