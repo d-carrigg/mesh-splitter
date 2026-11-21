@@ -44,6 +44,11 @@
    "after": 0
   },
   {
+   "do": "click",
+   "target": "#splitDone",
+   "after": 0
+  },
+  {
    "do": "key",
    "key": "q"
   },

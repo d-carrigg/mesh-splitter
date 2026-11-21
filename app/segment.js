@@ -97,18 +97,19 @@ export function autoSplit(S, k, opts = {}) {
     used.set(lab[f], used.get(lab[f]) + 1);
   }
   const order = [...used.keys()].sort((a, b) => used.get(b) - used.get(a));
-  const idx = new Map();
+  // Splitting inside one part: its biggest region stays that part (name, color, filament slot), the rest are new.
+  const idx = new Map(), made = [];
   for (const r of order) {
+    if (scope > 0 && !made.length) { idx.set(r, scope); S.parts[scope].seeds = [seeds[r]]; made.push(S.parts[scope]); continue; }
     idx.set(r, S.parts.length);
-    S.parts.push(newPart(S, { seeds: [seeds[r]] }));
+    const p = newPart(S, { seeds: [seeds[r]] });
+    S.parts.push(p); made.push(p);
   }
   for (let f = 0; f < S.nF; f++) if (mask[f] && lab[f] >= 0) S.labels[f] = idx.get(lab[f]);
-  if (scope > 0) S.parts[scope].seeds = [];
-  const p0 = S.parts.length - order.length, made = S.parts.slice(p0);
   snapCreases(S, mask, smooth); smoothCut(S, mask);
   // a region the clean-up emptied (its seed face went to a neighbor) is dropped with its seed
   const cnt = partCounts(S);
-  made.forEach((p, j) => { if (!cnt[p0 + j]) p.seeds = []; });
+  made.forEach((p) => { if (!cnt[S.parts.indexOf(p)]) p.seeds = []; });
   dropEmptyParts(S);
   return made.filter((p) => S.parts.includes(p)).length;
 }

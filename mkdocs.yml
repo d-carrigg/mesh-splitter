@@ -10,6 +10,7 @@ exclude_docs: |
   examples/demo/
   features/demo/
   features/README.md
+  manual-check.md
   screenshot.png
 nav:
   - Home: index.md
