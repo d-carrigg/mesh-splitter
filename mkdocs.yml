@@ -14,6 +14,7 @@ nav:
   - Home: index.md
   - Splitting: features/splitting.md
   - Editing parts: features/editing-parts.md
+  - AI part naming: features/ai-naming.md
   - Move, rotate, scale and heal: features/transforms.md
   - Exporting: features/exporting.md
   - Command line: features/command-line.md
