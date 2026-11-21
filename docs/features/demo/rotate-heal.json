@@ -20,20 +20,6 @@
   },
   {
    "do": "eval",
-   "js": "app.S.active = 4; app.refreshUI(); app.setGizmo('rotate'); app.setGizmoJoint(true)"
-  },
-  {
-   "do": "shot",
-   "name": "rotate-joint-ui",
-   "clip": [
-    560,
-    40,
-    640,
-    520
-   ]
-  },
-  {
-   "do": "eval",
    "js": "app.setGizmo('off'); document.getElementById('rightCol').style.visibility = 'hidden'; const x = app.ensureXf(4); x.r = [0, 0, -90]; app.applyXf(); app.refreshUI(); app.S.active = 0; app.refreshUI()"
   },
   {

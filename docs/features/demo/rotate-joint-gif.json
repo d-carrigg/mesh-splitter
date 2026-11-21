@@ -2,7 +2,7 @@
  "assets": "/mnt/project-files/mesh-splitter/demo-assets",
  "model": "curler.stl",
  "viewport": {
-  "width": 1200,
+  "width": 1600,
   "height": 760
  },
  "fps": 12,
@@ -12,10 +12,10 @@
   "dither": "sierra2_4a",
   "loop": 0,
   "crop": [
-   280,
+   680,
    40,
    920,
-   720
+   600
   ]
  },
  "camera": {
@@ -42,7 +42,11 @@
   },
   {
    "do": "caption",
-   "text": "J: rotate on joint"
+   "text": "J: rotate on joint",
+   "style": {
+    "left": "1140px",
+    "bottom": "140px"
+   }
   },
   {
    "do": "key",
@@ -51,7 +55,11 @@
   },
   {
    "do": "caption",
-   "text": "The part spins on its cut and stays seated"
+   "text": "The part spins on its cut and stays seated",
+   "style": {
+    "left": "1140px",
+    "bottom": "140px"
+   }
   },
   {
    "do": "eval",

@@ -1,0 +1,76 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "curler.stl",
+ "viewport": {
+  "width": 1600,
+  "height": 760
+ },
+ "fps": 12,
+ "gif": {
+  "width": 480,
+  "colors": 128,
+  "dither": "sierra2_4a",
+  "loop": 0,
+  "crop": [
+   650,
+   150,
+   560,
+   480
+  ]
+ },
+ "camera": {
+  "az": 20,
+  "el": 22,
+  "dist": 0.55,
+  "lift": 0.22
+ },
+ "css": "#__cursor { display: none !important } #__caption { transition: none !important }",
+ "out": "docs/features/img/rotate-j.gif",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "eval",
+   "js": "app.S.active = 4; app.refreshUI(); app.setGizmo('rotate'); app.setGizmoJoint(true); document.getElementById('rightCol').style.visibility = 'hidden'; let at = 0; window.__rot = (deg) => { const { gizmo, gzProxy } = app, Q = gzProxy.quaternion.constructor, V = gzProxy.up.constructor, a = -(deg - at) * Math.PI / 180; at = deg; gizmo.dispatchEvent({ type: 'dragging-changed', value: true }); gzProxy.quaternion.multiply(new Q().setFromAxisAngle(new V(0, 1, 0), a)); gizmo.dispatchEvent({ type: 'objectChange' }); gizmo.dispatchEvent({ type: 'dragging-changed', value: false }); window.__caption('Rotate on joint (J): ' + Math.round(deg) + '\\u00b0') }"
+  },
+  {
+   "do": "caption",
+   "text": "Rotate on joint (J): 0\u00b0",
+   "style": {
+    "left": "666px",
+    "top": "166px",
+    "bottom": "auto",
+    "transform": "none",
+    "font": "600 22px system-ui,sans-serif",
+    "padding": "6px 14px"
+   }
+  },
+  {
+   "do": "eval",
+   "js": "window.__rot(0)"
+  },
+  {
+   "do": "hold",
+   "s": 0.8
+  },
+  {
+   "do": "tween",
+   "s": 1.8,
+   "js": "(t) => window.__rot(90 * t)"
+  },
+  {
+   "do": "hold",
+   "s": 1.4
+  },
+  {
+   "do": "tween",
+   "s": 1.2,
+   "js": "(t) => window.__rot(90 * (1 - t))"
+  },
+  {
+   "do": "hold",
+   "s": 0.4
+  }
+ ]
+}
