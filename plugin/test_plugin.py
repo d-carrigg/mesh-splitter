@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """OrcaSlicer plugin: plate mesh extraction, message chunking, saving (fake `orca` host, no OrcaSlicer)."""
 import base64
+import json
 import importlib.util
 import os
 import sys
@@ -13,7 +14,9 @@ import numpy as np
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parent / "server"))  # plugin.py imports llm_providers (inlined by build.py)
 import fake_orca  # noqa: E402
+import mock_llm_server  # noqa: E402
 
 TET_V = np.array([[0, 0, 0], [10, 0, 0], [0, 10, 0], [0, 0, 10]], float)
 TET_F = np.array([[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]])
@@ -156,6 +159,58 @@ class BridgeTests(unittest.TestCase):
     def test_ignores_junk(self):
         self.b.handle("not a dict"); self.b.handle({"cmd": "nope"})
         self.assertEqual(self.sent, [])
+
+
+class AiNamingTests(unittest.TestCase):
+    """AI part naming inside OrcaSlicer: settings saved in the plugin's storage folder, request sent from Python."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        fake_orca.install([])
+        self.p = load_plugin([])
+        self.p._storage[:] = [self.tmp.name]
+        self.sent, self.audits = [], []
+        self.p.ask_network_permission = self.audits.append
+        self.b = self.p.Bridge(self.sent.append)
+        self.b.run_async = lambda work, on_error: self.sent.append(work())  # run inline
+
+    def test_settings_round_trip_without_leaking_key(self):
+        self.b.handle({"cmd": "llm_status"})
+        self.assertEqual((self.sent[-1]["cmd"], self.sent[-1]["configured"]), ("llm_status", False))
+        self.b.handle({"cmd": "llm_settings", "settings": {"provider": "openai", "api_key": "sk-secret", "model": "gpt-5-mini"}})
+        st = self.sent[-1]
+        self.assertEqual((st["provider"], st["configured"], st["has_key"]), ("openai", True, True))
+        self.assertNotIn("sk-secret", str(self.sent))
+        saved = Path(self.tmp.name, "ai_naming.json").read_text()
+        self.assertIn("sk-secret", saved)  # persisted for the next session
+        self.b.handle({"cmd": "llm_settings", "settings": {"provider": "custom", "base_url": "ftp://x"}})
+        self.assertEqual((self.sent[-1]["cmd"], self.sent[-1]["ok"]), ("llm_status", False))
+
+    def test_name_parts_against_local_server(self):
+        with mock_llm_server.running() as srv:
+            self.b.handle({"cmd": "llm_settings", "settings": {"provider": "custom", "base_url": srv.base_url}})
+            self.b.handle({"cmd": "llm_models"})
+            self.assertEqual(self.sent[-1], {"cmd": "llm_models", "models": ["mock-vision-1"]})
+            body = json.dumps({"model": "", "images": ["data:image/jpeg;base64,AAAA"], "captions": ["front"],
+                               "stats": {"parts": [{"id": 0}, {"id": 1}, {"id": 2}]}})
+            half = len(body) // 2
+            self.b.handle({"cmd": "llm_name", "id": "j1", "part": 1, "of": 2, "data": body[half:]})
+            self.assertEqual(len(srv.requests), 0)
+            self.b.handle({"cmd": "llm_name", "id": "j1", "part": 0, "of": 2, "data": body[:half]})
+            out = self.sent[-1]
+            self.assertEqual((out["cmd"], out["id"], out["ok"]), ("llm_result", "j1", True), out)
+            self.assertEqual([x["name"] for x in out["result"]["parts"]], ["mock part 1", "mock part 2"])
+            self.assertEqual(self.audits, [srv.base_url + "/models", srv.base_url + "/chat/completions"])
+            self.assertEqual(self.b.llm_jobs, {})
+
+    def test_denied_permission_reported(self):
+        def deny(url):
+            raise RuntimeError("audit permission required")
+        self.p.ask_network_permission = deny
+        self.b.handle({"cmd": "llm_name", "id": "j2", "part": 0, "of": 1, "data": "{}"})
+        self.assertEqual((self.sent[-1]["cmd"], self.sent[-1]["ok"]), ("llm_result", False))
+        self.assertIn("permission", self.sent[-1]["error"])
 
 
 class RegistrationTests(unittest.TestCase):

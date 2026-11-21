@@ -18,4 +18,4 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 package-dir = { "" = "server" }
-py-modules = ["serve", "llm_review"]
+py-modules = ["serve", "llm_review", "llm_providers"]

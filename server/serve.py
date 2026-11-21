@@ -4,8 +4,8 @@
 uv run mesh-splitter [--port 8766] [--no-browser]
 uv run mesh-splitter split MESH [options]     (command line; needs Node.js, see --help)
 
-Static files from the repo root plus the AI part-naming endpoints (/api/llm/status, /api/llm/name-parts),
-which keep the OpenRouter key on this machine.
+Static files from the repo root plus the AI part-naming endpoints (/api/llm/status, /api/llm/models,
+/api/llm/settings, /api/llm/name-parts), which keep the API key on this machine.
 """
 from __future__ import annotations
 
@@ -53,10 +53,14 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/llm/status":
             self._json(200, llm_review.status())
             return
+        if path == "/api/llm/models":
+            self._json(*llm_review.models())
+            return
         super().do_GET()
 
     def do_POST(self) -> None:
-        if urlsplit(self.path).path != "/api/llm/name-parts":
+        path = urlsplit(self.path).path
+        if path not in ("/api/llm/name-parts", "/api/llm/settings"):
             self._json(404, {"ok": False, "error": "not found"})
             return
         # JSON content type forces a CORS preflight (unhandled here), so other sites can't spend the key.
@@ -70,7 +74,7 @@ class Handler(SimpleHTTPRequestHandler):
         except ValueError:
             self._json(400, {"ok": False, "error": "bad json"})
             return
-        self._json(*llm_review.review(body))
+        self._json(*(llm_review.save_settings(body) if path == "/api/llm/settings" else llm_review.review(body)))
 
 
 def port_in_use(port: int) -> bool:

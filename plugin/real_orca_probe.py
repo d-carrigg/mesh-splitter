@@ -15,11 +15,14 @@ the real `orca` bindings (no fakes) and writes what it saw to $MESH_SPLITTER_PRO
   - the Mesh Splitter module loaded and its page decodes
   - "objects" lists the plate objects, "mesh" returns the right world-space mesh
   - the Mesh Splitter 3MF (made by e2e.mjs) imported as one object with one part per split part
+  - AI part naming: settings saved, then a naming request sent from OrcaSlicer's Python (worker thread,
+    urllib) to the mock OpenAI-compatible server at $MESH_SPLITTER_MOCK_LLM, as with LM Studio
 """
 import base64
 import json
 import os
 import sys
+import tempfile
 import threading
 import time
 import traceback
@@ -74,6 +77,20 @@ def probe():
         tri = np.frombuffer(data[nV * 12:], dtype="<u4").reshape(-1, 3)
         r["mesh"] = {"nV": nV, "nF": nF, "bytes": len(data), "max_index": int(tri.max()),
                      "size": [round(float(x), 2) for x in (pos.max(0) - pos.min(0))]}
+
+        llm = os.environ.get("MESH_SPLITTER_MOCK_LLM")
+        if llm:
+            mod._storage[:] = [tempfile.mkdtemp(prefix="ms-ai-")]
+            got = []
+            ai = mod.Bridge(got.append)
+            ai.handle({"cmd": "llm_settings", "settings": {"provider": "custom", "base_url": llm}})
+            body = json.dumps({"images": ["data:image/jpeg;base64,AAAA"], "captions": ["front"],
+                               "stats": {"parts": [{"id": 1}, {"id": 2}]}})
+            ai.handle({"cmd": "llm_name", "id": "ci", "part": 0, "of": 1, "data": body})
+            t = time.time()
+            while time.time() - t < 30 and not any(m.get("cmd") == "llm_result" for m in got):
+                time.sleep(0.2)
+            r["ai"] = {"status": got[0], "result": next((m for m in got if m.get("cmd") == "llm_result"), None)}
         r["ok"] = True
     except Exception as e:
         r["error"] = f"{e}\n{traceback.format_exc()}"

@@ -16,14 +16,19 @@ file (dist/mesh_splitter_any.py) from Plugins > Install local plugin, then tick 
   page --orca.postMessage({cmd: 'objects'})--------------> plugin: list plate objects
   page --orca.postMessage({cmd: 'mesh', index})----------> plugin: world-space mesh, base64 chunks
   page --orca.postMessage({cmd: 'save', id, name, ...})--> plugin: write the file to Downloads
+  page --orca.postMessage({cmd: 'llm_*', ...})-----------> plugin: AI part naming settings / one request, only when
+                                                           the user clicks (llm_providers below, from server/)
 
 OrcaSlicer 2.5's plugin API reads the model but cannot add or replace objects, so the split comes back as
 a 3MF (one object, one part per split part, filament slot per part) that you import with Ctrl+I.
 """
 import base64
+import json
 import os
 import re
+import sys
 import tempfile
+import threading
 import zlib
 
 import orca
@@ -33,12 +38,63 @@ try:
 except Exception:  # numpy is declared above; uv installs it when the plugin loads
     np = None
 
+from llm_providers import call as llm_call, list_models as llm_list_models, resolve as llm_resolve, status as llm_status, update as llm_update  # noqa: E402  __LLM_PROVIDERS__
+
 PAGE_Z = "__PAGE_Z__"  # zlib + base64 of the bundled page, filled in by build.py
 CHUNK = 512 * 1024
 
 
 def page_html():
     return zlib.decompress(base64.b64decode(PAGE_Z)).decode("utf-8")
+
+
+_storage = []  # the plugin's own data folder, found once from a plugin callback
+
+
+def storage_dir():
+    if not _storage:
+        try:  # only callable inside an audited plugin callback (not from a create_window handler)
+            _storage.append(orca.host.plugin.storage())
+        except Exception:
+            return os.path.join(os.path.expanduser("~"), ".mesh-splitter")
+    return _storage[0]
+
+
+def ai_settings_path():
+    return os.path.join(storage_dir(), "ai_naming.json")
+
+
+def load_ai_settings():
+    try:
+        with open(ai_settings_path(), encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_ai_settings(store):
+    path = ai_settings_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(store, f, indent=2)
+
+
+def network_origin(url):
+    """'https://Api.Example.com:8443/v1/x' -> 'https://api.example.com', the host-wide form OrcaSlicer saves."""
+    m = re.match(r"^(https?)://([^/?#]+)", str(url), re.I)
+    if not m:
+        raise ValueError(f"not an http(s) URL: {url}")
+    host = m.group(2).rsplit("@", 1)[-1].lower()
+    host = host if host.startswith("[") and host.endswith("]") else re.sub(r"(\]|^[^:\[]*):\d*$", r"\1", host)
+    return f"{m.group(1).lower()}://{host}"
+
+
+def ask_network_permission(url):
+    """Ask OrcaSlicer's permission for the provider's host now, on the UI thread, before the worker thread sends
+    the request (a prompt raised off the UI thread is denied the first time). OrcaSlicer saves a Yes for the
+    whole host, so this asks once per provider. Raises if the user says No."""
+    sys.audit("urllib.Request", network_origin(url), None, {}, "POST")
 
 
 def downloads_dir():
@@ -166,6 +222,7 @@ class Bridge:
     def __init__(self, send):
         self.send = send
         self.saves = {}
+        self.llm_jobs = {}
 
     def handle(self, msg):
         if not isinstance(msg, dict):
@@ -184,12 +241,59 @@ class Bridge:
                     self.send(m)
             elif cmd == "save":
                 self.save_chunk(msg)
+            elif cmd == "llm_status":
+                self.send({"cmd": "llm_status", **llm_status(load_ai_settings())})
+            elif cmd == "llm_settings":
+                store = llm_update(load_ai_settings(), msg.get("settings"))
+                save_ai_settings(store)
+                self.send({"cmd": "llm_status", "saved": True, **llm_status(store)})
+            elif cmd == "llm_models":
+                cfg = llm_resolve(load_ai_settings())
+                ask_network_permission(cfg["base_url"] + "/models")
+                self.run_async(lambda: {"cmd": "llm_models", "models": llm_list_models(cfg)},
+                               lambda e: {"cmd": "llm_models", "models": [], "error": str(e)})
+            elif cmd == "llm_name":
+                self.name_chunk(msg)
         except Exception as e:  # report to the page instead of failing silently
-            if cmd == "save":
+            if cmd in ("llm_status", "llm_settings", "llm_models"):
+                self.send({"cmd": "llm_models" if cmd == "llm_models" else "llm_status", "ok": False, "error": str(e),
+                           "models": []})
+            elif cmd == "llm_name":
+                self.llm_jobs.pop(msg.get("id"), None)
+                self.send({"cmd": "llm_result", "id": msg.get("id"), "ok": False, "error": f"Mesh Splitter: {e}"})
+            elif cmd == "save":
                 self.saves.pop(msg.get("id"), None)
                 self.send({"cmd": "save_error", "id": msg.get("id"), "message": str(e)})
             else:
                 self.send({"cmd": "error", "message": f"Mesh Splitter: {e}"})
+
+    def run_async(self, work, on_error):
+        """Run a slow network call off the UI thread; the host marshals post_message back to it."""
+        def go():
+            try:
+                out = work()
+            except Exception as e:  # e.g. OrcaSlicer denied the request
+                out = on_error(e)
+            self.send(out)
+        threading.Thread(target=go, daemon=True).start()
+
+    def name_chunk(self, msg):
+        """AI part naming: the page sends the request body (views + stats) in chunks; send it once complete."""
+        jid, part, of = msg["id"], int(msg["part"]), int(msg["of"])
+        buf = self.llm_jobs.setdefault(jid, [None] * of)
+        buf[part] = msg["data"]
+        if any(x is None for x in buf):
+            return
+        del self.llm_jobs[jid]
+        body = json.loads("".join(buf))
+        cfg = llm_resolve(load_ai_settings())
+        if cfg["base_url"]:
+            ask_network_permission(cfg["base_url"] + ("/messages" if cfg["api"] == "anthropic" else "/chat/completions"))
+
+        def work():
+            code, out = llm_call(cfg, body)
+            return {"cmd": "llm_result", "id": jid, **out}
+        self.run_async(work, lambda e: {"cmd": "llm_result", "id": jid, "ok": False, "error": f"Mesh Splitter: {e}"})
 
     def save_chunk(self, msg):
         sid, part, of = msg["id"], int(msg["part"]), int(msg["of"])
@@ -221,6 +325,7 @@ class MeshSplitterPage(orca.pages.PagesPluginCapabilityBase):
         return "menu_split_parts"  # name of an OrcaSlicer resources/images icon
 
     def on_message(self, data):
+        storage_dir()  # remember the plugin's data folder while a plugin callback is running
         self.bridge.handle(data)
 
     def on_lifecycle_event(self, event, ctx):
@@ -254,5 +359,6 @@ class OpenMeshSplitter(orca.script.ScriptPluginCapabilityBase):
 class MeshSplitterPlugin(orca.base):
     def register_capabilities(self):
         orca.request_permissions(fs_readwrite=[os.path.join(downloads_dir(), "*")])
+        storage_dir()
         orca.register_capability(MeshSplitterPage)
         orca.register_capability(OpenMeshSplitter)
