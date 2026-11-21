@@ -15,6 +15,8 @@ Settings store (a JSON file the caller loads and saves):
 """
 import json
 import re
+import socket
+import time
 import urllib.error
 import urllib.request
 
@@ -30,7 +32,10 @@ PROVIDERS = {
 }
 DEFAULT_PROVIDER = "openrouter"
 MAX_IMAGES = 6
-TIMEOUT = 300  # seconds; local models on a GPU can take a while
+# Seconds. FIRST_BYTE: no reply at all (the server or a proxy is stuck). TOTAL: the whole answer, streamed.
+# A local model on a GPU can take minutes to read the pictures, so custom servers get longer limits.
+LIMITS = {"cloud": {"first_byte": 90, "total": 300}, "local": {"first_byte": 300, "total": 900}}
+TIMEOUT = LIMITS["local"]["total"]
 
 SYSTEM = """You review a 3D mesh that a user split into parts for multi-color / multi-piece 3D printing (FDM).
 You get rendered views (each part drawn in its own color, labeled #id) and per-part stats as JSON.
@@ -182,7 +187,7 @@ def build_request(cfg, body):
         headers.update({"x-api-key": cfg["api_key"], "anthropic-version": "2023-06-01"})
         payload = {"model": model, "max_tokens": 16000, "system": SYSTEM,
                    "messages": [{"role": "user", "content": anthropic_content(body)}],
-                   "output_config": {"effort": "low"}}
+                   "output_config": {"effort": "low"}, "stream": True}
         if re.match(r"claude-(opus-5|sonnet-5-5|fable-5)", model):
             # On a safety decline, let the API re-run the request on a fallback model instead of failing.
             headers["anthropic-beta"] = "server-side-fallback-2026-07-01"
@@ -190,11 +195,12 @@ def build_request(cfg, body):
         return cfg["base_url"] + "/messages", headers, payload
     if cfg["api_key"]:
         headers["Authorization"] = f"Bearer {cfg['api_key']}"
-    payload = {"messages": build_messages(body)}
+    payload = {"messages": build_messages(body), "stream": True}  # streamed: progress, and a stall is visible
     if model:
         payload["model"] = model  # a local server with one model loaded may not need it
     if cfg["provider"] in ("openrouter", "openai"):
         payload["response_format"] = {"type": "json_object"}  # local servers often reject json_object
+        payload["stream_options"] = {"include_usage": True}
     if cfg["provider"] == "openrouter":
         payload["temperature"] = 0.2
         headers["X-Title"] = "Mesh Splitter"
@@ -226,57 +232,247 @@ def read_reply(cfg, resp):
     return text, resp.get("usage"), resp.get("model")
 
 
-def call(cfg, body, opener=None):
-    """Send one naming request. Returns (http_status, {"ok", "result" | "error", ...}) for the page."""
+class Cancelled(Exception):
+    pass
+
+
+def limits(cfg):
+    return LIMITS["local" if cfg["provider"] == "custom" else "cloud"]
+
+
+def provider_name(cfg):
+    return cfg["label"] if cfg["provider"] != "custom" else cfg["base_url"]
+
+
+def mins(s):
+    return f"{s // 60} min" if s >= 120 else f"{s} s"
+
+
+class Stream:
+    """Collects a streamed reply (OpenAI-style chat completion chunks or Anthropic Messages events)."""
+
+    def __init__(self, cfg, progress):
+        self.cfg, self.progress = cfg, progress
+        self.text, self.reasoning, self.model, self.usage, self.stop = [], 0, None, None, None
+        self.in_tokens = None
+        self.chars = 0
+
+    def tick(self, stage):
+        self.progress(stage, {"chars": self.chars, "reasoning": self.reasoning})
+
+    def event(self, d):
+        if not isinstance(d, dict):
+            return
+        if d.get("error") or d.get("type") == "error":
+            e = d.get("error") or d
+            raise ValueError(str(e.get("message") if isinstance(e, dict) else e)[:400])
+        if self.cfg["api"] == "anthropic":
+            t = d.get("type")
+            if t == "message_start":
+                m = d.get("message") or {}
+                self.model = m.get("model")
+                self.in_tokens = (m.get("usage") or {}).get("input_tokens")
+            elif t == "content_block_delta":
+                dl = d.get("delta") or {}
+                if dl.get("type") == "text_delta":
+                    self.text.append(dl.get("text") or "")
+                    self.chars += len(dl.get("text") or "")
+                    self.tick("writing")
+                elif dl.get("type") == "thinking_delta":
+                    self.reasoning += len(dl.get("thinking") or "")
+                    self.tick("thinking")
+            elif t == "message_delta":
+                self.stop = (d.get("delta") or {}).get("stop_reason") or self.stop
+                u = d.get("usage") or {}
+                self.usage = {"prompt_tokens": self.in_tokens, "completion_tokens": u.get("output_tokens")}
+            return
+        self.model = d.get("model") or self.model
+        if d.get("usage"):
+            self.usage = d["usage"]
+        for ch in d.get("choices") or []:
+            dl = ch.get("delta") or {}
+            r = dl.get("reasoning") or dl.get("reasoning_content") or ""
+            if r:
+                self.reasoning += len(r)
+                self.tick("thinking")
+            if dl.get("content"):
+                self.text.append(dl["content"])
+                self.chars += len(dl["content"])
+                self.tick("writing")
+            if ch.get("finish_reason"):
+                self.stop = ch["finish_reason"]
+
+
+def read_stream(r, st, deadline, cancel, clock):
+    """Read server-sent events until the end, the deadline or a cancel. Comment lines (': ...') keep-alive only."""
+    data = []
+    while True:
+        if cancel():
+            raise Cancelled()
+        if clock() > deadline:
+            raise TimeoutError("total")
+        line = r.readline()
+        if not line:
+            break
+        line = line.decode("utf-8", "replace").rstrip("\r\n")
+        if line.startswith("data:"):
+            data.append(line[5:].lstrip())
+        elif not line and data:
+            raw, data = "\n".join(data), []
+            if raw.strip() == "[DONE]":
+                break
+            try:
+                st.event(json.loads(raw))
+            except json.JSONDecodeError:
+                pass
+    if cancel():
+        raise Cancelled()
+    if data and "\n".join(data).strip() != "[DONE]":
+        try:
+            st.event(json.loads("\n".join(data)))
+        except json.JSONDecodeError:
+            pass
+
+
+def abort(r):
+    """Stop a response that another thread is reading (Cancel): shut the socket so the blocked read returns."""
+    try:  # only shutdown: closing the response under the reading thread breaks http.client
+        r.fp.raw._sock.shutdown(socket.SHUT_RDWR)
+    except Exception:
+        pass
+
+
+def call(cfg, body, opener=None, progress=None, cancel=None, on_response=None):
+    """Send one naming request. Returns (http_status, {"ok", "result" | "error", ...}) for the page.
+
+    progress(stage, info) is called as the request moves: "sending", "waiting" (connected, no answer yet),
+    "thinking" / "writing" (streamed characters so far). cancel() returning True stops the request;
+    on_response(r) gets the open response, so a Cancel from another thread can abort(r) a blocked read.
+    The request gives up after LIMITS (no reply at all, or the whole answer too slow)."""
+    progress = progress or (lambda stage, info: None)
+    cancel = cancel or (lambda: False)
+    clock = time.monotonic
     spec = PROVIDERS[cfg["provider"]]
-    name = cfg["label"] if cfg["provider"] != "custom" else cfg["base_url"]
+    name = provider_name(cfg)
     if spec["needs_key"] and not cfg["api_key"]:
         return 400, {"ok": False, "error": f"No {cfg['label']} API key. Add one in AI settings."}
     if cfg["api"] == "openai" and cfg["provider"] != "custom" and not str(body.get("model") or cfg["model"]).strip():
         return 400, {"ok": False, "error": "Pick a model first."}
+    lim = limits(cfg)
     url, headers, payload = build_request(cfg, body)
     req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
     opener = opener or opener_for(url)
+    start = clock()
+    st = Stream(cfg, progress)
+    hint = " Is the local server running?" if cfg["provider"] == "custom" else ""
     try:
-        with opener(req, timeout=TIMEOUT) as r:
-            resp = json.loads(r.read().decode("utf-8"))
+        progress("sending", {"bytes": len(req.data)})
+        with opener(req, timeout=lim["first_byte"]) as r:
+            if on_response:
+                on_response(r)
+            progress("waiting", {})
+            ctype = (getattr(r, "headers", None) or {}).get("Content-Type", "") or ""
+            if "text/event-stream" in ctype:
+                read_stream(r, st, start + lim["total"], cancel, clock)
+                text = "".join(st.text)
+                if not text and st.stop is None:
+                    return 502, {"ok": False, "error": f"{name} closed the connection before answering. Try again."}
+                if st.stop == "refusal":
+                    return 502, {"ok": False, "error": f"{name}: The model declined this request"}
+                usage, model = st.usage, st.model
+            else:  # a server that ignores "stream" answers in one piece
+                resp = json.loads(r.read().decode("utf-8"))
+                if cancel():
+                    raise Cancelled()
+                if isinstance(resp, dict) and resp.get("error"):
+                    err = resp["error"]
+                    return 502, {"ok": False, "error": str(err.get("message") if isinstance(err, dict) else err)[:400]}
+                text, usage, model = read_reply(cfg, resp)
+    except Cancelled:
+        return 499, {"ok": False, "cancelled": True, "error": "Cancelled"}
     except urllib.error.HTTPError as e:
         detail = error_detail(e.read().decode("utf-8", "replace"))
         return 502, {"ok": False, "error": f"{name} HTTP {e.code}: {str(detail)[:400]}"}
-    except (urllib.error.URLError, TimeoutError, OSError) as e:
-        hint = " Is the local server running?" if cfg["provider"] == "custom" else ""
-        return 502, {"ok": False, "error": f"{name} unreachable: {getattr(e, 'reason', e)}.{hint}"}
+    except TimeoutError as e:
+        if cancel():
+            return 499, {"ok": False, "cancelled": True, "error": "Cancelled"}
+        if str(e) == "total":
+            return 504, {"ok": False, "error": f"Stopped after {mins(lim['total'])}: {name} was still answering. "
+                                                "Try again, or pick a faster model."}
+        if st.chars or st.reasoning:
+            return 504, {"ok": False, "error": f"{name} stopped sending for {mins(lim['first_byte'])} mid-answer. "
+                                                "Try again."}
+        return 504, {"ok": False, "error": f"No answer from {name} in {mins(lim['first_byte'])}. "
+                                            f"Try again, or pick another model.{hint}"}
+    except (urllib.error.URLError, OSError) as e:
+        if cancel():
+            return 499, {"ok": False, "cancelled": True, "error": "Cancelled"}
+        reason = getattr(e, "reason", e)
+        if isinstance(reason, TimeoutError) or "timed out" in str(reason):
+            return 504, {"ok": False, "error": f"No answer from {name} in {mins(lim['first_byte'])}. "
+                                                f"Try again, or pick another model.{hint}"}
+        return 502, {"ok": False, "error": f"{name} unreachable: {reason}.{hint}"}
     except (json.JSONDecodeError, UnicodeDecodeError):
         return 502, {"ok": False, "error": f"{name} did not return JSON"}
-    if isinstance(resp, dict) and resp.get("error"):
-        err = resp["error"]
-        return 502, {"ok": False, "error": str(err.get("message") if isinstance(err, dict) else err)[:400]}
-    try:
-        text, usage, model = read_reply(cfg, resp)
-    except ValueError as e:
+    except ValueError as e:  # an error event mid-stream, an unexpected reply shape, or a read after Cancel
+        if cancel():
+            return 499, {"ok": False, "cancelled": True, "error": "Cancelled"}
         return 502, {"ok": False, "error": f"{name}: {e}"}
+    if st.stop == "length" or st.stop == "max_tokens":
+        return 502, {"ok": False, "error": f"{name}: the answer was cut off (too long). Try again.", "raw": text[:2000]}
     try:
         result = extract_json(text)
     except json.JSONDecodeError:
         return 502, {"ok": False, "error": "Model did not return JSON", "raw": text[:2000]}
-    return 200, {"ok": True, "model": model or payload.get("model") or "local model", "usage": usage, "result": result}
+    return 200, {"ok": True, "model": model or payload.get("model") or "local model", "usage": usage, "result": result,
+                 "seconds": round(clock() - start, 1)}
+
+
+def check(cfg, opener=None):
+    """Test the saved settings: can we reach the provider, does it take the key, does it offer the model?
+
+    Returns {"ok", "error"?, "warning"?, "models": [...]}. Sends no model data."""
+    name = provider_name(cfg)
+    spec = PROVIDERS[cfg["provider"]]
+    if spec["needs_key"] and not cfg["api_key"]:
+        return {"ok": False, "error": f"Paste your {cfg['label']} API key first.", "models": []}
+    headers = {}
+    if cfg["api"] == "anthropic":
+        headers = {"x-api-key": cfg["api_key"], "anthropic-version": "2023-06-01"}
+    elif cfg["api_key"]:
+        headers = {"Authorization": f"Bearer {cfg['api_key']}"}
+
+    def get(path):
+        req = urllib.request.Request(cfg["base_url"] + path, headers=headers)
+        with (opener or opener_for(req.full_url))(req, timeout=15) as r:
+            return json.loads(r.read().decode("utf-8"))
+
+    try:
+        if cfg["provider"] == "openrouter":
+            get("/key")  # the model list is public there; this is what checks the key
+        data = get("/models")
+        data = (data.get("data") or []) if isinstance(data, dict) else []
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            return {"ok": False, "error": f"{name} rejected the API key (HTTP {e.code}). Check it and save again.",
+                    "models": []}
+        detail = error_detail(e.read().decode("utf-8", "replace"))
+        return {"ok": False, "error": f"{name} HTTP {e.code}: {str(detail)[:300]}", "models": []}
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        hint = " Is the local server running?" if cfg["provider"] == "custom" else ""
+        return {"ok": False, "error": f"Can't reach {name}: {getattr(e, 'reason', e)}.{hint}", "models": []}
+    models = sorted({str(m.get("id")) for m in data if isinstance(m, dict) and m.get("id")})[:500]
+    out = {"ok": True, "models": models}
+    vision = {str(m.get("id")) for m in data if isinstance(m, dict)
+              and "image" in ((m.get("architecture") or {}).get("input_modalities") or [])}
+    model = cfg["model"]
+    if model and models and model not in models:
+        out["warning"] = f"{name} does not list the model {model}. Check the spelling."
+    elif model and vision and model not in vision:
+        out["warning"] = f"{model} does not take pictures. Pick a vision model."
+    return out
 
 
 def list_models(cfg, opener=None):
     """Model ids the provider offers (GET {base_url}/models), for the model picker. [] on any failure."""
-    headers = {}
-    if cfg["api"] == "anthropic":
-        if not cfg["api_key"]:
-            return []
-        headers = {"x-api-key": cfg["api_key"], "anthropic-version": "2023-06-01"}
-    elif cfg["api_key"]:
-        headers = {"Authorization": f"Bearer {cfg['api_key']}"}
-    elif PROVIDERS[cfg["provider"]]["needs_key"]:
-        return []
-    try:
-        req = urllib.request.Request(cfg["base_url"] + "/models", headers=headers)
-        with (opener or opener_for(req.full_url))(req, timeout=10) as r:
-            data = json.loads(r.read().decode("utf-8")).get("data") or []
-    except Exception:
-        return []
-    return sorted({str(m.get("id")) for m in data if isinstance(m, dict) and m.get("id")})[:500]
+    return check(cfg, opener)["models"]

@@ -12,9 +12,10 @@
 // Frames are captured step by step at a fixed frame rate, so the GIF's timing doesn't depend on how fast
 // the machine renders. Steps, timing, camera and size all come from the config (demo.config.json).
 // The demo meshes aren't in the repo: prep_curling.py makes them. --keep-frames leaves the PNGs in build/frames.
-// "llm": {reply, models, delay, port} runs AI part naming for real against a mock model: it starts the local server
+// "llm": {reply, models, delay, think, chunkDelay, port} runs AI part naming for real against a mock model: it starts the local server
 // (server/serve.py, settings in a temp file) and server/mock_llm_server.py (an OpenAI-compatible server, like
-// LM Studio, that answers with the canned reply), and sends the page's /api/llm/* requests to that local server.
+// LM Studio, that answers with the canned reply), and opens the page at the local server's address so its
+// /api/llm/* requests (and the streamed progress) go there.
 // Python: $PYTHON, else "python".
 import { mkdirSync, readFileSync, rmSync, existsSync, statSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
@@ -84,7 +85,8 @@ if (cfg.llm) {
   rmSync(settings, { force: true });
   process.on("exit", () => rmSync(settings, { force: true }));
   await start(["server/mock_llm_server.py", "--port", String(mp), "--models", (cfg.llm.models || ["mock-vision-1"]).join(","),
-    "--delay", String(cfg.llm.delay ?? 0), ...(cfg.llm.reply ? ["--reply", path.resolve(root, cfg.llm.reply)] : [])], {});
+    "--delay", String(cfg.llm.delay ?? 0), "--think", String(cfg.llm.think ?? 0), "--chunk-delay", String(cfg.llm.chunkDelay ?? 0),
+    ...(cfg.llm.reply ? ["--reply", path.resolve(root, cfg.llm.reply)] : [])], {});
   await start(["server/serve.py", "--port", String(sp), "--no-browser"], { ...keys, MESH_SPLITTER_LLM_SETTINGS: settings, NO_PROXY: "127.0.0.1,localhost" });
   llmUrl = `http://127.0.0.1:${sp}`;
 }
@@ -100,9 +102,10 @@ await page.route("https://cdn.jsdelivr.net/npm/**", (r) => {
   const m = new URL(r.request().url()).pathname.match(/^\/npm\/((?:@[^/]+\/)?[^@/]+)@[^/]+\/(.*)$/);
   return m ? serve(r, path.join(nm, m[1], m[2])) : r.fulfill({ status: 404 });
 });
-await page.route(ORIGIN + "/**", (r) => {
+const origin = llmUrl || ORIGIN; // with "llm" the page comes from the local server's address, so /api/llm/* streams
+await page.route(origin + "/**", (r) => {
   const p = decodeURIComponent(new URL(r.request().url()).pathname);
-  if (llmUrl && p.startsWith("/api/llm/")) return r.fetch({ url: llmUrl + p }).then((res) => r.fulfill({ response: res }));
+  if (llmUrl && p.startsWith("/api/llm/")) return r.continue(); // to the local server, streamed progress and all
   if (p === "/api/llm/status") return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(cfg.llmStatus || { configured: false, source: null, model: "" }) });
   return serve(r, path.join(root, p.endsWith("/") ? p + "index.html" : p));
 });
@@ -341,7 +344,7 @@ const steps = {
 };
 const shots = new Map();
 
-await page.goto(`${ORIGIN}/app/index.html`);
+await page.goto(`${origin}/app/index.html`);
 await page.waitForFunction(() => window.app && window.__cur, null, { timeout: 60000 });
 if (cfg.css) await page.addStyleTag({ content: cfg.css });
 for (const [i, s] of cfg.steps.entries()) {

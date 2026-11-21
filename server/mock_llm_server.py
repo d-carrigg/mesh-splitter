@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """A tiny OpenAI-compatible server for testing AI part naming without a real model (like LM Studio, no key).
 
-    python server/mock_llm_server.py [--port 1234] [--reply reply.json] [--models a,b] [--delay S]
+    python server/mock_llm_server.py [--port 1234] [--reply reply.json] [--models a,b] [--delay S] [--think S]
     then use Custom or local, base URL http://127.0.0.1:1234/v1
 
 It answers GET /v1/models and POST /v1/chat/completions, naming every part id it finds in the stats
 "mock part N", or replying with --reply (a canned answer, as for the docs GIF: docs/demo/record.mjs).
+A request with "stream": true gets server-sent events, as LM Studio and OpenRouter send them: --think S
+streams reasoning for S seconds first, and "stall" (tests) sends only keep-alive comments and never answers.
 It records each request (path, auth header, image count) in .requests for tests.
 """
 import argparse
@@ -44,24 +46,65 @@ class Handler(BaseHTTPRequestHandler):
         stats = next((c["text"] for c in user if c.get("type") == "text" and c["text"].startswith("Part stats:")), "")
         ids = sorted({int(i) for i in re.findall(r'"id":(\d+)', stats)} - {0})
         self.server.requests.append({"path": self.path, "auth": self.headers.get("Authorization"),
-                                     "images": sum(c.get("type") == "image_url" for c in user), "model": body.get("model")})
+                                     "images": sum(c.get("type") == "image_url" for c in user), "model": body.get("model"),
+                                     "stream": bool(body.get("stream"))})
         reply = self.server.reply or {"object": "model review", "summary": "Mock reply.", "issues": [],
                                       "parts": [{"id": i, "name": f"mock part {i}", "confidence": 0.9} for i in ids]}
         time.sleep(self.server.delay)
+        if body.get("stream"):
+            return self._stream(body, reply)
         self._json(200, {"model": body.get("model") or self.server.models[0], "usage": {"prompt_tokens": 10, "completion_tokens": 20},
                          "choices": [{"message": {"role": "assistant", "content": "<think>ok</think>\n" + json.dumps(reply)}}]})
 
 
+    def _stream(self, body, reply):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        model = body.get("model") or self.server.models[0]
+
+        def send(raw):
+            self.wfile.write(raw.encode())
+            self.wfile.flush()
+
+        def chunk(delta, **extra):
+            send("data: " + json.dumps({"model": model, "choices": [{"index": 0, "delta": delta, **extra}]}) + "\n\n")
+
+        try:
+            if self.server.stall:
+                while not self.server.stopping.wait(0.2):
+                    send(": OPENROUTER PROCESSING\n\n")
+                return
+            t = time.monotonic()
+            while time.monotonic() - t < self.server.think:
+                chunk({"reasoning": "Looking at the views. "})
+                time.sleep(0.1)
+            text = "<think>ok</think>\n" + json.dumps(reply)
+            for i in range(0, len(text), 40):
+                chunk({"content": text[i:i + 40]})
+                time.sleep(self.server.chunk_delay)
+            chunk({}, finish_reason="stop")
+            send("data: " + json.dumps({"model": model, "choices": [],
+                                        "usage": {"prompt_tokens": 10, "completion_tokens": 20}}) + "\n\n")
+            send("data: [DONE]\n\n")
+        except (BrokenPipeError, ConnectionResetError):
+            self.server.aborted.append(self.path)  # the client cancelled
+
+
 @contextlib.contextmanager
-def running(port=0, reply=None, models=("mock-vision-1",), delay=0.0):
+def running(port=0, reply=None, models=("mock-vision-1",), delay=0.0, think=0.0, stall=False, chunk_delay=0.0):
     srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    srv.daemon_threads = True
     srv.requests, srv.reply, srv.models, srv.delay = [], reply, list(models), delay
+    srv.think, srv.stall, srv.chunk_delay, srv.aborted, srv.stopping = think, stall, chunk_delay, [], threading.Event()
     srv.base_url = f"http://127.0.0.1:{srv.server_address[1]}/v1"
     t = threading.Thread(target=srv.serve_forever, daemon=True)
     t.start()
     try:
         yield srv
     finally:
+        srv.stopping.set()
         srv.shutdown()
         srv.server_close()
 
@@ -72,9 +115,11 @@ if __name__ == "__main__":
     ap.add_argument("--reply", help="JSON file: the answer to give every naming request")
     ap.add_argument("--models", default="mock-vision-1", help="comma-separated model ids for /v1/models")
     ap.add_argument("--delay", type=float, default=0.0, help="seconds to wait before answering, like a real model")
+    ap.add_argument("--think", type=float, default=0.0, help="seconds of streamed reasoning before the answer")
+    ap.add_argument("--chunk-delay", type=float, default=0.0, help="seconds between streamed answer chunks")
     a = ap.parse_args()
     reply = json.load(open(a.reply, encoding="utf-8")) if a.reply else None
-    with running(a.port, reply, a.models.split(","), a.delay) as s:
+    with running(a.port, reply, a.models.split(","), a.delay, a.think, chunk_delay=a.chunk_delay) as s:
         print(f"Mock LLM at {s.base_url}  (Ctrl+C to stop)", flush=True)
         try:
             threading.Event().wait()

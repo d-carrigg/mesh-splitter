@@ -147,7 +147,19 @@
   #aiSet { display:flex; flex-direction:column; gap:6px; border:1px solid var(--line); border-radius:4px; padding:8px; margin-bottom:8px; }
   #aiSet label { display:grid; grid-template-columns:62px 1fr; gap:6px; align-items:center; }
   #aiSet select, #aiSet input { width:100%; background:var(--in); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:3px 5px; font:inherit; }
-  #aiModel, #aiNote { width:100%; background:var(--in); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:3px 5px; font:inherit; }
+  #aiNote { width:100%; background:var(--in); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:3px 5px; font:inherit; }
+  #aiSet .step { display:flex; flex-direction:column; gap:2px; }
+  #aiSet label.wide { grid-template-columns:1fr; gap:2px; }
+  #aiConn.ok { color:#5fd38d; } #aiConn.bad { color:#ff7b7b; } #aiConn.warn { color:#f5a623; }
+  #aiMain { display:flex; flex-direction:column; gap:6px; }
+  #aiUsing { display:flex; gap:6px; align-items:baseline; overflow-wrap:anywhere; }
+  #aiUsing #aiState { flex:1; }
+  button.link { background:none; border:0; padding:0; min-height:0; color:var(--acc); cursor:pointer; font:inherit; }
+  #aiBtn { justify-content:center; }
+  #aiProg { display:flex; flex-direction:column; gap:4px; border:1px solid var(--line); border-radius:4px; padding:6px 8px; }
+  #aiStop { align-self:flex-end; }
+  .spin { width:12px; height:12px; border-radius:50%; border:2px solid var(--line); border-top-color:var(--acc); animation:msSpin .8s linear infinite; flex:none; }
+  @keyframes msSpin { to { transform:rotate(360deg); } }
   #followRow:empty, #hitRow:empty, #stretchRow.hide, #stretchGapRow.hide { display:none !important; }
   #followRow .chip { display:inline-flex; align-items:center; gap:4px; padding:1px 6px; border:1px solid var(--line); border-radius:10px; }
   #followRow .chip button { padding:0 4px; min-width:0; min-height:0; border:0; background:none; color:var(--mute); }
@@ -323,24 +335,31 @@
     <div id="aiCard" class="float card" hidden>
       <div class="cardHead">
         <h2>Part names</h2>
-        <span id="aiState" class="small"></span>
-        <button id="aiGear" data-icon="gear" title="AI settings: provider, API key, model"></button>
         <button id="aiClose" data-icon="x" title="Close"></button>
       </div>
       <div id="aiSet" hidden>
+        <div class="step"><b>Connect an AI model</b><span class="small">Optional. Pictures of the split model go only to the provider you pick.</span></div>
         <label><span class="lbl">Provider</span><select id="aiProv"></select></label>
         <label id="aiUrlRow"><span class="lbl">Base URL</span><input id="aiUrl" list="aiUrls" placeholder="http://localhost:1234/v1" title="OpenAI-compatible base URL, ending in /v1. LM Studio: http://localhost:1234/v1 · Ollama: http://localhost:11434/v1"></label>
         <datalist id="aiUrls"><option value="http://localhost:1234/v1">LM Studio</option><option value="http://localhost:11434/v1">Ollama</option><option value="http://localhost:8080/v1">llama.cpp server</option></datalist>
-        <label><span class="lbl">API key</span><input id="aiKey" type="password" autocomplete="off" spellcheck="false"></label>
-        <div class="row" style="margin:0"><span id="aiKeyNote" class="small" style="flex:1"></span><button id="aiForget" title="Delete the saved key for this provider">Forget key</button><button id="aiSave" class="pri">Save</button></div>
-        <span class="small">Saved on this computer only. Requests go only to the provider above.</span>
-      </div>
-      <div class="row">
-        <input id="aiModel" list="aiModels" title="Model id (needs image input)" style="flex:1; width:auto">
+        <label id="aiKeyRow"><span class="lbl">API key</span><input id="aiKey" type="password" autocomplete="off" spellcheck="false"></label>
+        <span id="aiKeyNote" class="small"></span>
+        <label class="wide"><span class="lbl">Model (must accept images)</span><input id="aiModel" list="aiModels" spellcheck="false" title="Model id. It must accept images."></label>
         <datalist id="aiModels"></datalist>
-        <button id="aiBtn" class="pri" data-icon="sparkle" title="Render views + part stats, ask the vision model you set up to name parts and flag segmentation problems">Name parts</button>
+        <div id="aiConn" class="small" hidden></div>
+        <div class="row" style="margin:0"><button id="aiForget" title="Delete the saved key for this provider">Forget key</button><span style="flex:1"></span><button id="aiSetCancel">Cancel</button><button id="aiSave" class="pri" title="Save, then check that the provider answers and takes the key">Connect</button></div>
+        <span class="small">The key is saved on this computer only.</span>
       </div>
-      <input id="aiNote" type="text" placeholder="Hint, e.g. what the object is (optional)">
+      <div id="aiMain">
+        <div id="aiUsing" class="small"><span id="aiState"></span><button id="aiChange" class="link" title="Change provider, key or model">Change</button></div>
+        <input id="aiNote" type="text" placeholder="Hint, e.g. what the object is (optional)">
+        <button id="aiBtn" class="pri" data-icon="sparkle" title="Render views + part stats, ask the model to name parts and flag segmentation problems">Name parts</button>
+        <div id="aiProg" hidden>
+          <div class="row" style="margin:0"><span class="spin"></span><span id="aiStage" style="flex:1"></span><span id="aiTime" class="small"></span></div>
+          <div id="aiDetail" class="small"></div>
+          <button id="aiStop" data-icon="x" title="Stop waiting and cancel the request">Cancel</button>
+        </div>
+      </div>
       <div id="aiOut"></div>
     </div>
   </div>
@@ -385,7 +404,6 @@ THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
 const $ = (id) => document.getElementById(id);
 const ICONS = {
-  gear: '<path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/>',
   orbit: '<path d="M16.5 7.5C15.6 4.2 14 2 12 2 9.2 2 7 6.5 7 12s2.2 10 5 10c.3 0 .7-.1 1-.2"/><path d="m15.2 13.7 3.8 1.9-1.9 3.8"/><path d="M19 15.6c-1.8.9-4.3 1.4-7 1.4-5.5 0-10-2.2-10-5s4.5-5 10-5c4.8 0 8.9 1.7 9.8 4"/>',
   seed: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
   fill: '<path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/>',
@@ -1968,7 +1986,7 @@ function renderPaintSw() {
   box.appendChild(add);
 }
 // review card
-const showAi = (on) => { $("aiCard").hidden = !on; $("aiToggle").classList.toggle("on", on); };
+const showAi = (on) => { $("aiCard").hidden = !on; $("aiToggle").classList.toggle("on", on); if (on && LLM.st && !LLM.st.configured && !LLM.job) llmSettings(true); };
 $("aiToggle").onclick = () => showAi($("aiCard").hidden);
 $("aiClose").onclick = () => showAi(false);
 $("fileIn").onchange = async () => { const f = $("fileIn").files[0]; if (f) openFile(f); };
@@ -2673,7 +2691,7 @@ let lastNaming = null;
 // Where AI naming requests go: inside OrcaSlicer the plugin makes them (window.orca messages); in the browser the
 // local server does (/api/llm/*). Either way the page never holds the saved key, and nothing is sent until a click.
 const IN_ORCA = !!(window.orca && window.orca.postMessage);
-const LLM = { st: null, wait: new Map(), seq: 0, models: {} };
+const LLM = { st: null, wait: new Map(), prog: new Map(), seq: 0, models: {}, job: null, warned: "" };
 function llmAsk(msgs, key, ms = 30000) { // plugin round trip: resolves with the reply that carries `key`
   return new Promise((res, rej) => {
     LLM.wait.set(key, res); for (const m of msgs) window.orca.postMessage(m);
@@ -2681,7 +2699,9 @@ function llmAsk(msgs, key, ms = 30000) { // plugin round trip: resolves with the
   });
 }
 function llmReply(m) { // called from the plugin bridge for llm_* messages
+  if (m.cmd === "llm_progress") { LLM.prog.get(m.id)?.(m); return; }
   const key = m.cmd === "llm_result" ? m.id : m.cmd, f = LLM.wait.get(key);
+  if (m.cmd === "llm_result") LLM.prog.delete(m.id);
   if (f) { LLM.wait.delete(key); f(m); }
 }
 async function llmApi(path, body) {
@@ -2690,23 +2710,48 @@ async function llmApi(path, body) {
 }
 const llmGetStatus = () => IN_ORCA ? llmAsk([{ cmd: "llm_status" }], "llm_status") : llmApi("/api/llm/status");
 const llmSaveSettings = (settings) => IN_ORCA ? llmAsk([{ cmd: "llm_settings", settings }], "llm_status") : llmApi("/api/llm/settings", settings);
-const llmModels = () => (IN_ORCA ? llmAsk([{ cmd: "llm_models" }], "llm_models") : llmApi("/api/llm/models")).then((j) => j.models || []).catch(() => []);
-function llmSendName(body) {
-  if (!IN_ORCA) return llmApi("/api/llm/name-parts", body);
+// Connection test: reaches the provider, checks the key and the model (no model data sent). 60 s: OrcaSlicer may ask first.
+const llmTest = () => (IN_ORCA ? llmAsk([{ cmd: "llm_test" }], "llm_test", 60000) : llmApi("/api/llm/test")).catch((e) => ({ ok: false, error: e.message, models: [] }));
+const PAGE_LIMIT = 16 * 60000; // the plugin / server always answers within its own limit (15 min for a local model)
+// One naming request. onProgress gets {stage, chars, reasoning, bytes}; signal (an AbortController's) cancels it.
+async function llmSendName(body, onProgress, signal) {
+  const cancelled = { ok: false, cancelled: true, error: "Cancelled" };
+  if (!IN_ORCA) {
+    let r;
+    try { r = await fetch("/api/llm/name-parts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal }); }
+    catch (e) { if (signal.aborted) return cancelled; throw e; }
+    if (!r.body || !(r.headers.get("Content-Type") || "").includes("ndjson")) return r.json().catch(() => ({ ok: false, error: `HTTP ${r.status}` }));
+    const rd = r.body.getReader(), dec = new TextDecoder(); let buf = "", last = null;
+    try {
+      for (;;) {
+        const { value, done } = await rd.read(); if (done) break;
+        buf += dec.decode(value, { stream: true }); let i;
+        while ((i = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1); if (!line) continue;
+          const m = JSON.parse(line); if (m.progress) onProgress({ ...m, stage: m.progress }); else last = m;
+        }
+      }
+    } catch (e) { if (signal.aborted) return cancelled; throw e; }
+    return last || { ok: false, error: "The local server closed the connection without an answer" };
+  }
   const t = JSON.stringify(body), id = `n${Date.now().toString(36)}-${++LLM.seq}`, n = Math.max(1, Math.ceil(t.length / (512 * 1024)));
   const parts = Array.from({ length: n }, (_, i) => ({ cmd: "llm_name", id, part: i, of: n, data: t.slice(i * 512 * 1024, (i + 1) * 512 * 1024) }));
-  return llmAsk(parts, id, 330000);
+  LLM.prog.set(id, onProgress);
+  signal.addEventListener("abort", () => {
+    window.orca.postMessage({ cmd: "llm_cancel", id });
+    LLM.prog.delete(id); const f = LLM.wait.get(id); if (f) { LLM.wait.delete(id); f(cancelled); }
+  });
+  try { return await llmAsk(parts, id, PAGE_LIMIT); }
+  catch (e) { LLM.prog.delete(id); window.orca.postMessage({ cmd: "llm_cancel", id }); throw e; }
 }
+const llmWho = (j) => j.provider === "custom" ? (j.base_url || "").replace(/^https?:\/\//, "") : j.label;
 function llmShow(j) {
   LLM.st = j;
-  const ready = j.configured, who = j.provider === "custom" ? (j.base_url || "").replace(/^https?:\/\//, "") : j.label;
-  $("aiState").textContent = ready ? who : j.needs_key ? `${j.label}: no key` : "not set up";
-  $("aiState").title = ready ? `${j.label}${j.has_key ? ` · key ${j.source === "saved" ? "saved" : `from ${j.key_note || j.source}`}` : ""}` : "Click the settings button to pick a provider";
-  let m = null; try { m = localStorage.getItem(`meshsplit:model:${j.provider}`); } catch {}
-  $("aiModel").value = m || j.model || "";
-  $("aiModel").placeholder = j.provider === "custom" ? "model id (blank: the loaded model)" : "model id";
+  $("aiState").innerHTML = j.configured ? `${esc(llmWho(j))} · <b style="color:var(--fg)">${esc(j.model || "the loaded model")}</b>` : "No AI model connected yet.";
+  $("aiState").title = j.configured ? `${j.label}${j.has_key ? ` · key ${j.source === "saved" ? "saved" : `from ${j.key_note || j.source}`}` : ""}` : "";
+  $("aiChange").textContent = j.configured ? "Change" : "Connect";
+  $("aiBtn").disabled = !j.configured;
   llmFillModels(j.provider);
-  if (!$("aiSet").hidden) llmFillSettings(j.provider);
   return j;
 }
 const MODEL_HINTS = {
@@ -2715,6 +2760,8 @@ const MODEL_HINTS = {
   anthropic: ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
   custom: [],
 };
+const KEY_HELP = { openrouter: "Get a key at openrouter.ai/keys", openai: "Get a key at platform.openai.com/api-keys",
+  anthropic: "Get a key at console.anthropic.com", custom: "LM Studio, Ollama and other OpenAI-compatible servers. Key optional." };
 function llmFillModels(pid) {
   const list = [...new Set([...(MODEL_HINTS[pid] || []), ...(LLM.models[pid] || [])])];
   $("aiModels").innerHTML = list.map((m) => `<option value="${esc(m)}">`).join("");
@@ -2727,36 +2774,56 @@ function llmFillSettings(pid) {
   $("aiKey").value = "";
   const hasKey = cur && j.has_key;
   $("aiKey").placeholder = hasKey ? (j.source === "saved" ? "saved (type to replace)" : `set by ${j.key_note || j.source}`) : p.needs_key ? "paste your API key" : "optional";
-  $("aiKeyNote").textContent = p.id === "custom" ? "LM Studio, Ollama and other OpenAI-compatible servers" : "";
+  $("aiKeyNote").textContent = KEY_HELP[p.id] || "";
+  $("aiModel").value = cur ? j.model : p.model;
+  $("aiModel").placeholder = p.id === "custom" ? "blank: the model loaded in the server" : "model id";
   $("aiForget").hidden = !(hasKey && j.source === "saved");
+  llmFillModels(p.id); llmConnNote("");
+}
+function llmConnNote(text, kind = "") { $("aiConn").hidden = !text; $("aiConn").textContent = text; $("aiConn").className = `small ${kind}`; }
+function llmSettings(on) {
+  if (on && !LLM.st) return;
+  $("aiSet").hidden = !on; $("aiMain").hidden = on;
+  if (on) { llmFillSettings(LLM.st.provider); $("aiSetCancel").hidden = !LLM.st.configured; LLM.warned = ""; (LLM.st.needs_key && !LLM.st.has_key ? $("aiKey") : $("aiModel")).focus(); }
 }
 async function llmStatus() {
-  if (!IN_ORCA && location.protocol === "file:") { $("aiState").textContent = "needs uv run mesh-splitter"; return { configured: false }; }
+  if (!IN_ORCA && location.protocol === "file:") { $("aiState").textContent = "AI naming needs the local server: uv run mesh-splitter"; $("aiBtn").disabled = true; $("aiChange").hidden = true; return { configured: false }; }
   try { return llmShow(await llmGetStatus()); }
-  catch { $("aiState").textContent = IN_ORCA ? "plugin not answering" : "server offline"; return { configured: false }; }
+  catch { $("aiState").textContent = IN_ORCA ? "The plugin is not answering. Reopen the Mesh Splitter tab." : "The local server is not running."; return { configured: false }; }
 }
+// Connect: save the settings, then test them. Closes on success; a warning (e.g. unknown model) closes on the second click.
 async function llmSave(extra = {}) {
   const pid = $("aiProv").value, patch = { provider: pid, model: $("aiModel").value.trim(), ...extra };
   if (pid === "custom") patch.base_url = $("aiUrl").value.trim();
   if ($("aiKey").value.trim()) patch.api_key = $("aiKey").value.trim();
-  if (LLM.st && pid !== LLM.st.provider) patch.model = (LLM.st.providers.find((x) => x.id === pid) || {}).model || "";
+  const sig = JSON.stringify([patch.provider, patch.model, patch.base_url]);
   const j = await llmSaveSettings(patch).catch((e) => ({ ok: false, error: e.message }));
-  if (j.ok === false) { status(`AI settings: ${j.error}`); alert(j.error); return; }
-  $("aiKey").value = ""; llmShow(j); status(`AI naming uses ${j.provider === "custom" ? j.base_url : j.label}`);
-  if (j.configured) llmModels().then((ms) => { LLM.models[j.provider] = ms; llmFillModels(j.provider); if (!$("aiModel").value && ms.length === 1) $("aiModel").value = ms[0]; });
+  if (j.ok === false) { llmConnNote(j.error, "bad"); return; }
+  $("aiKey").value = ""; llmShow(j); llmFillSettings(j.provider); $("aiSetCancel").hidden = !j.configured;
+  if (extra.clear_key) { llmConnNote("Key deleted.", ""); return; }
+  if (!j.configured) { llmConnNote(`Paste your ${j.label} API key, then click Connect.`, "bad"); $("aiKey").focus(); return; }
+  if (LLM.warned === sig) { llmSettings(false); return; }
+  llmConnNote(`Checking ${llmWho(j)}…${IN_ORCA ? " Click Yes if OrcaSlicer asks to allow the connection." : ""}`);
+  $("aiSave").disabled = true;
+  const t = await llmTest(); $("aiSave").disabled = false;
+  if (t.models?.length) { LLM.models[j.provider] = t.models; llmFillModels(j.provider); }
+  if (!t.ok) { llmConnNote(t.error || "Could not connect.", "bad"); return; }
+  if (t.warning) { LLM.warned = sig; llmConnNote(`${t.warning} Click Connect again to use it anyway.`, "warn"); return; }
+  llmConnNote(`Connected to ${llmWho(j)}.`, "ok"); status(`AI naming uses ${llmWho(j)} · ${j.model || "the loaded model"}`);
+  setTimeout(() => { if (!$("aiSet").hidden && $("aiConn").classList.contains("ok")) llmSettings(false); }, 700);
 }
-$("aiGear").onclick = () => { const on = $("aiSet").hidden; $("aiSet").hidden = !on; $("aiGear").classList.toggle("on", on); if (on && LLM.st) llmFillSettings(LLM.st.provider); };
-$("aiProv").onchange = () => llmFillSettings($("aiProv").value);
+$("aiChange").onclick = () => llmSettings(true);
+$("aiSetCancel").onclick = () => llmSettings(false);
+$("aiProv").onchange = () => { llmFillSettings($("aiProv").value); $("aiSetCancel").hidden = !LLM.st.configured; };
 $("aiSave").onclick = () => llmSave();
 $("aiForget").onclick = () => llmSave({ clear_key: true });
-$("aiModel").onchange = () => { try { localStorage.setItem(`meshsplit:model:${LLM.st?.provider || "openrouter"}`, $("aiModel").value.trim()); } catch {} };
+for (const id of ["aiKey", "aiUrl", "aiModel"]) $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") llmSave(); });
 
 const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 function renderNaming(R) {
   const o = $("aiOut"), nP = S.parts.length; o.innerHTML = "";
   const ai = R.ai, add = (h) => o.insertAdjacentHTML("beforeend", h);
   if (R.error) add(`<div class="iss high">${esc(R.error)}${R.raw ? `<div class="fix">${esc(R.raw.slice(0, 300))}</div>` : ""}</div>`);
-  if (R.pending) add(`<div class="small">Asking ${esc(R.model)}…</div>`);
   if (ai?.object || ai?.summary) add(`<div class="small" style="margin-top:4px"><b style="color:var(--fg)">${esc(ai.object || "")}</b> ${esc(ai.summary || "")}</div>`);
   const names = (ai?.parts || []).filter((p) => Number.isInteger(p.id) && p.id > 0 && p.id < nP && p.name);
   if (names.length) {
@@ -2800,28 +2867,49 @@ function runChecks() {
   if (!S.G) return;
   const st = partStats(); renderNaming({ checks: localChecks(st) }); status("Local checks done");
 }
+const mmss = (ms) => { const t = Math.floor(ms / 1000); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`; };
+function aiProgress(job) { // the progress box: what is happening now, for how long, and Cancel
+  const st = LLM.st || {}, who = llmWho(st), m = job.m || {}, secs = (Date.now() - job.since) / 1000;
+  const text = {
+    upload: "Handing the pictures to the plugin…",
+    permission: "Asking OrcaSlicer to allow the connection…",
+    sending: `Sending ${m.bytes ? `${(m.bytes / 1048576).toFixed(1)} MB ` : ""}to ${who}…`,
+    waiting: "Waiting for the model to start answering…",
+    thinking: "The model is thinking…",
+    writing: "Receiving part names…",
+  }[job.stage] || "Working…";
+  const detail = job.stage === "permission" ? "Click Yes if OrcaSlicer asks."
+    : job.stage === "thinking" ? `${(m.reasoning || 0).toLocaleString()} characters of reasoning so far.`
+    : job.stage === "writing" ? `${(m.chars || 0).toLocaleString()} characters received.`
+    : job.stage === "waiting" && secs > 20 ? `Connected. ${st.provider === "custom" ? "A local model can take a few minutes to read the pictures." : "Larger models can take a minute or two."}`
+    : "";
+  $("aiStage").textContent = text; $("aiDetail").textContent = detail; $("aiTime").textContent = mmss(Date.now() - job.t0);
+}
 async function runNaming() {
-  if (!S.G) return;
-  const model = $("aiModel").value.trim();
-  if (LLM.st && !LLM.st.configured) { showAi(true); $("aiSet").hidden = false; llmFillSettings(LLM.st.provider); status("Set up a provider for AI naming first"); return; }
-  $("busy").textContent = "Rendering views…"; busy(true);
+  if (!S.G || LLM.job) return;
+  if (LLM.st && !LLM.st.configured) { showAi(true); llmSettings(true); return; }
+  const model = LLM.st?.model || "", ac = new AbortController();
+  const job = LLM.job = { t0: Date.now(), since: Date.now(), stage: "upload", ac };
+  $("aiBtn").disabled = true; $("aiProg").hidden = false; $("aiStage").textContent = "Rendering views…"; $("aiDetail").textContent = ""; $("aiTime").textContent = "";
   await new Promise((r) => setTimeout(r, 30));
   let st, cap;
   try { st = partStats(); cap = captureForNaming(st); }
-  catch (e) { console.error(e); busy(false); $("busy").textContent = "Working…"; alert(e.message); return; }
+  catch (e) { console.error(e); LLM.job = null; $("aiProg").hidden = true; $("aiBtn").disabled = false; renderNaming({ error: e.message }); return; }
   const checks = localChecks(st);
-  const who = model || "the local model";
-  renderNaming({ checks, pending: true, model: who, images: cap.images });
-  $("busy").textContent = `Asking ${who}…`;
+  renderNaming({ checks, images: cap.images });
+  const tick = setInterval(() => aiProgress(job), 500); aiProgress(job);
+  const onProgress = (m) => { if (m.stage !== job.stage) job.since = Date.now(); job.stage = m.stage; job.m = m; aiProgress(job); };
   try {
-    const j = await llmSendName({ model, images: cap.images, captions: cap.captions, stats: statsForLLM(st), hint: $("aiNote").value });
+    const j = await llmSendName({ model, images: cap.images, captions: cap.captions, stats: statsForLLM(st), hint: $("aiNote").value }, onProgress, ac.signal);
     lastNaming = j;
-    if (!j.ok) renderNaming({ checks, error: j.error, raw: j.raw, images: cap.images });
-    else { renderNaming({ checks, ai: j.result, images: cap.images, usage: j.usage }); status(`Named by ${j.model}`); }
+    if (j.cancelled) { renderNaming({ checks, images: cap.images }); status("AI naming cancelled"); }
+    else if (!j.ok) { renderNaming({ checks, error: j.error, raw: j.raw, images: cap.images }); status("AI naming failed"); }
+    else { renderNaming({ checks, ai: j.result, images: cap.images, usage: j.usage }); status(`Named by ${j.model} in ${mmss(Date.now() - job.t0)}`); }
   } catch (e) {
-    renderNaming({ checks, error: `${IN_ORCA ? "Plugin" : "Server"} unreachable: ${e.message}`, images: cap.images });
-  } finally { busy(false); $("busy").textContent = "Working…"; }
+    renderNaming({ checks, error: IN_ORCA ? `No answer from the plugin (${e.message}). Reopen the Mesh Splitter tab and try again.` : `The local server stopped answering: ${e.message}`, images: cap.images });
+  } finally { clearInterval(tick); LLM.job = null; $("aiProg").hidden = true; $("aiBtn").disabled = !LLM.st?.configured; }
 }
+$("aiStop").onclick = () => LLM.job?.ac.abort();
 $("aiBtn").onclick = runNaming;
 $("aiChk").onclick = () => { if (S.G) { showAi(true); runChecks(); } };
 

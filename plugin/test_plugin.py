@@ -173,7 +173,7 @@ class AiNamingTests(unittest.TestCase):
         self.sent, self.audits = [], []
         self.p.ask_network_permission = self.audits.append
         self.b = self.p.Bridge(self.sent.append)
-        self.b.run_async = lambda work, on_error: self.sent.append(work())  # run inline
+        self.b.run_async = lambda work, on_error, done=None: (done or self.sent.append)(work())  # run inline
 
     def test_settings_round_trip_without_leaking_key(self):
         self.b.handle({"cmd": "llm_status"})
@@ -190,8 +190,8 @@ class AiNamingTests(unittest.TestCase):
     def test_name_parts_against_local_server(self):
         with mock_llm_server.running() as srv:
             self.b.handle({"cmd": "llm_settings", "settings": {"provider": "custom", "base_url": srv.base_url}})
-            self.b.handle({"cmd": "llm_models"})
-            self.assertEqual(self.sent[-1], {"cmd": "llm_models", "models": ["mock-vision-1"]})
+            self.b.handle({"cmd": "llm_test"})
+            self.assertEqual(self.sent[-1], {"cmd": "llm_test", "ok": True, "models": ["mock-vision-1"]})
             body = json.dumps({"model": "", "images": ["data:image/jpeg;base64,AAAA"], "captions": ["front"],
                                "stats": {"parts": [{"id": 0}, {"id": 1}, {"id": 2}]}})
             half = len(body) // 2
@@ -201,16 +201,39 @@ class AiNamingTests(unittest.TestCase):
             out = self.sent[-1]
             self.assertEqual((out["cmd"], out["id"], out["ok"]), ("llm_result", "j1", True), out)
             self.assertEqual([x["name"] for x in out["result"]["parts"]], ["mock part 1", "mock part 2"])
+            stages = [m["stage"] for m in self.sent if m["cmd"] == "llm_progress"]
+            self.assertEqual(list(dict.fromkeys(stages)), ["permission", "sending", "waiting", "writing"])
             self.assertEqual(self.audits, [srv.base_url + "/models", srv.base_url + "/chat/completions"])
-            self.assertEqual(self.b.llm_jobs, {})
+            self.assertEqual((self.b.llm_jobs, self.b.llm_running), ({}, {}))
+
+    def test_cancel_stops_a_stalled_request(self):
+        """A server that never answers: Cancel answers the page at once and shuts the connection."""
+        import threading
+        self.b.run_async = self.p.Bridge.run_async.__get__(self.b)  # real worker thread
+        lock = threading.Lock()
+        self.b.send = lambda m: (lock.acquire(), self.sent.append(m), lock.release())
+        with mock_llm_server.running(stall=True) as srv:
+            self.b.handle({"cmd": "llm_settings", "settings": {"provider": "custom", "base_url": srv.base_url}})
+            self.b.handle({"cmd": "llm_name", "id": "j3", "part": 0, "of": 1, "data": json.dumps({"images": []})})
+            for _ in range(100):
+                if any(m.get("stage") == "waiting" for m in self.sent):
+                    break
+                threading.Event().wait(0.05)
+            self.b.handle({"cmd": "llm_cancel", "id": "j3"})
+            self.assertEqual(self.sent[-1], {"cmd": "llm_result", "id": "j3", "ok": False, "cancelled": True,
+                                             "error": "Cancelled"})
+            n = len(self.sent)
+            threading.Event().wait(0.5)
+        self.assertEqual(self.sent[n:], [])  # the worker's late result is dropped
+        self.assertEqual(self.b.llm_running, {})
 
     def test_denied_permission_reported(self):
         def deny(url):
-            raise RuntimeError("audit permission required")
+            raise PermissionError("audit permission required")
         self.p.ask_network_permission = deny
         self.b.handle({"cmd": "llm_name", "id": "j2", "part": 0, "of": 1, "data": "{}"})
         self.assertEqual((self.sent[-1]["cmd"], self.sent[-1]["ok"]), ("llm_result", False))
-        self.assertIn("permission", self.sent[-1]["error"])
+        self.assertIn("click Yes", self.sent[-1]["error"])
 
 
 class RegistrationTests(unittest.TestCase):

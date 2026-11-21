@@ -15,8 +15,9 @@ the real `orca` bindings (no fakes) and writes what it saw to $MESH_SPLITTER_PRO
   - the Mesh Splitter module loaded and its page decodes
   - "objects" lists the plate objects, "mesh" returns the right world-space mesh
   - the Mesh Splitter 3MF (made by e2e.mjs) imported as one object with one part per split part
-  - AI part naming: settings saved, then a naming request sent from OrcaSlicer's Python (worker thread,
-    urllib) to the mock OpenAI-compatible server at $MESH_SPLITTER_MOCK_LLM, as with LM Studio
+  - AI part naming: settings saved, a connection test, then a naming request sent from OrcaSlicer's Python
+    (worker thread, urllib, streamed) to the mock OpenAI-compatible server at $MESH_SPLITTER_MOCK_LLM, as with
+    LM Studio, with its progress messages; and Cancel of a request to $MESH_SPLITTER_MOCK_LLM_STALL (never answers)
 """
 import base64
 import json
@@ -84,13 +85,31 @@ def probe():
             got = []
             ai = mod.Bridge(got.append)
             ai.handle({"cmd": "llm_settings", "settings": {"provider": "custom", "base_url": llm}})
+
+            def wait_for(pred, secs=30):
+                t = time.time()
+                while time.time() - t < secs and not any(pred(m) for m in list(got)):
+                    time.sleep(0.1)
+                return next((m for m in list(got) if pred(m)), None)
+            ai.handle({"cmd": "llm_test"})
+            test = wait_for(lambda m: m.get("cmd") == "llm_test")
             body = json.dumps({"images": ["data:image/jpeg;base64,AAAA"], "captions": ["front"],
                                "stats": {"parts": [{"id": 1}, {"id": 2}]}})
             ai.handle({"cmd": "llm_name", "id": "ci", "part": 0, "of": 1, "data": body})
-            t = time.time()
-            while time.time() - t < 30 and not any(m.get("cmd") == "llm_result" for m in got):
-                time.sleep(0.2)
-            r["ai"] = {"status": got[0], "result": next((m for m in got if m.get("cmd") == "llm_result"), None)}
+            result = wait_for(lambda m: m.get("cmd") == "llm_result" and m.get("id") == "ci")
+            stages = list(dict.fromkeys(m["stage"] for m in got if m.get("cmd") == "llm_progress" and m.get("id") == "ci"))
+            r["ai"] = {"status": got[0], "test": test, "result": result, "stages": stages}
+
+            ai.handle({"cmd": "llm_settings", "settings": {"provider": "custom", "base_url": os.environ["MESH_SPLITTER_MOCK_LLM_STALL"]}})
+            ai.handle({"cmd": "llm_name", "id": "stall", "part": 0, "of": 1, "data": body})
+            wait_for(lambda m: m.get("id") == "stall" and m.get("stage") == "waiting", 15)
+            t0 = time.time()
+            ai.handle({"cmd": "llm_cancel", "id": "stall"})
+            res = wait_for(lambda m: m.get("cmd") == "llm_result" and m.get("id") == "stall", 10)
+            secs = round(time.time() - t0, 2)
+            time.sleep(1)
+            late = [m for m in got if m.get("cmd") == "llm_result" and m.get("id") == "stall"][1:]
+            r["ai"]["cancel"] = {"result": res, "seconds": secs, "late": late, "running": list(ai.llm_running)}
         r["ok"] = True
     except Exception as e:
         r["error"] = f"{e}\n{traceback.format_exc()}"
