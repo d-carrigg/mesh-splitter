@@ -19,6 +19,7 @@ nav:
   - Move, rotate, scale and heal: features/transforms.md
   - Exporting: features/exporting.md
   - Command line: features/command-line.md
+  - Claude Code plugin: features/claude-code.md
   - Examples: examples.md
   - How it works: how-it-works.md
 theme:

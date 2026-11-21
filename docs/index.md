@@ -14,6 +14,7 @@ For the example photo, I made the eyes 1 part, then replaced them with a flipped
 - **[Move, rotate, scale and heal](features/transforms.md):** handles, snapping, undo, rotate on joint, heal joint, fill and anchor
 - **[Exporting](features/exporting.md):** Send to Orca, painted 3MF, part STLs, merged STL
 - **[Command line](features/command-line.md):** split and export from a script with `uv run mesh-splitter split`
+- **[Claude Code plugin](features/claude-code.md):** ask Claude Code to split and export a model for you
 - **[How it works](how-it-works.md):** the splitting algorithm, the shared core, and the math behind joint transforms
 
 ## Install in OrcaSlicer
