@@ -1,8 +1,9 @@
 """AI part naming: provider settings and one request to the provider the user picked.
 
-Shared by the local server (server/llm_review.py) and the OrcaSlicer plugin (plugin/build.py inlines this file),
-so both send the same request. Standard library only. Nothing here runs unless the user clicks Connect (connection test) or Name parts, and
-the request goes only to the chosen provider's base URL.
+Used by the OrcaSlicer plugin (plugin/build.py inlines this file) and by the separate Mesh Splitter web app's
+backend (server/llm_review.py, not part of the plugin), so both send the same request. Standard library only.
+Nothing here runs unless the user clicks Connect (connection test) or Name parts, and the request goes only to
+the chosen provider's base URL.
 
 Providers:
   openrouter  https://openrouter.ai/api/v1   OpenAI-style chat completions, key required
@@ -366,7 +367,7 @@ def call(cfg, body, opener=None, progress=None, cancel=None, on_response=None):
     opener = opener or opener_for(url)
     start = clock()
     st = Stream(cfg, progress)
-    hint = " Is the local server running?" if cfg["provider"] == "custom" else ""
+    hint = " Is your model app (LM Studio, Ollama, ...) running?" if cfg["provider"] == "custom" else ""
     try:
         progress("sending", {"bytes": len(req.data)})
         with opener(req, timeout=lim["first_byte"]) as r:
@@ -461,7 +462,7 @@ def check(cfg, opener=None):
         detail = error_detail(e.read().decode("utf-8", "replace"))
         return {"ok": False, "error": f"{name} HTTP {e.code}: {str(detail)[:300]}", "models": []}
     except (urllib.error.URLError, OSError, ValueError) as e:
-        hint = " Is the local server running?" if cfg["provider"] == "custom" else ""
+        hint = " Is your model app (LM Studio, Ollama, ...) running?" if cfg["provider"] == "custom" else ""
         return {"ok": False, "error": f"Can't reach {name}: {getattr(e, 'reason', e)}.{hint}", "models": []}
     models = sorted({str(m.get("id")) for m in data if isinstance(m, dict) and m.get("id")})[:500]
     out = {"ok": True, "models": models}

@@ -17,7 +17,7 @@ file (dist/mesh_splitter_any.py) from Plugins > Install local plugin, then tick 
   page --orca.postMessage({cmd: 'mesh', index})----------> plugin: world-space mesh, base64 chunks
   page --orca.postMessage({cmd: 'save', id, name, ...})--> plugin: write the file to Downloads
   page --orca.postMessage({cmd: 'llm_*', ...})-----------> plugin: AI part naming settings / one request, only when
-                                                           the user clicks (llm_providers below, from server/)
+                                                           the user clicks (llm_providers below)
 
 Internet access: only AI part naming connects, and only when the user clicks Connect or Name parts. It sends the
 part images and stats to the provider the user picked (OpenRouter, OpenAI, Anthropic, or a base URL they enter,
@@ -44,15 +44,19 @@ try:
 except Exception:  # numpy is declared above; uv installs it when the plugin loads
     np = None
 
-from llm_providers import abort as llm_abort, call as llm_call, check as llm_check, resolve as llm_resolve, status as llm_status, update as llm_update  # noqa: E402  __LLM_PROVIDERS__
+from llm_providers import PROVIDERS as LLM_PROVIDERS, abort as llm_abort, call as llm_call, check as llm_check, resolve as llm_resolve, status as llm_status, update as llm_update  # noqa: E402  __LLM_PROVIDERS__
 
 # The plugin's page: app/index.html with three.js, three-mesh-bvh and fflate, bundled and minified by esbuild,
 # then zlib-compressed and base64-encoded by plugin/build.py (the plain page is about 0.9 MB). page_html()
 # decodes it and OrcaSlicer shows it in the Mesh Splitter tab. Source: app/ in github.com/d-carrigg/mesh-splitter.
 # To read it, rebuild the same page from source: python plugin/build.py --page-out page.html
-# Inside OrcaSlicer the page sends every request through this plugin (window.orca.postMessage); its fetch() calls
-# are only for the standalone web app's local server.
+# Inside OrcaSlicer the page sends every request through this plugin (window.orca.postMessage). Its fetch() calls
+# are used only when the same page runs as the separate Mesh Splitter web app, never inside OrcaSlicer.
 PAGE_Z = "__PAGE_Z__"
+
+# The built-in AI naming providers (PROVIDERS in llm_providers): the only internet hosts the plugin connects to
+# besides a custom base URL the user enters.
+AI_PROVIDER_HOSTS = ("https://openrouter.ai", "https://api.openai.com", "https://api.anthropic.com")
 CHUNK = 512 * 1024
 
 
@@ -407,7 +411,16 @@ class OpenMeshSplitter(orca.script.ScriptPluginCapabilityBase):
 @orca.plugin
 class MeshSplitterPlugin(orca.base):
     def register_capabilities(self):
-        orca.request_permissions(fs_readwrite=[os.path.join(downloads_dir(), "*")])
+        # Declared up front, so OrcaSlicer asks the user once, at install, in one prompt:
+        #  - write files in ~/Downloads: Send to Orca saves the split 3MF there
+        #  - connect to the AI naming providers' hosts (used only when the user clicks Connect or Name parts)
+        #  - start background threads: AI naming runs its request off the UI thread
+        # A custom AI base URL the user types in later is asked for by OrcaSlicer when it is first used.
+        orca.request_permissions(
+            fs_readwrite=[os.path.join(downloads_dir(), "*")],
+            network=list(AI_PROVIDER_HOSTS),
+            threading=True,
+        )
         storage_dir()
         orca.register_capability(MeshSplitterPage)
         orca.register_capability(OpenMeshSplitter)

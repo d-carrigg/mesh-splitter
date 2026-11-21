@@ -237,13 +237,21 @@ class AiNamingTests(unittest.TestCase):
 
 
 class RegistrationTests(unittest.TestCase):
-    def test_requests_downloads_only_write_permission(self):
+    def test_declares_downloads_ai_hosts_and_threads_at_load(self):
         p = load_plugin([])
         import orca
         with mock.patch.object(os.path, "expanduser", return_value=os.path.join("C:", "Users", "d")):
             p.MeshSplitterPlugin().register_capabilities()
         st = orca._state
-        self.assertEqual(st["permissions"], [{"fs_readwrite": [os.path.join("C:", "Users", "d", "Downloads", "*")]}])
+        self.assertEqual(st["permissions"], [{
+            "fs_readwrite": [os.path.join("C:", "Users", "d", "Downloads", "*")],
+            "network": ["https://openrouter.ai", "https://api.openai.com", "https://api.anthropic.com"],
+            "threading": True}])
+
+    def test_declared_hosts_cover_every_builtin_provider(self):
+        p = load_plugin([])
+        cloud = {p.network_origin(d["base_url"]) for d in p.LLM_PROVIDERS.values() if d["needs_key"]}
+        self.assertEqual(cloud, set(p.AI_PROVIDER_HOSTS))
 
     def test_window_and_page_share_bridge(self):
         p = load_plugin([fake_orca.FakeObject("cube", [fake_orca.FakeVolume(TET_V, TET_F)])])
