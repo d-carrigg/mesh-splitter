@@ -3,11 +3,11 @@
 !!! info "Privacy: opt-in only, sent only to the provider you choose"
 
     - **Opt-in only.** No model data is sent until you connect a provider and click **Name parts**. Splitting, **Check** and everything else run on your machine.
-    - **Sent only to the provider you choose.** Requests go straight from your computer (the OrcaSlicer plugin or your local server) to that provider: OpenAI, OpenRouter, Anthropic, or the base URL you enter. Their data policies apply. OpenRouter passes requests on to the model you pick.
+    - **Sent only to the provider you choose.** Requests go straight from your computer (the OrcaSlicer plugin, your local server, or your browser in the hosted app) to that provider: OpenAI, OpenRouter, Anthropic, or the base URL you enter. Their data policies apply. OpenRouter passes requests on to the model you pick.
     - **Fully local option.** With a local server such as LM Studio or Ollama, nothing leaves your computer.
     - **Not shared with anyone else.** Your models and info are never sent to the Mesh Splitter developer, OrcaSlicer or any other provider. There is no telemetry.
     - **What is sent:** rendered pictures of the split model, each part's stats and your optional hint. The mesh file itself is not sent. **Connect** only checks your key and asks the provider for its list of models (no model data).
-    - **Your key stays on your computer**, in a settings file only Mesh Splitter reads. It is never shown to the page.
+    - **Your key stays on your computer**, in a settings file only Mesh Splitter reads. It is never shown to the page. In the hosted web app (no local server), the key is saved in that browser's storage instead, and sent only to the provider.
 
 Optional. Sends pictures of the split model and each part's stats to a vision model, which suggests a name for every part and points out bad cuts, such as stray fragments, slivers or a feature split in two. Nothing changes until you click **Apply names**.
 
@@ -40,6 +40,7 @@ The key is saved on this computer:
 
 - **OrcaSlicer plugin:** in the plugin's own data folder (`ai_naming.json`).
 - **Browser version:** in `server/llm.local.json` (gitignored).
+- **Hosted web app:** in this browser's site storage. Requests go from the browser straight to the provider.
 
 **Forget key** deletes the saved key for that provider.
 
@@ -58,6 +59,8 @@ Any server with an OpenAI-compatible `/v1/chat/completions` endpoint works, with
     - **Ollama:** runs on `http://localhost:11434/v1`.
 2. In the AI settings, pick **Custom or local** and enter the base URL, then click **Save**.
 3. Pick the model from the model box, or leave it blank to use the loaded model.
+
+In the hosted web app, the local server must allow requests from the app's address (CORS): in LM Studio, turn on **Enable CORS** in the server settings; for Ollama, set `OLLAMA_ORIGINS` to the app's address.
 
 Local models can be slow to read the pictures, so Mesh Splitter waits longer for them (see below).
 

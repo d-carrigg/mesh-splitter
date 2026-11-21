@@ -2785,8 +2785,20 @@ function localChecks(st) {
 
 let lastNaming = null;
 // Where AI naming requests go: inside OrcaSlicer the plugin makes them (window.orca messages); in the browser the
-// local server does (/api/llm/*). Either way the page never holds the saved key, and nothing is sent until a click.
+// local server does (/api/llm/*), and there the page never holds the saved key. The hosted app has no server: it sends
+// straight from the browser to the provider (llm-direct.js), with the key kept in this browser. Nothing is sent until a click.
 const IN_ORCA = !!(window.orca && window.orca.postMessage);
+let DIRECT = null; // llm-direct.js once we know there is no local server
+const DIRECT_JS = "./llm-direct.js"; // a variable, so the plugin bundle leaves it out (never used inside OrcaSlicer)
+async function llmServerOrDirect() {
+  if (DIRECT) return DIRECT;
+  try {
+    const r = await fetch("/api/llm/status");
+    if (r.ok && (r.headers.get("Content-Type") || "").includes("json")) return null;
+  } catch {}
+  DIRECT = (await import(DIRECT_JS)).directLLM();
+  return DIRECT;
+}
 const LLM = { st: null, wait: new Map(), prog: new Map(), seq: 0, models: {}, job: null, warned: "" };
 function llmAsk(msgs, key, ms = 30000) { // plugin round trip: resolves with the reply that carries `key`
   return new Promise((res, rej) => {
@@ -2804,14 +2816,15 @@ async function llmApi(path, body) {
   const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : undefined);
   return r.json().catch(() => ({ ok: false, error: `HTTP ${r.status}` }));
 }
-const llmGetStatus = () => IN_ORCA ? llmAsk([{ cmd: "llm_status" }], "llm_status") : llmApi("/api/llm/status");
-const llmSaveSettings = (settings) => IN_ORCA ? llmAsk([{ cmd: "llm_settings", settings }], "llm_status") : llmApi("/api/llm/settings", settings);
+const llmGetStatus = async () => IN_ORCA ? llmAsk([{ cmd: "llm_status" }], "llm_status") : (await llmServerOrDirect())?.status() ?? llmApi("/api/llm/status");
+const llmSaveSettings = (settings) => IN_ORCA ? llmAsk([{ cmd: "llm_settings", settings }], "llm_status") : DIRECT ? DIRECT.saveSettings(settings) : llmApi("/api/llm/settings", settings);
 // Connection test: reaches the provider, checks the key and the model (no model data sent). 60 s: OrcaSlicer may ask first.
-const llmTest = () => (IN_ORCA ? llmAsk([{ cmd: "llm_test" }], "llm_test", 60000) : llmApi("/api/llm/test")).catch((e) => ({ ok: false, error: e.message, models: [] }));
+const llmTest = () => (IN_ORCA ? llmAsk([{ cmd: "llm_test" }], "llm_test", 60000) : DIRECT ? DIRECT.test() : llmApi("/api/llm/test")).catch((e) => ({ ok: false, error: e.message, models: [] }));
 const PAGE_LIMIT = 16 * 60000; // the plugin / server always answers within its own limit (15 min for a local model)
 // One naming request. onProgress gets {stage, chars, reasoning, bytes}; signal (an AbortController's) cancels it.
 async function llmSendName(body, onProgress, signal) {
   const cancelled = { ok: false, cancelled: true, error: "Cancelled" };
+  if (DIRECT) return DIRECT.nameParts(body, onProgress, signal);
   if (!IN_ORCA) {
     let r;
     try { r = await fetch("/api/llm/name-parts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal }); }
@@ -2870,7 +2883,7 @@ function llmFillSettings(pid) {
   $("aiKey").value = "";
   const hasKey = cur && j.has_key;
   $("aiKey").placeholder = hasKey ? (j.source === "saved" ? "saved (type to replace)" : `set by ${j.key_note || j.source}`) : p.needs_key ? "paste your API key" : "optional";
-  $("aiKeyNote").textContent = KEY_HELP[p.id] || "";
+  $("aiKeyNote").textContent = (KEY_HELP[p.id] || "") + (j.in_browser && p.needs_key ? ". The key is saved in this browser only and sent only to this provider." : "");
   $("aiModel").value = cur ? j.model : p.model;
   $("aiModel").placeholder = p.id === "custom" ? "blank: the model loaded in the server" : "model id";
   $("aiForget").hidden = !(hasKey && j.source === "saved");
@@ -3005,7 +3018,7 @@ async function runNaming() {
     else if (!j.ok) { renderNaming({ checks, error: j.error, raw: j.raw, images: cap.images }); status("AI naming failed"); }
     else { renderNaming({ checks, ai: j.result, images: cap.images, usage: j.usage }); status(`Named by ${j.model} in ${mmss(Date.now() - job.t0)}`); }
   } catch (e) {
-    renderNaming({ checks, error: IN_ORCA ? `No answer from the plugin (${e.message}). Reopen the Mesh Splitter tab and try again.` : `The local server stopped answering: ${e.message}`, images: cap.images });
+    renderNaming({ checks, error: IN_ORCA ? `No answer from the plugin (${e.message}). Reopen the Mesh Splitter tab and try again.` : DIRECT ? e.message : `The local server stopped answering: ${e.message}`, images: cap.images });
   } finally { clearInterval(tick); LLM.job = null; $("aiProg").hidden = true; $("aiBtn").disabled = !LLM.st?.configured; }
 }
 $("aiStop").onclick = () => LLM.job?.ac.abort();
