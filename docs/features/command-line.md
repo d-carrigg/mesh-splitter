@@ -11,13 +11,38 @@ Split a mesh without opening the app: for batch jobs, scripts, or a quick split 
 
 ## Setup
 
-You need [uv](https://docs.astral.sh/uv/getting-started/installation/) and [Node.js](https://nodejs.org/) 20 or newer. From the repo folder:
+Pick one. All three run the same code and give the same parts.
+
+**Download (nothing to install).** Get the file for your computer from the [latest release](https://github.com/d-carrigg/mesh-splitter/releases/latest) and run it from a terminal:
+
+| Computer | File |
+| --- | --- |
+| Windows | [mesh-splitter-windows-x64.exe](https://github.com/d-carrigg/mesh-splitter/releases/latest/download/mesh-splitter-windows-x64.exe) |
+| Mac (Apple silicon) | [mesh-splitter-macos-arm64](https://github.com/d-carrigg/mesh-splitter/releases/latest/download/mesh-splitter-macos-arm64) |
+| Mac (Intel) | [mesh-splitter-macos-x64](https://github.com/d-carrigg/mesh-splitter/releases/latest/download/mesh-splitter-macos-x64) |
+| Linux | [mesh-splitter-linux-x64](https://github.com/d-carrigg/mesh-splitter/releases/latest/download/mesh-splitter-linux-x64), [mesh-splitter-linux-arm64](https://github.com/d-carrigg/mesh-splitter/releases/latest/download/mesh-splitter-linux-arm64) |
+
+```
+mesh-splitter-windows-x64.exe figure.stl --auto 6 -o figure.3mf
+```
+
+The files aren't code-signed. On Windows, if SmartScreen stops it, click **More info**, then **Run anyway**. On a Mac or Linux, make it runnable first: `chmod +x mesh-splitter-macos-arm64`, and on a Mac also `xattr -d com.apple.quarantine mesh-splitter-macos-arm64`.
+
+**npx (needs [Node.js](https://nodejs.org/) 20+).** No clone needed:
+
+```
+npx github:d-carrigg/mesh-splitter figure.stl --auto 6 -o figure.3mf
+```
+
+**From the repo folder (needs [uv](https://docs.astral.sh/uv/getting-started/installation/) and Node.js 20+).**
 
 ```
 uv run mesh-splitter split --help
 ```
 
 The first run installs two small npm packages (`npm ci`). You can also run it with Node directly: `npm ci`, then `node cli/split.mjs ...`.
+
+The examples below use `uv run mesh-splitter split`. With a downloaded file or npx, put that in its place, for example `mesh-splitter-windows-x64.exe figure.stl --auto 6`. `--version` prints the version.
 
 ## Examples
 
