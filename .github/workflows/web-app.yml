@@ -1,0 +1,38 @@
+name: Web app
+
+# Publishes the browser app (app/) to Azure Static Web Apps (Free plan) when a vX.Y.Z release is published, so the
+# hosted app always matches the latest release. Also runs by hand (Actions > Web app > Run workflow).
+# No build step: app/ is plain HTML + ES modules (three.js etc. come from the CDN), and app/staticwebapp.config.json
+# sets the headers. AI naming there goes straight from the browser to the provider (app/llm-direct.js).
+# One-time setup: create the Static Web App (Free plan, deployment source "Other") and save its deployment token
+# as the repo secret AZURE_STATIC_WEB_APPS_API_TOKEN. Until that secret exists the job skips the deploy and passes.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-app
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'release' && github.ref_name || '' }}
+      - name: Deploy app/ to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        env:
+          SKIP_DEPLOY_ON_MISSING_SECRETS: true
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: upload
+          app_location: app
+          output_location: ""
+          skip_app_build: true
+          skip_api_build: true

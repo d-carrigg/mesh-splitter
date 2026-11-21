@@ -30,6 +30,8 @@ jobs:
       - run: npm ci
       - name: Golden outputs (same parts and files as test/golden.json)
         run: node test/golden.mjs
+      - name: AI naming from the browser (hosted web app)
+        run: node --test test/llm-direct.test.mjs
       - name: Test mesh (two spheres)
         run: |
           mkdir -p build
