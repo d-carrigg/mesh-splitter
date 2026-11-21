@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Install the built plugin in a real OrcaSlicer, start it, and check the plugin from the inside.
 
-    python real_orca_test.py ORCA_APPRUN PLUGIN.py MESH.stl SPLIT.3mf [--out DIR] [--timeout S]
+    python real_orca_test.py ORCA_APPRUN PLUGIN.whl MESH.stl SPLIT.3mf [--out DIR] [--timeout S]
 
 Needs an X display (CI runs it under xvfb-run). Uses a fresh OrcaSlicer data folder, installs
-PLUGIN.py the way Plugins > Install local plugin does (orca_plugins/<file>/<file> + .install_state.json),
+PLUGIN.whl the way Plugins > Install local plugin does (orca_plugins/<file>/<file> + .install_state.json),
 with the ~/Downloads write permission it asks for at load already granted (a modal prompt would block a
 headless run), plus the CI-only real_orca_probe.py. OrcaSlicer opens MESH.stl and SPLIT.3mf from its
 command line; the probe drives the plugin's Bridge with the real `orca` bindings and reports back.

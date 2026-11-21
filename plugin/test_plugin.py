@@ -273,16 +273,24 @@ class RegistrationTests(unittest.TestCase):
 
 class BuildTests(unittest.TestCase):
     @unittest.skipUnless((HERE / "node_modules" / "three").is_dir(), "run npm ci in plugin/ first")
-    def test_build_embeds_self_contained_page(self):
+    def test_build_writes_plain_wheel_with_self_contained_page(self):
         with tempfile.TemporaryDirectory() as d:
-            out = Path(d) / "mesh_splitter.py"
-            import subprocess
+            out = Path(d) / "mesh_splitter_any.whl"
+            import subprocess, zipfile
             subprocess.run([sys.executable, str(HERE / "build.py"), "--version", "9.9.9", "--out", str(out)], check=True,
                            capture_output=True)
-            src = out.read_text()
-            self.assertIn('version = "9.9.9"', src)
+            z = zipfile.ZipFile(out)
+            info = "mesh_splitter_any-9.9.9.dist-info/"
+            self.assertEqual(sorted(z.namelist()), sorted([
+                "mesh_splitter_any/__init__.py", "mesh_splitter_any/page.html",
+                info + "METADATA", info + "WHEEL", info + "top_level.txt", info + "RECORD"]))
+            meta = z.read(info + "METADATA").decode()
+            for line in ("Name: Mesh Splitter", "Version: 9.9.9", "Author: d-carrigg", "Requires-Dist: numpy"):
+                self.assertIn(line, meta)
+            self.assertIn("Tag: py3-none-any", z.read(info + "WHEEL").decode())
+            z.extractall(d)
             fake_orca.install([])
-            spec = importlib.util.spec_from_file_location("built", out)
+            spec = importlib.util.spec_from_file_location("built", Path(d) / "mesh_splitter_any" / "__init__.py")
             mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
             html = mod.page_html()
             self.assertNotIn("cdn.jsdelivr.net", html)

@@ -10,8 +10,8 @@
 # ///
 """Mesh Splitter for OrcaSlicer 2.5 (stock build).
 
-Built by plugin/build.py, which embeds the bundled app/index.html below. Install the built
-file (dist/mesh_splitter_any.py) from Plugins > Install local plugin, then tick Activate.
+Built by plugin/build.py into dist/mesh_splitter_any.whl, with the bundled app/index.html as page.html next to
+this file. Install the wheel from Plugins > Install local plugin, then tick Activate.
 
   page --orca.postMessage({cmd: 'objects'})--------------> plugin: list plate objects
   page --orca.postMessage({cmd: 'mesh', index})----------> plugin: world-space mesh, base64 chunks
@@ -36,7 +36,6 @@ import sys
 import tempfile
 import threading
 import time
-import zlib
 
 import orca
 
@@ -47,18 +46,15 @@ except Exception:  # numpy is declared above; uv installs it when the plugin loa
 
 from llm_providers import abort as llm_abort, call as llm_call, check as llm_check, resolve as llm_resolve, status as llm_status, update as llm_update  # noqa: E402  __LLM_PROVIDERS__
 
-# The plugin's page: app/index.html with three.js, three-mesh-bvh and fflate, bundled and minified by esbuild,
-# then zlib-compressed and base64-encoded by plugin/build.py (the plain page is about 0.9 MB). page_html()
-# decodes it and OrcaSlicer shows it in the Mesh Splitter tab. Source: app/ in github.com/d-carrigg/mesh-splitter.
-# To read it, rebuild the same page from source: python plugin/build.py --page-out page.html
-# Inside OrcaSlicer the page sends every request through this plugin (window.orca.postMessage). Its fetch() calls
-# are used only when the same page runs as the separate Mesh Splitter web app, never inside OrcaSlicer.
-PAGE_Z = "__PAGE_Z__"
 CHUNK = 512 * 1024
 
 
 def page_html():
-    return zlib.decompress(base64.b64decode(PAGE_Z)).decode("utf-8")
+    """The app page: app/index.html with three.js, three-mesh-bvh and fflate, bundled by plugin/build.py and shipped
+    as page.html next to this file. Inside OrcaSlicer the page sends every request through this plugin
+    (window.orca.postMessage); its fetch() calls are used only when it runs as the separate web app."""
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "page.html"), encoding="utf-8") as f:
+        return f.read()
 
 
 _storage = []  # the plugin's own data folder, found once from a plugin callback
