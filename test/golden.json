@@ -189,7 +189,7 @@
   }
  },
  "core functions": {
-  "exports": "100140cdf7812c3d",
+  "exports": "0b9105c3684b73d8",
   "meshOf": "a8cec2875bea7a27",
   "soupVolume": "13896.868176",
   "reverseSoup": "02bb4e706b840986",
@@ -200,5 +200,10 @@
   "meshAfterCleanup": "1c1e1db5675b57ab50c480182066ab0f",
   "session": "4615b9a66a65280d",
   "sessionRoundTrip": "88bba62c9642a6f5"
+ },
+ "floating spots": {
+  "found": "1.5000:492,1.5000:492",
+  "dropped": "7bb82c9d76160548",
+  "afterDrop": 0
  }
 }

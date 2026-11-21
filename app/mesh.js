@@ -207,3 +207,45 @@ export function setMesh(S, pos, tri, G = null) {
   S.pos = pos; S.tri = tri; S.nV = pos.length / 3; S.nF = tri.length / 3;
   S.G = G || buildGraph(pos, tri);
 }
+
+// ---------------------------------------------------------------- floating spots
+// The plate is at the model's lowest point. A spot (feet, say) whose own bottom is a little above it would print in
+// mid-air. Spots: connected patches of vertices within max + band mm of the plate; a patch whose lowest point is
+// 0.02..max mm up floats. Returns [{ gap, low (its lowest vertex), verts }], highest gap first.
+export const FLOAT = { max: 3, band: 5, tol: 0.02 };
+export function floatingSpots(pos, tri, o = FLOAT) {
+  const nV = pos.length / 3; let z0 = Infinity;
+  for (let i = 0; i < nV; i++) z0 = Math.min(z0, pos[3*i+2]);
+  const top = z0 + o.max + o.band, inB = (v) => pos[3*v+2] <= top;
+  const head = new Int32Array(nV).fill(-1), nxt = [], to = []; // vertex adjacency inside the band
+  const link = (a, b) => { to.push(b); nxt.push(head[a]); head[a] = to.length - 1; };
+  for (let f = 0; f < tri.length; f += 3) for (let k = 0; k < 3; k++) {
+    const a = tri[f+k], b = tri[f+(k+1)%3];
+    if (inB(a) && inB(b)) { link(a, b); link(b, a); }
+  }
+  const seen = new Uint8Array(nV), out = [];
+  for (let s = 0; s < nV; s++) {
+    if (seen[s] || !inB(s)) continue;
+    const verts = [s]; seen[s] = 1; let low = s;
+    for (let q = 0; q < verts.length; q++) for (let e = head[verts[q]]; e >= 0; e = nxt[e]) {
+      const v = to[e]; if (seen[v]) continue; seen[v] = 1; verts.push(v); if (pos[3*v+2] < pos[3*low+2]) low = v;
+    }
+    const gap = pos[3*low+2] - z0;
+    if (gap > o.tol && gap <= o.max) out.push({ gap, low, verts: Uint32Array.from(verts) });
+  }
+  return out.sort((a, b) => b.gap - a.gap);
+}
+// Pull floating spots down onto the plate: a vertex s mm above its spot's bottom moves down by gap x w(s), w falling
+// from 1 at the bottom to 0 at band mm (cosine), so the spot's lower band mm stretch and nothing above it moves.
+// z' = z - gap*w(z) only grows with z, so the surface never folds. Returns new positions (pos is not changed).
+export function dropSpots(pos, spots, band = FLOAT.band) {
+  const P = Float32Array.from(pos);
+  for (const sp of spots) {
+    const b = pos[3*sp.low+2];
+    for (const v of sp.verts) {
+      const s = pos[3*v+2] - b;
+      if (s < band) P[3*v+2] -= sp.gap * 0.5 * (1 + Math.cos(Math.PI * Math.max(0, s) / band));
+    }
+  }
+  return P;
+}

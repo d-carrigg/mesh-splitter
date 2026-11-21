@@ -89,6 +89,20 @@ for (const [name, [args]] of Object.entries(CASES)) {
   got["core functions"] = d;
 }
 
+// Floating spots: a second copy of the robot 1.5 mm up (its feet float) is found and dropped onto the plate.
+{
+  const pos = core.parseSTL(fs.readFileSync(ex("robot/robot.stl"))), n = pos.length;
+  const two = new Float32Array(2 * n); two.set(pos);
+  for (let i = 0; i < n; i += 3) { two[n+i] = pos[i] + 1000; two[n+i+1] = pos[i+1]; two[n+i+2] = pos[i+2] + 1.5; }
+  const S = core.newSplit("robots.stl", { pos: two, tri: core.soupIndex(two), source: { type: "stl" } });
+  const sp = core.floatingSpots(S.pos, S.tri), P = core.dropSpots(S.pos, sp);
+  got["floating spots"] = {
+    found: sp.map((x) => `${x.gap.toFixed(4)}:${x.verts.length}`).join(","),
+    dropped: sha(new Uint8Array(P.buffer)),
+    afterDrop: core.floatingSpots(P, S.tri).length,
+  };
+}
+
 fs.rmSync(tmp, { recursive: true, force: true });
 if (update) { fs.writeFileSync(goldenFile, JSON.stringify(got, null, 1) + "\n"); console.log(`Wrote ${path.relative(root, goldenFile)}`); process.exit(0); }
 

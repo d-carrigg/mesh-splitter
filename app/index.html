@@ -20,6 +20,8 @@
   .spacer { flex:1; }
   .caretI { width:14px !important; height:14px !important; opacity:.7; }
   #toast { position:absolute; left:50%; bottom:34px; transform:translateX(-50%); max-width:min(640px, 90%); background:var(--gp); border-left:3px solid #ff5d5d; color:var(--fg); padding:8px 12px; border-radius:3px; z-index:20; cursor:pointer; box-shadow:0 3px 12px #0008; }
+  #floatNote { position:absolute; left:50%; bottom:34px; transform:translateX(-50%); max-width:min(640px, 90%); background:var(--gp); border-left:3px solid var(--acc); color:var(--fg); padding:8px 12px; border-radius:3px; z-index:6; box-shadow:0 3px 12px #0008; display:flex; align-items:center; gap:10px; }
+  #floatNote[hidden] { display:none; }
   .mh { color:var(--mute); font-size:11px; text-transform:uppercase; letter-spacing:.06em; padding:6px 8px 2px; }
   .msep { height:1px; background:var(--sep); margin:4px 2px; }
   .menu .sub { display:flex; flex-direction:column; }
@@ -242,6 +244,7 @@
 
 <div id="view">
   <div id="toast" hidden title="Click to dismiss"></div>
+  <div id="floatNote" hidden><span id="floatText"></span><button id="floatDrop" class="pri" title="Stretch the bottom few mm of each floating spot down so it rests on the plate. Nothing higher up moves, so cuts stay where they are. Undo puts it back.">Drop to plate</button><button id="floatKeep">Keep as is</button></div>
   <div id="drop"><span>Drop an STL or 3MF here</span><div id="dropOrca"></div><button id="dropOpen" data-icon="open">Open…</button><div id="dropRecent"></div></div>
 
   <div id="toolbar" class="float">
@@ -516,6 +519,7 @@ function loadRaw(name, raw) {
   if (!restoreAutosave() && S.nF >= 200) { autoSplit(0, true); S.hist = { past: [], future: [] }; refreshUI(); }
   const fixes = [S.refined && `split long edges (+${S.refined.toLocaleString()} faces) so creases show`, S.flipped && `turned ${S.flipped} inside-out shell${S.flipped > 1 ? "s" : ""} right side out`].filter(Boolean);
   if (fixes.length) status(`${$("status").textContent} · On open: ${fixes.join("; ")}`);
+  checkFloating();
 }
 
 // The splitting algorithm lives in core.js (shared with the command line); these wrap it with the UI's
@@ -655,10 +659,38 @@ function deletePart(i) {
   S.active = into > i ? into - 1 : into;
   afterEdit(into > 0 ? `Deleted ${p.name}, merged into ${S.parts[S.active].name}` : `Deleted ${p.name}`);
 }
+// ---------------------------------------------------------------- floating spots
+// The plate sits at the model's lowest point; a spot whose own bottom is a little above it (feet 1 mm above a broom
+// that touches) prints in mid-air. After a model loads, a note offers to drop those spots onto the plate (core.js).
+let floatSpots = [];
+function checkFloating() {
+  floatSpots = S.G ? core.floatingSpots(S.pos, S.tri) : [];
+  $("floatNote").hidden = !floatSpots.length;
+  if (!floatSpots.length) return;
+  const lows = new Set(floatSpots.map((sp) => sp.low)), names = new Set();
+  for (let f = 0; f < S.nF; f++) for (let c = 0; c < 3; c++) if (lows.has(S.tri[3*f+c]) && S.labels[f] > 0) names.add(S.parts[S.labels[f]].name);
+  const n = floatSpots.length, gap = Math.max(...floatSpots.map((sp) => sp.gap));
+  const what = names.size ? [...names].join(", ") : `${n} spot${n > 1 ? "s" : ""} of the model`;
+  $("floatText").textContent = `${what} ${names.size === 1 && n === 1 ? "floats" : "float"} ${gap.toFixed(1)} mm above the plate.`;
+}
+function dropToPlate() {
+  $("floatNote").hidden = true;
+  if (!floatSpots.length) return;
+  const n = floatSpots.length, gap = Math.max(...floatSpots.map((sp) => sp.gap));
+  pushUndo();
+  setMesh(core.dropSpots(S.pos, floatSpots), S.tri.slice()); // a new tri array marks the mesh as changed (undo, session, export)
+  floatSpots = [];
+  afterEdit(`Dropped ${n} floating spot${n > 1 ? "s" : ""} (up to ${gap.toFixed(1)} mm) onto the plate`);
+}
+$("floatDrop").onclick = dropToPlate;
+$("floatKeep").onclick = () => { $("floatNote").hidden = true; floatSpots = []; };
+
 // Crease snapping and boundary anti-aliasing: see core.js.
 const snapCreases = (mask = null) => core.snapCreases(S, mask, smoothIters());
 function smoothCut(mask = null) { const tri0 = S.tri, n = core.smoothCut(S, mask); meshChanged(tri0); return n; }
-function setMesh(pos, tri, G = null) { core.setMesh(S, pos, tri, G); buildMesh(); }
+function setMesh(pos, tri, G = null) { core.setMesh(S, pos, tri, G); clearGeoCaches(); buildMesh(); }
+// Caches keyed by part labels hold vertex positions too: drop them when the mesh's positions change.
+function clearGeoCaches() { for (const c of [healCache, loopCache, pocketCache, patchCache, pjCache]) c.clear(); }
 function smoothBoundaries() {
   const before = snapshot(), n = snapCreases() + smoothCut();
   if (!n) { status("No boundaries to smooth"); return; }
