@@ -1,0 +1,213 @@
+{
+ "assets": "examples/robot",
+ "model": "robot.stl",
+ "out": null,
+ "shots": "docs/examples/img",
+ "viewport": {
+  "width": 1300,
+  "height": 900
+ },
+ "camera": {
+  "az": 20,
+  "el": 12,
+  "dist": 0.86,
+  "lift": 0.07
+ },
+ "css": "#view > :not(canvas) { visibility: hidden !important }",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "session",
+   "file": "robot.split.json"
+  },
+  {
+   "do": "script",
+   "file": "gallery.js"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Head\": \"#dfe4ea\", \"Antenna\": \"#e0a030\", \"Torso\": \"#7aa5d6\", \"Left arm\": \"#c3ccd6\", \"Right arm\": \"#c3ccd6\", \"Left hand\": \"#77818c\", \"Right hand\": \"#77818c\", \"Wrench\": \"#e0a030\", \"Left leg\": \"#c3ccd6\", \"Right leg\": \"#c3ccd6\", \"Left foot\": \"#77818c\", \"Right foot\": \"#77818c\"}); ; G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "robot-model",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Head\": \"#dfe4ea\", \"Antenna\": \"#e0a030\", \"Torso\": \"#7aa5d6\", \"Left arm\": \"#c3ccd6\", \"Right arm\": \"#c3ccd6\", \"Left hand\": \"#77818c\", \"Right hand\": \"#77818c\", \"Wrench\": \"#e0a030\", \"Left leg\": \"#c3ccd6\", \"Right leg\": \"#c3ccd6\", \"Left foot\": \"#77818c\", \"Right foot\": \"#77818c\"}); G.rotate('Left arm',[0,1,0],150); G.rotate('Right arm',[0,1,0],-35); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "robot-arms-up",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Head\": \"#dfe4ea\", \"Antenna\": \"#e0a030\", \"Torso\": \"#7aa5d6\", \"Left arm\": \"#c3ccd6\", \"Right arm\": \"#c3ccd6\", \"Left hand\": \"#77818c\", \"Right hand\": \"#77818c\", \"Wrench\": \"#e0a030\", \"Left leg\": \"#c3ccd6\", \"Right leg\": \"#c3ccd6\", \"Left foot\": \"#77818c\", \"Right foot\": \"#77818c\"}); G.rotate('Right arm',[0,1,0],125); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "robot-arms-down",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Head\": \"#dfe4ea\", \"Antenna\": \"#e0a030\", \"Torso\": \"#7aa5d6\", \"Left arm\": \"#c3ccd6\", \"Right arm\": \"#c3ccd6\", \"Left hand\": \"#77818c\", \"Right hand\": \"#77818c\", \"Wrench\": \"#e0a030\", \"Left leg\": \"#c3ccd6\", \"Right leg\": \"#c3ccd6\", \"Left foot\": \"#77818c\", \"Right foot\": \"#77818c\"}); G.stretch('Right arm',130); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "robot-long-arm",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Head\": \"#dfe4ea\", \"Antenna\": \"#e0a030\", \"Torso\": \"#7aa5d6\", \"Left arm\": \"#c3ccd6\", \"Right arm\": \"#c3ccd6\", \"Left hand\": \"#77818c\", \"Right hand\": \"#77818c\", \"Wrench\": \"#e0a030\", \"Left leg\": \"#c3ccd6\", \"Right leg\": \"#c3ccd6\", \"Left foot\": \"#77818c\", \"Right foot\": \"#77818c\"}); G.follow('Antenna','Head'); G.spin('Head',35); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "robot-head-turn",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Head\": \"#dfe4ea\", \"Antenna\": \"#e0a030\", \"Torso\": \"#7aa5d6\", \"Left arm\": \"#c3ccd6\", \"Right arm\": \"#c3ccd6\", \"Left hand\": \"#77818c\", \"Right hand\": \"#77818c\", \"Wrench\": \"#e0a030\", \"Left leg\": \"#c3ccd6\", \"Right leg\": \"#c3ccd6\", \"Left foot\": \"#77818c\", \"Right foot\": \"#77818c\"}); G.follow('Left foot','Left leg'); G.follow('Right foot','Right leg'); G.rotate('Left leg',[1,0,0],25); G.rotate('Right leg',[1,0,0],-25); G.heal('Left leg'); G.heal('Right leg'); G.quiet()"
+  },
+  {
+   "do": "camera",
+   "az": 75,
+   "el": 10,
+   "dist": 0.78,
+   "lift": 0.02,
+   "s": 0.01
+  },
+  {
+   "do": "shot",
+   "name": "robot-walk",
+   "clip": "#view"
+  },
+  {
+   "do": "camera",
+   "az": 20,
+   "el": 12,
+   "dist": 0.86,
+   "lift": 0.07,
+   "s": 0.01
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Head\": \"#dfe4ea\", \"Antenna\": \"#e0a030\", \"Torso\": \"#7aa5d6\", \"Left arm\": \"#c3ccd6\", \"Right arm\": \"#c3ccd6\", \"Left hand\": \"#77818c\", \"Right hand\": \"#77818c\", \"Wrench\": \"#e0a030\", \"Left leg\": \"#c3ccd6\", \"Right leg\": \"#c3ccd6\", \"Left foot\": \"#77818c\", \"Right foot\": \"#77818c\"}); G.scale('Wrench',170,'center'); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "robot-big-wrench",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Head\": \"#dfe4ea\", \"Antenna\": \"#e0a030\", \"Torso\": \"#7aa5d6\", \"Left arm\": \"#c3ccd6\", \"Right arm\": \"#c3ccd6\", \"Left hand\": \"#77818c\", \"Right hand\": \"#77818c\", \"Wrench\": \"#e0a030\", \"Left leg\": \"#c3ccd6\", \"Right leg\": \"#c3ccd6\", \"Left foot\": \"#77818c\", \"Right foot\": \"#77818c\"}); G.colors({'Antenna':'#2b2d31'}); G.quiet()"
+  },
+  {
+   "do": "eval",
+   "js": "G.select('Antenna')"
+  },
+  {
+   "do": "file",
+   "input": "#repIn",
+   "file": "parts/top_hat.stl"
+  },
+  {
+   "do": "eval",
+   "js": "G.inPlace('Antenna')"
+  },
+  {
+   "do": "eval",
+   "js": "G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "robot-top-hat",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Head\": \"#dfe4ea\", \"Antenna\": \"#e0a030\", \"Torso\": \"#7aa5d6\", \"Left arm\": \"#c3ccd6\", \"Right arm\": \"#c3ccd6\", \"Left hand\": \"#77818c\", \"Right hand\": \"#77818c\", \"Wrench\": \"#e0a030\", \"Left leg\": \"#c3ccd6\", \"Right leg\": \"#c3ccd6\", \"Left foot\": \"#77818c\", \"Right foot\": \"#77818c\"}); G.colors({'Antenna':'#e0508a'}); G.quiet()"
+  },
+  {
+   "do": "eval",
+   "js": "G.select('Antenna')"
+  },
+  {
+   "do": "file",
+   "input": "#repIn",
+   "file": "parts/party_hat.stl"
+  },
+  {
+   "do": "eval",
+   "js": "G.inPlace('Antenna')"
+  },
+  {
+   "do": "eval",
+   "js": "G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "robot-party-hat",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Head\": \"#dfe4ea\", \"Antenna\": \"#e0a030\", \"Torso\": \"#7aa5d6\", \"Left arm\": \"#c3ccd6\", \"Right arm\": \"#c3ccd6\", \"Left hand\": \"#77818c\", \"Right hand\": \"#77818c\", \"Wrench\": \"#e0a030\", \"Left leg\": \"#c3ccd6\", \"Right leg\": \"#c3ccd6\", \"Left foot\": \"#77818c\", \"Right foot\": \"#77818c\"}); G.colors({'Antenna':'#e8b830'}); G.quiet()"
+  },
+  {
+   "do": "eval",
+   "js": "G.select('Antenna')"
+  },
+  {
+   "do": "file",
+   "input": "#repIn",
+   "file": "parts/crown.stl"
+  },
+  {
+   "do": "eval",
+   "js": "G.inPlace('Antenna')"
+  },
+  {
+   "do": "eval",
+   "js": "G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "robot-crown",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Head\": \"#dfe4ea\", \"Antenna\": \"#e0a030\", \"Torso\": \"#7aa5d6\", \"Left arm\": \"#c3ccd6\", \"Right arm\": \"#c3ccd6\", \"Left hand\": \"#77818c\", \"Right hand\": \"#77818c\", \"Wrench\": \"#e0a030\", \"Left leg\": \"#c3ccd6\", \"Right leg\": \"#c3ccd6\", \"Left foot\": \"#77818c\", \"Right foot\": \"#77818c\"}); G.follow('Antenna','Head'); G.quiet()"
+  },
+  {
+   "do": "eval",
+   "js": "G.select('Head')"
+  },
+  {
+   "do": "file",
+   "input": "#repIn",
+   "file": "parts/round_head.stl"
+  },
+  {
+   "do": "eval",
+   "js": "G.inPlace('Head')"
+  },
+  {
+   "do": "eval",
+   "js": "G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "robot-round-head",
+   "clip": "#view"
+  }
+ ]
+}

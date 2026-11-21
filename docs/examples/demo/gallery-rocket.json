@@ -1,0 +1,118 @@
+{
+ "assets": "examples/rocket",
+ "model": "rocket.stl",
+ "out": null,
+ "shots": "docs/examples/img",
+ "viewport": {
+  "width": 1300,
+  "height": 900
+ },
+ "camera": {
+  "az": 25,
+  "el": 12,
+  "dist": 0.95,
+  "lift": 0.1
+ },
+ "css": "#view > :not(canvas) { visibility: hidden !important }",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "session",
+   "file": "rocket.split.json"
+  },
+  {
+   "do": "script",
+   "file": "gallery.js"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Body\": \"#e9edf2\", \"Stand\": \"#5b6470\", \"Stand socket\": \"#3d434b\", \"Fin 1\": \"#d9483b\", \"Fin 2\": \"#d9483b\", \"Fin 3\": \"#d9483b\", \"Porthole\": \"#4aa3df\"}); ; G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "rocket-model",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Body\": \"#e9edf2\", \"Stand\": \"#5b6470\", \"Stand socket\": \"#3d434b\", \"Fin 1\": \"#d9483b\", \"Fin 2\": \"#d9483b\", \"Fin 3\": \"#d9483b\", \"Porthole\": \"#4aa3df\"}); G.scale('Fin 1',160); G.scale('Fin 2',160); G.scale('Fin 3',160); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "rocket-big-fins",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Body\": \"#e9edf2\", \"Stand\": \"#5b6470\", \"Stand socket\": \"#3d434b\", \"Fin 1\": \"#d9483b\", \"Fin 2\": \"#d9483b\", \"Fin 3\": \"#d9483b\", \"Porthole\": \"#4aa3df\"}); G.scale('Fin 1',55); G.scale('Fin 2',55); G.scale('Fin 3',55); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "rocket-small-fins",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Body\": \"#e9edf2\", \"Stand\": \"#5b6470\", \"Stand socket\": \"#3d434b\", \"Fin 1\": \"#d9483b\", \"Fin 2\": \"#d9483b\", \"Fin 3\": \"#d9483b\", \"Porthole\": \"#4aa3df\"}); G.follow('Porthole','Body'); G.scale('Body',[100,100,135],[0,0,12]); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "rocket-long-body",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Body\": \"#e9edf2\", \"Stand\": \"#5b6470\", \"Stand socket\": \"#3d434b\", \"Fin 1\": \"#d9483b\", \"Fin 2\": \"#d9483b\", \"Fin 3\": \"#d9483b\", \"Porthole\": \"#4aa3df\"}); G.follow('Porthole','Body'); G.scale('Body',[135,135,100],'center'); G.out('Fin 1',4.2); G.out('Fin 2',4.2); G.out('Fin 3',4.2); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "rocket-wide-body",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Body\": \"#e9edf2\", \"Stand\": \"#5b6470\", \"Stand socket\": \"#3d434b\", \"Fin 1\": \"#d9483b\", \"Fin 2\": \"#d9483b\", \"Fin 3\": \"#d9483b\", \"Porthole\": \"#4aa3df\"}); G.move('Porthole',[0,-3.3,0]); G.scale('Porthole',[175,100,175],'center'); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "rocket-big-window",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Body\": \"#e9edf2\", \"Stand\": \"#5b6470\", \"Stand socket\": \"#3d434b\", \"Fin 1\": \"#d9483b\", \"Fin 2\": \"#d9483b\", \"Fin 3\": \"#d9483b\", \"Porthole\": \"#4aa3df\"}); G.follow(['Fin 1','Fin 2','Fin 3','Porthole'],'Body'); G.move('Body',[0,0,30]); G.quiet()"
+  },
+  {
+   "do": "camera",
+   "az": 25,
+   "el": 12,
+   "dist": 1.15,
+   "lift": 0.2,
+   "s": 0.01
+  },
+  {
+   "do": "shot",
+   "name": "rocket-lift-off",
+   "clip": "#view"
+  },
+  {
+   "do": "camera",
+   "az": 25,
+   "el": 12,
+   "dist": 0.95,
+   "lift": 0.1,
+   "s": 0.01
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Body\": \"#e9edf2\", \"Stand\": \"#5b6470\", \"Stand socket\": \"#3d434b\", \"Fin 1\": \"#d9483b\", \"Fin 2\": \"#d9483b\", \"Fin 3\": \"#d9483b\", \"Porthole\": \"#4aa3df\"}); G.merge('Fin 1',['Fin 2','Fin 3']); G.colors({'Fin 1':'#2f6fd0'}); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "rocket-merged-fins",
+   "clip": "#view"
+  }
+ ]
+}
