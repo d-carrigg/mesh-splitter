@@ -144,6 +144,7 @@
   #welcomeFoot { display:flex; flex-direction:column; align-items:center; gap:10px; margin-top:22px; padding-top:16px; border-top:1px solid var(--sep); min-width:360px; pointer-events:auto; }
   #welcomeFoot .local { display:flex; align-items:center; gap:7px; margin:0; color:var(--lbl); font-size:12.5px; }
   #welcomeFoot svg { width:14px; height:14px; fill:none; stroke:var(--acch); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+  #welcomeFoot .sub { margin:-4px 0 0; color:var(--mute); font-size:12px; }
   #welcomeFoot nav { display:flex; gap:18px; font-size:13px; }
   #welcomeFoot a { color:var(--acch); text-decoration:none; }
   #welcomeFoot a:hover { text-decoration:underline; }
@@ -263,9 +264,11 @@
     <span>Drop an STL or 3MF here</span><div id="dropOrca"></div><button id="dropOpen" data-icon="open">Open…</button><div id="dropRecent"></div>
     <div id="welcomeFoot">
       <p class="local"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Everything runs locally <span id="whereLocal">in your browser</span>. Nothing is uploaded unless you choose AI naming.</span></p>
+      <p class="sub">You can also use local models via <a href="https://d-carrigg.github.io/mesh-splitter/features/ai-naming/#local-models-lm-studio-ollama" target="_blank" rel="noopener">LM Studio</a>.</p>
       <nav>
         <a id="linkOther" href="https://github.com/d-carrigg/mesh-splitter#install-in-orcaslicer" target="_blank" rel="noopener">OrcaSlicer plugin</a>
         <a href="https://d-carrigg.github.io/mesh-splitter/" target="_blank" rel="noopener">Docs</a>
+        <a href="https://d-carrigg.github.io/mesh-splitter/features/claude-code/" target="_blank" rel="noopener">Claude Code plugin</a>
         <a href="https://github.com/d-carrigg/mesh-splitter" target="_blank" rel="noopener">GitHub</a>
       </nav>
     </div>
