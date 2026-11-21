@@ -37,7 +37,7 @@
   },
   {
    "do": "eval",
-   "js": "const { S } = app, cen = S.G.cen, P = [42, -1.5, 71]; let best = 0, bd = Infinity; for (let f = 0; f < S.nF; f++) { const d = (cen[3*f]-P[0])**2 + (cen[3*f+1]-P[1])**2 + (cen[3*f+2]-P[2])**2; if (d < bd) { bd = d; best = f; } } document.getElementById('fillAng').value = 15; S.active = 11; app.fillFrom(best); S.active = 0; app.afterEdit('')"
+   "js": "const { S } = app, cen = S.G.cen, near = (P, lab) => { let best = -1, bd = Infinity; for (let f = 0; f < S.nF; f++) { if (lab != null && S.labels[f] !== lab) continue; const d = (cen[3*f]-P[0])**2 + (cen[3*f+1]-P[1])**2 + (cen[3*f+2]-P[2])**2; if (d < bd) { bd = d; best = f; } } return best; }; document.getElementById('fillAng').value = 15; S.active = 11; app.fillFrom(near([42, -1.5, 71])); app.fillFrom(near([46, -1.5, 71], 1)); S.active = 0; app.afterEdit('')"
   },
   {
    "do": "eval",
