@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.3.11](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.10...v0.3.11) (2026-11-21)
+
+
+### Bug Fixes
+
+* AI naming shows progress, times out and can be cancelled; clearer Connect step ([#53](https://github.com/d-carrigg/mesh-splitter/issues/53)) ([afa5ca8](https://github.com/d-carrigg/mesh-splitter/commit/afa5ca8c916841acc87895587cf9ec701112366d))
+* Fill keeps its curved patch under a part that is tilted or lifted over the hole ([#59](https://github.com/d-carrigg/mesh-splitter/issues/59)) ([47150bc](https://github.com/d-carrigg/mesh-splitter/commit/47150bc496c4fdc8eca75e72c2301e33f5c75319))
+* Fill no longer covers a part that is still seated on its cut ([#58](https://github.com/d-carrigg/mesh-splitter/issues/58)) ([39458dd](https://github.com/d-carrigg/mesh-splitter/commit/39458dd9dd1dce09ed7567895a800f1d6a8ac560))
+* warn about shared filament slots, add --filaments, clearer face counts in the command line ([#51](https://github.com/d-carrigg/mesh-splitter/issues/51)) ([4315c1a](https://github.com/d-carrigg/mesh-splitter/commit/4315c1aa251112173e71dcf65ee4c098b499c389))
+
+
+### Documentation
+
+* animate rotate vs rotate on joint side by side, reframe the how-to visuals ([#57](https://github.com/d-carrigg/mesh-splitter/issues/57)) ([3c566c0](https://github.com/d-carrigg/mesh-splitter/commit/3c566c06dbd5b1ba7bdcb0b757373c1dc913b58c))
+* clean up site header with neutral bar and crisp logo ([#54](https://github.com/d-carrigg/mesh-splitter/issues/54)) ([54f2ddd](https://github.com/d-carrigg/mesh-splitter/commit/54f2ddd89c6589dada874e53558ddfeef6e8c813))
+* turn Examples into a picture-first gallery of edits ([#56](https://github.com/d-carrigg/mesh-splitter/issues/56)) ([c4cc6b0](https://github.com/d-carrigg/mesh-splitter/commit/c4cc6b0ce626485618806a3da3fa93bd58443cd5))
+
 ## [0.3.10](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.9...v0.3.10) (2026-11-21)
 
 
