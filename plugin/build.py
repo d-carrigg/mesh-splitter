@@ -66,6 +66,22 @@ def build_page():
     return page
 
 
+LLM_IMPORT_RE = re.compile(r"^from llm_providers import (.+?)  # noqa: E402  __LLM_PROVIDERS__$", re.M)
+
+
+def inline_llm(src):
+    """Replace plugin.py's `from llm_providers import ...` with that module's code (one file to install)."""
+    m = LLM_IMPORT_RE.search(src)
+    if not m:
+        sys.exit("plugin.py: llm_providers import marker not found")
+    mod = (HERE.parent / "server" / "llm_providers.py").read_text(encoding="utf-8")
+    mod = re.sub(r'^""".*?"""\n', "", mod, count=1, flags=re.S)  # module docstring
+    aliases = "\n".join(f"{a.strip()} = {n.strip()}" for n, a in
+                         (x.split(" as ") for x in m.group(1).split(",")) if n.strip() != a.strip())
+    block = f"# ---- inlined from server/llm_providers.py (AI part naming) ----\n{mod.strip()}\n{aliases}\n# ---- end llm_providers ----"
+    return src[:m.start()] + block + src[m.end():]
+
+
 def project_version():
     """The single source of the version: [project].version in the repo's pyproject.toml."""
     m = re.search(r'^version\s*=\s*"([^"]+)"', (HERE.parent / "pyproject.toml").read_text(encoding="utf-8"), re.M)
@@ -84,7 +100,7 @@ def main():
     size = len(page.encode("utf-8"))
     if size > MAX_PAGE:
         sys.exit(f"bundled page is {size:,} bytes; OrcaSlicer's webview limit is about 2 MB")
-    src = (HERE / "plugin.py").read_text(encoding="utf-8")
+    src = inline_llm((HERE / "plugin.py").read_text(encoding="utf-8"))
     z = base64.b64encode(zlib.compress(page.encode("utf-8"), 9)).decode("ascii")
     for key, val in (("__VERSION__", a.version), ("__PAGE_Z__", z)):
         if src.count(key) != 1:

@@ -20,7 +20,7 @@ Every feature is documented with pictures on the [docs site](https://d-carrigg.g
 - **[Send to Orca](https://d-carrigg.github.io/mesh-splitter/features/exporting/#send-to-orca):** one multi-part 3MF, every part on its filament. Painted 3MF, merged STL and per-part STLs are also available.
 - **[Command line](https://d-carrigg.github.io/mesh-splitter/features/command-line/):** `uv run mesh-splitter split model.stl --auto 6 -o model.3mf` splits and exports without opening the app, with the same results.
 - **[Claude Code plugin](https://d-carrigg.github.io/mesh-splitter/features/claude-code/):** ask Claude to split a model for you (`/plugin marketplace add d-carrigg/mesh-splitter`).
-- **Optional [AI part naming](https://d-carrigg.github.io/mesh-splitter/features/ai-naming/):** suggests part names and flags bad cuts (browser version).
+- **Optional [AI part naming](https://d-carrigg.github.io/mesh-splitter/features/ai-naming/):** suggests part names and flags bad cuts, in the browser and in OrcaSlicer, with OpenAI, OpenRouter, Claude or a local model (LM Studio, Ollama).
 
 ## Install in OrcaSlicer
 
@@ -83,21 +83,17 @@ Parts are grown from seeds across the mesh and stop at concave creases, the vall
 
 Details, with diagrams: [How it works](https://d-carrigg.github.io/mesh-splitter/how-it-works/).
 
-## AI part naming (optional, browser only)
+## AI part naming (optional)
 
 Splitting runs entirely on your machine. Optionally, you can send the result to an AI vision model. It suggests a name for each part and points out bad cuts, such as stray fragments, slivers or a feature split in two. Nothing changes until you click **Apply names**.
 
-It needs the local server, so it works in the browser version (`uv run mesh-splitter`) but not inside the OrcaSlicer plugin. **Check**, which runs the same cut checks locally without AI, works in both.
+It works in the browser version and inside the OrcaSlicer plugin, with OpenAI, OpenRouter, Anthropic Claude, or any OpenAI-compatible server, including local ones such as LM Studio and Ollama (no key, nothing leaves your computer). Nothing is sent until you click **Name parts**, and only to the provider you pick. There is no telemetry. **Check**, which runs the same cut checks locally without AI, works in both.
 
-It currently uses [OpenRouter](https://openrouter.ai/) (OpenAI-compatible API, any vision model it lists).
+1. Open a mesh and split it.
+2. Open the AI panel (sparkle button), click the settings button, pick a provider, paste your key (none for local servers), and click **Save**.
+3. Click **Name parts**, read the suggested names and issues, then click **Apply names** to keep the names.
 
-1. Get an API key from OpenRouter.
-2. Put `OPENROUTER_API_KEY=sk-or-...` in a `.env` file in the repo root. Optionally add `OPENROUTER_MODEL=...` to pick the model.
-3. Run `uv run mesh-splitter`, open a mesh and split it.
-4. Open the AI panel (sparkle button) and click **Name parts**.
-5. Read the suggested names and issues, then click **Apply names** to keep the names.
-
-The key stays in the local server and is never sent to the page.
+The key is saved on your computer and is never sent to the page. Details: [AI part naming](https://d-carrigg.github.io/mesh-splitter/features/ai-naming/).
 
 ## Development
 
@@ -105,7 +101,7 @@ The key stays in the local server and is never sent to the page.
 - `app/core.js`: mesh loading, the splitting algorithm and the file writers, with no UI code. The app, the plugin bundle and the command line all import it.
 - `cli/split.mjs`: the command line (`uv run mesh-splitter split`, or `npm ci && node cli/split.mjs`).
 - `plugin/`: OrcaSlicer plugin. `npm ci && uv run python build.py` writes `dist/mesh_splitter_any.py`. Tests: `uv run python test_plugin.py`. CI also installs the plugin in a real OrcaSlicer 2.5.1 (Linux AppImage, headless under Xvfb) and checks that it loads, reads the plate mesh, and that its 3MF imports as one part per split part: `real_orca_test.py`. CI runs the tests only on the Release Please PR (or when started by hand from the Actions tab).
-- `server/`: local server behind `uv run mesh-splitter` and the AI naming proxy.
+- `server/`: local server behind `uv run mesh-splitter`, and the AI naming providers (`llm_providers.py`, also built into the plugin).
 - `docs/demo/`: script that records `docs/demo.gif` with headless Chromium and ffmpeg: `node docs/demo/record.mjs` (needs `npm ci` in `plugin/`). Steps, timing, camera and size are in `docs/demo/demo.config.json`. The meshes come from `prep_curling.py` and aren't in the repo. The same script makes the feature docs' images: `node docs/demo/record.mjs docs/features/demo/*.json`.
 - Docs site: `mkdocs.yml` + `docs/`, built with MkDocs Material and deployed to [GitHub Pages](https://d-carrigg.github.io/mesh-splitter/) by `.github/workflows/docs.yml` on every merge to `main`. Preview locally with `pip install mkdocs-material && mkdocs serve`.
 

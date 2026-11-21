@@ -10,6 +10,7 @@ import importlib.util
 import json
 import os
 import sys
+import threading
 from pathlib import Path
 
 import numpy as np
@@ -17,6 +18,7 @@ import trimesh
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parent / "server"))  # llm_providers (inlined in the built plugin)
 import fake_orca  # noqa: E402
 
 
@@ -40,11 +42,13 @@ def main():
                                             fake_orca.FakeInstance(inst))])
     plugin = load_plugin()
     plugin.output_dir = lambda: a.out
-    out = sys.stdout
+    plugin._storage[:] = [a.out]  # AI naming settings land next to the outputs, not in the real temp folder
+    out, lock = sys.stdout, threading.Lock()
 
-    def send(msg):
-        out.write(json.dumps(msg) + "\n")
-        out.flush()
+    def send(msg):  # AI naming replies come from a worker thread
+        with lock:
+            out.write(json.dumps(msg) + "\n")
+            out.flush()
 
     bridge = plugin.Bridge(send)
     for line in sys.stdin:

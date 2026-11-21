@@ -194,6 +194,28 @@ if (!fa.fill.kinds.includes("patch") || !fa.fill.shown || fa.fill.me.open || fa.
   || fa.anchor.nb.open || !(fa.anchor.me.vol > fa.fill.me.vol + 1) || !fa.anchor.saved || fa.after) errors.push("fill/anchor failed: " + JSON.stringify(fa));
 await page.evaluate(() => app.setGizmoJoint(false));
 if (shot) await page.screenshot({ path: shot });
+// AI part naming from inside OrcaSlicer: set up a local OpenAI-compatible server (no key), as with LM Studio,
+// name the parts through the plugin, and apply the names.
+const mock = spawn(py, [path.join(here, "..", "server", "mock_llm_server.py"), "--port", "18765"], { stdio: ["ignore", "pipe", "ignore"] });
+process.on("exit", () => mock.kill());
+await new Promise((r) => mock.stdout.once("data", r));
+await page.evaluate(() => { document.getElementById("xfDone")?.click(); document.getElementById("aiToggle").click(); document.getElementById("aiGear").click(); });
+await page.selectOption("#aiProv", "custom");
+await page.fill("#aiUrl", "http://127.0.0.1:18765/v1"); await page.click("#aiSave");
+await page.waitForFunction(() => document.getElementById("aiState").textContent.includes("127.0.0.1:18765"), null, { timeout: 10000 });
+await page.waitForFunction(() => [...document.querySelectorAll("#aiModels option")].some((o) => o.value === "mock-vision-1"), null, { timeout: 10000 });
+await page.click("#aiBtn");
+const aiErr = () => [...document.querySelectorAll("#aiOut .iss.high")].find((d) => !d.querySelector(".small"))?.textContent; // check issues carry "· check"
+await page.waitForFunction((f) => document.querySelector("#aiOut .nm") || eval(f)(), aiErr.toString(), { timeout: 60000 });
+const ai = await page.evaluate((f) => ({ err: eval(f)(), rows: document.querySelectorAll("#aiOut .nm").length, parts: app.S.parts.length - 1 }), aiErr.toString());
+if (ai.err || ai.rows !== ai.parts) errors.push("AI naming failed: " + JSON.stringify(ai));
+else {
+  await page.click("#aiOut button:has-text('Apply names')");
+  const names = await page.evaluate(() => app.S.parts.slice(1).map((p) => p.name));
+  if (!names.every((n, i) => n === `mock part ${i + 1}`)) errors.push("AI names not applied: " + names.join(", "));
+  console.log("ai naming:", names.join(", "));
+}
+mock.kill();
 await page.click("#expMain");
 const t0 = Date.now();
 while (!saved && !errors.length && Date.now() - t0 < 60000) await new Promise((r) => setTimeout(r, 100));

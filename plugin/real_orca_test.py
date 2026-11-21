@@ -10,7 +10,8 @@ headless run), plus the CI-only real_orca_probe.py. OrcaSlicer opens MESH.stl an
 command line; the probe drives the plugin's Bridge with the real `orca` bindings and reports back.
 
 Fails unless OrcaSlicer logs a successful load of the plugin, the probe gets the right mesh back from
-the plugin, and OrcaSlicer imported SPLIT.3mf as one object with one part per split part.
+the plugin, OrcaSlicer imported SPLIT.3mf as one object with one part per split part, and AI part naming
+reached a local mock OpenAI-compatible server and got names back.
 Logs, the probe's report and a screenshot go to --out.
 """
 import argparse
@@ -27,6 +28,8 @@ import zipfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent / "server"))
+import mock_llm_server  # noqa: E402
 PLUGIN_KEY = "mesh_splitter_any"
 
 
@@ -82,8 +85,10 @@ def main():
 
     report = a.out / "probe.json"
     report.unlink(missing_ok=True)
+    llm_ctx = mock_llm_server.running()  # keep a reference: the server stops when this is collected
+    llm = llm_ctx.__enter__()
     env = dict(os.environ, MESH_SPLITTER_PROBE_OUT=str(report.resolve()), LIBGL_ALWAYS_SOFTWARE="1",
-               LANG=os.environ.get("LANG", "C.UTF-8"))
+               LANG=os.environ.get("LANG", "C.UTF-8"), MESH_SPLITTER_MOCK_LLM=llm.base_url)
     # Without SSL_CERT_FILE, OrcaSlicer on Linux asks "use system SSL certificate ...?" in a modal at startup.
     env.setdefault("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt")
     with open(a.out / "orca-stdout.log", "w") as log:
@@ -126,6 +131,12 @@ def main():
                 m = r["mesh"]
                 if m["nF"] != faces or m["max_index"] != m["nV"] - 1 or m["bytes"] != m["nV"] * 12 + m["nF"] * 12:
                     problems.append(f"plugin returned a bad mesh: {m} (plate has {faces} faces)")
+            ai = r.get("ai") or {}
+            res = ai.get("result") or {}
+            names = [x.get("name") for x in (res.get("result") or {}).get("parts", [])]
+            if not (ai.get("status", {}).get("configured") and res.get("ok") and names == ["mock part 1", "mock part 2"]
+                    and llm.requests):
+                problems.append(f"AI part naming via the local server failed: {ai}")
             want = split_parts(a.split_3mf)
             split = [o for o in r["objects"] if o["name"] != a.mesh.name]
             got = [v["name"] for v in split[0]["volumes"] if v["part"]] if len(split) == 1 else None
@@ -133,6 +144,7 @@ def main():
                 problems.append(f"{a.split_3mf.name} imported as {got}, expected one object with parts {want}")
 
     shutil.rmtree(data, ignore_errors=True)
+    llm_ctx.__exit__(None, None, None)
     if problems:
         # Enough to diagnose a CI failure from the job log alone (a modal dialog shows up in the window list).
         print("Open windows: " + ", ".join(windows), file=sys.stderr)

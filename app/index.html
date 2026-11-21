@@ -144,6 +144,9 @@
   #view.placing canvas { cursor:crosshair; }
   #flowPop { z-index:4; padding:8px 10px; width:max-content; }
   #flowPop .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
+  #aiSet { display:flex; flex-direction:column; gap:6px; border:1px solid var(--line); border-radius:4px; padding:8px; margin-bottom:8px; }
+  #aiSet label { display:grid; grid-template-columns:62px 1fr; gap:6px; align-items:center; }
+  #aiSet select, #aiSet input { width:100%; background:var(--in); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:3px 5px; font:inherit; }
   #aiModel, #aiNote { width:100%; background:var(--in); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:3px 5px; font:inherit; }
   #followRow:empty, #hitRow:empty, #stretchRow.hide, #stretchGapRow.hide { display:none !important; }
   #followRow .chip { display:inline-flex; align-items:center; gap:4px; padding:1px 6px; border:1px solid var(--line); border-radius:10px; }
@@ -321,15 +324,21 @@
       <div class="cardHead">
         <h2>Part names</h2>
         <span id="aiState" class="small"></span>
+        <button id="aiGear" data-icon="gear" title="AI settings: provider, API key, model"></button>
         <button id="aiClose" data-icon="x" title="Close"></button>
       </div>
+      <div id="aiSet" hidden>
+        <label><span class="lbl">Provider</span><select id="aiProv"></select></label>
+        <label id="aiUrlRow"><span class="lbl">Base URL</span><input id="aiUrl" list="aiUrls" placeholder="http://localhost:1234/v1" title="OpenAI-compatible base URL, ending in /v1. LM Studio: http://localhost:1234/v1 · Ollama: http://localhost:11434/v1"></label>
+        <datalist id="aiUrls"><option value="http://localhost:1234/v1">LM Studio</option><option value="http://localhost:11434/v1">Ollama</option><option value="http://localhost:8080/v1">llama.cpp server</option></datalist>
+        <label><span class="lbl">API key</span><input id="aiKey" type="password" autocomplete="off" spellcheck="false"></label>
+        <div class="row" style="margin:0"><span id="aiKeyNote" class="small" style="flex:1"></span><button id="aiForget" title="Delete the saved key for this provider">Forget key</button><button id="aiSave" class="pri">Save</button></div>
+        <span class="small">Saved on this computer only. Requests go only to the provider above.</span>
+      </div>
       <div class="row">
-        <input id="aiModel" list="aiModels" title="OpenRouter model id (needs image input)" style="flex:1; width:auto">
-        <datalist id="aiModels">
-          <option value="deepseek/deepseek-v4.1-flash"><option value="google/gemini-2.5-flash"><option value="google/gemini-2.5-pro">
-          <option value="anthropic/claude-sonnet-4.5"><option value="openai/gpt-5-mini">
-        </datalist>
-        <button id="aiBtn" class="pri" data-icon="sparkle" title="Render views + part stats, ask a vision model (OpenRouter) to name parts and flag segmentation problems">Name parts</button>
+        <input id="aiModel" list="aiModels" title="Model id (needs image input)" style="flex:1; width:auto">
+        <datalist id="aiModels"></datalist>
+        <button id="aiBtn" class="pri" data-icon="sparkle" title="Render views + part stats, ask the vision model you set up to name parts and flag segmentation problems">Name parts</button>
       </div>
       <input id="aiNote" type="text" placeholder="Hint, e.g. what the object is (optional)">
       <div id="aiOut"></div>
@@ -376,6 +385,7 @@ THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
 const $ = (id) => document.getElementById(id);
 const ICONS = {
+  gear: '<path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/>',
   orbit: '<path d="M16.5 7.5C15.6 4.2 14 2 12 2 9.2 2 7 6.5 7 12s2.2 10 5 10c.3 0 .7-.1 1-.2"/><path d="m15.2 13.7 3.8 1.9-1.9 3.8"/><path d="M19 15.6c-1.8.9-4.3 1.4-7 1.4-5.5 0-10-2.2-10-5s4.5-5 10-5c4.8 0 8.9 1.7 9.8 4"/>',
   seed: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
   fill: '<path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/>',
@@ -2660,18 +2670,86 @@ function localChecks(st) {
 }
 
 let lastNaming = null;
-async function llmStatus() {
-  if (location.protocol === "file:") { $("aiState").textContent = "browser version only"; return { configured: false }; } // no local server (e.g. inside OrcaSlicer)
-  try {
-    const j = await (await fetch("/api/llm/status")).json();
-    $("aiState").textContent = j.configured ? `key: ${j.source}` : "no key";
-    $("aiState").title = j.configured ? "" : "Put OPENROUTER_API_KEY=... in .env (repo root), set the env var, or put {\"api_key\": \"...\"} in server/openrouter.local.json, then restart uv run mesh-splitter";
-    let m = null; try { m = localStorage.getItem("meshsplit:model"); } catch {}
-    $("aiModel").value = (m && m !== "google/gemini-2.5-flash") ? m : j.model;
-    return j;
-  } catch { $("aiState").textContent = "server offline"; return { configured: false }; }
+// Where AI naming requests go: inside OrcaSlicer the plugin makes them (window.orca messages); in the browser the
+// local server does (/api/llm/*). Either way the page never holds the saved key, and nothing is sent until a click.
+const IN_ORCA = !!(window.orca && window.orca.postMessage);
+const LLM = { st: null, wait: new Map(), seq: 0, models: {} };
+function llmAsk(msgs, key, ms = 30000) { // plugin round trip: resolves with the reply that carries `key`
+  return new Promise((res, rej) => {
+    LLM.wait.set(key, res); for (const m of msgs) window.orca.postMessage(m);
+    setTimeout(() => { if (LLM.wait.delete(key)) rej(new Error("No reply from the plugin")); }, ms);
+  });
 }
-$("aiModel").onchange = () => { try { localStorage.setItem("meshsplit:model", $("aiModel").value.trim()); } catch {} };
+function llmReply(m) { // called from the plugin bridge for llm_* messages
+  const key = m.cmd === "llm_result" ? m.id : m.cmd, f = LLM.wait.get(key);
+  if (f) { LLM.wait.delete(key); f(m); }
+}
+async function llmApi(path, body) {
+  const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : undefined);
+  return r.json().catch(() => ({ ok: false, error: `HTTP ${r.status}` }));
+}
+const llmGetStatus = () => IN_ORCA ? llmAsk([{ cmd: "llm_status" }], "llm_status") : llmApi("/api/llm/status");
+const llmSaveSettings = (settings) => IN_ORCA ? llmAsk([{ cmd: "llm_settings", settings }], "llm_status") : llmApi("/api/llm/settings", settings);
+const llmModels = () => (IN_ORCA ? llmAsk([{ cmd: "llm_models" }], "llm_models") : llmApi("/api/llm/models")).then((j) => j.models || []).catch(() => []);
+function llmSendName(body) {
+  if (!IN_ORCA) return llmApi("/api/llm/name-parts", body);
+  const t = JSON.stringify(body), id = `n${Date.now().toString(36)}-${++LLM.seq}`, n = Math.max(1, Math.ceil(t.length / (512 * 1024)));
+  const parts = Array.from({ length: n }, (_, i) => ({ cmd: "llm_name", id, part: i, of: n, data: t.slice(i * 512 * 1024, (i + 1) * 512 * 1024) }));
+  return llmAsk(parts, id, 330000);
+}
+function llmShow(j) {
+  LLM.st = j;
+  const ready = j.configured, who = j.provider === "custom" ? (j.base_url || "").replace(/^https?:\/\//, "") : j.label;
+  $("aiState").textContent = ready ? who : j.needs_key ? `${j.label}: no key` : "not set up";
+  $("aiState").title = ready ? `${j.label}${j.has_key ? ` · key ${j.source === "saved" ? "saved" : `from ${j.key_note || j.source}`}` : ""}` : "Click the settings button to pick a provider";
+  let m = null; try { m = localStorage.getItem(`meshsplit:model:${j.provider}`); } catch {}
+  $("aiModel").value = m || j.model || "";
+  $("aiModel").placeholder = j.provider === "custom" ? "model id (blank: the loaded model)" : "model id";
+  llmFillModels(j.provider);
+  if (!$("aiSet").hidden) llmFillSettings(j.provider);
+  return j;
+}
+const MODEL_HINTS = {
+  openrouter: ["deepseek/deepseek-v4.1-flash", "google/gemini-2.5-flash", "google/gemini-2.5-pro", "anthropic/claude-opus-5-5", "openai/gpt-5-mini"],
+  openai: ["gpt-5-mini", "gpt-5", "gpt-4.1-mini"],
+  anthropic: ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
+  custom: [],
+};
+function llmFillModels(pid) {
+  const list = [...new Set([...(MODEL_HINTS[pid] || []), ...(LLM.models[pid] || [])])];
+  $("aiModels").innerHTML = list.map((m) => `<option value="${esc(m)}">`).join("");
+}
+function llmFillSettings(pid) {
+  const j = LLM.st, p = j.providers.find((x) => x.id === pid) || j.providers[0], cur = pid === j.provider;
+  $("aiProv").innerHTML = j.providers.map((x) => `<option value="${x.id}">${esc(x.label)}</option>`).join(""); $("aiProv").value = p.id;
+  $("aiUrlRow").hidden = p.id !== "custom";
+  $("aiUrl").value = cur && p.id === "custom" ? j.base_url : p.base_url;
+  $("aiKey").value = "";
+  const hasKey = cur && j.has_key;
+  $("aiKey").placeholder = hasKey ? (j.source === "saved" ? "saved (type to replace)" : `set by ${j.key_note || j.source}`) : p.needs_key ? "paste your API key" : "optional";
+  $("aiKeyNote").textContent = p.id === "custom" ? "LM Studio, Ollama and other OpenAI-compatible servers" : "";
+  $("aiForget").hidden = !(hasKey && j.source === "saved");
+}
+async function llmStatus() {
+  if (!IN_ORCA && location.protocol === "file:") { $("aiState").textContent = "needs uv run mesh-splitter"; return { configured: false }; }
+  try { return llmShow(await llmGetStatus()); }
+  catch { $("aiState").textContent = IN_ORCA ? "plugin not answering" : "server offline"; return { configured: false }; }
+}
+async function llmSave(extra = {}) {
+  const pid = $("aiProv").value, patch = { provider: pid, model: $("aiModel").value.trim(), ...extra };
+  if (pid === "custom") patch.base_url = $("aiUrl").value.trim();
+  if ($("aiKey").value.trim()) patch.api_key = $("aiKey").value.trim();
+  if (LLM.st && pid !== LLM.st.provider) patch.model = (LLM.st.providers.find((x) => x.id === pid) || {}).model || "";
+  const j = await llmSaveSettings(patch).catch((e) => ({ ok: false, error: e.message }));
+  if (j.ok === false) { status(`AI settings: ${j.error}`); alert(j.error); return; }
+  $("aiKey").value = ""; llmShow(j); status(`AI naming uses ${j.provider === "custom" ? j.base_url : j.label}`);
+  if (j.configured) llmModels().then((ms) => { LLM.models[j.provider] = ms; llmFillModels(j.provider); if (!$("aiModel").value && ms.length === 1) $("aiModel").value = ms[0]; });
+}
+$("aiGear").onclick = () => { const on = $("aiSet").hidden; $("aiSet").hidden = !on; $("aiGear").classList.toggle("on", on); if (on && LLM.st) llmFillSettings(LLM.st.provider); };
+$("aiProv").onchange = () => llmFillSettings($("aiProv").value);
+$("aiSave").onclick = () => llmSave();
+$("aiForget").onclick = () => llmSave({ clear_key: true });
+$("aiModel").onchange = () => { try { localStorage.setItem(`meshsplit:model:${LLM.st?.provider || "openrouter"}`, $("aiModel").value.trim()); } catch {} };
 
 const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 function renderNaming(R) {
@@ -2725,23 +2803,23 @@ function runChecks() {
 async function runNaming() {
   if (!S.G) return;
   const model = $("aiModel").value.trim();
+  if (LLM.st && !LLM.st.configured) { showAi(true); $("aiSet").hidden = false; llmFillSettings(LLM.st.provider); status("Set up a provider for AI naming first"); return; }
   $("busy").textContent = "Rendering views…"; busy(true);
   await new Promise((r) => setTimeout(r, 30));
   let st, cap;
   try { st = partStats(); cap = captureForNaming(st); }
   catch (e) { console.error(e); busy(false); $("busy").textContent = "Working…"; alert(e.message); return; }
   const checks = localChecks(st);
-  renderNaming({ checks, pending: true, model, images: cap.images });
-  $("busy").textContent = `Asking ${model}…`;
+  const who = model || "the local model";
+  renderNaming({ checks, pending: true, model: who, images: cap.images });
+  $("busy").textContent = `Asking ${who}…`;
   try {
-    const r = await fetch("/api/llm/name-parts", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model, images: cap.images, captions: cap.captions, stats: statsForLLM(st), hint: $("aiNote").value }) });
-    const j = await r.json().catch(() => ({ ok: false, error: `HTTP ${r.status}` }));
+    const j = await llmSendName({ model, images: cap.images, captions: cap.captions, stats: statsForLLM(st), hint: $("aiNote").value });
     lastNaming = j;
     if (!j.ok) renderNaming({ checks, error: j.error, raw: j.raw, images: cap.images });
     else { renderNaming({ checks, ai: j.result, images: cap.images, usage: j.usage }); status(`Named by ${j.model}`); }
   } catch (e) {
-    renderNaming({ checks, error: `Server unreachable: ${e.message}`, images: cap.images });
+    renderNaming({ checks, error: `${IN_ORCA ? "Plugin" : "Server"} unreachable: ${e.message}`, images: cap.images });
   } finally { busy(false); $("busy").textContent = "Working…"; }
 }
 $("aiBtn").onclick = runNaming;
@@ -2982,7 +3060,6 @@ if (ORCA.on) {
   $("expMain").lastChild.textContent = "Send to Orca";
   $("expMain").title = "Save a multi-part 3MF (each part keeps its filament slot) to Downloads, then import it in OrcaSlicer with Ctrl+I";
   $("expParts").hidden = true;
-  $("aiBtn").disabled = true; $("aiBtn").title = "AI part naming needs the browser version (uv run mesh-splitter); Check still works here";
   window.orca.onMessage((m) => {
     if (!m || typeof m !== "object") return;
     if (m.cmd === "objects") {
@@ -2994,7 +3071,8 @@ if (ORCA.on) {
     else if (m.cmd === "saved" || m.cmd === "save_error") {
       const P = ORCA.saves.get(m.id); if (!P) return; ORCA.saves.delete(m.id);
       m.cmd === "saved" ? P.res(m.path) : P.rej(new Error(m.message || "unknown error"));
-    } else if (m.cmd === "error") { busy(false); ORCA.rx = null; ORCA.want = null; clearTimeout(rxTimer); status(m.message); alert(m.message); }
+    } else if (/^llm_/.test(m.cmd || "")) llmReply(m);
+    else if (m.cmd === "error") { busy(false); ORCA.rx = null; ORCA.want = null; clearTimeout(rxTimer); status(m.message); alert(m.message); }
   });
   orcaSend({ cmd: "objects", auto: true });
 }
