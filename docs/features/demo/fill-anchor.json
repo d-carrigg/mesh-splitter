@@ -24,7 +24,7 @@
   },
   {
    "do": "eval",
-   "js": "app.setAnchor([3, 7], false); app.fillMesh() && (app.fillMesh().visible = false); app.render()"
+   "js": "app.setGap([5, 10, 2], 'fill'); app.setAnchor([3, 7], false); app.fillMesh() && (app.fillMesh().visible = false); app.render()"
   },
   {
    "do": "shot",
