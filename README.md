@@ -98,7 +98,8 @@ The key is saved on your computer and is never sent to the page. Details: [AI pa
 ## Development
 
 - `app/index.html`: the app (UI, display, editing tools).
-- `app/core.js`: mesh loading, the splitting algorithm and the file writers, with no UI code. The app, the plugin bundle and the command line all import it.
+- `app/core.js`: the entry point for mesh loading, the splitting algorithm and the file writers, with no UI code. The app, the plugin bundle and the command line all import it. The code is in the modules it re-exports: `mesh.js` (reading STL/3MF, welding), `graph.js` (face graph, concavity barrier), `segment.js` (seeds, auto split, shells), `parts.js`, `boundary.js` (crease snapping, smooth cut), `export.js` (3MF/STL writers) and `session.js` (`.split.json`).
+- `test/golden.mjs`: end-to-end check that the splitting output hasn't changed: runs the command line on the example meshes with every method and output, and compares hashes of everything it writes with `test/golden.json` (`npm ci && node test/golden.mjs`; `--update` after an intended change).
 - `cli/split.mjs`: the command line (`uv run mesh-splitter split`, or `npm ci && node cli/split.mjs`).
 - `plugin/`: OrcaSlicer plugin. `npm ci && uv run python build.py` writes `dist/mesh_splitter_any.py`. Tests: `uv run python test_plugin.py`. CI also installs the plugin in a real OrcaSlicer 2.5.1 (Linux AppImage, headless under Xvfb) and checks that it loads, reads the plate mesh, and that its 3MF imports as one part per split part: `real_orca_test.py`. CI runs the tests only on the Release Please PR (or when started by hand from the Actions tab).
 - `server/`: local server behind `uv run mesh-splitter`, and the AI naming providers (`llm_providers.py`, also built into the plugin).

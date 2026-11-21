@@ -78,7 +78,7 @@ No creases involved: each disconnected shell becomes a part, largest first, name
 
 ## One core, three front ends
 
-The parsing, the splitting pipeline and the file writers live in one JavaScript module, `app/core.js` (added in [#29](https://github.com/d-carrigg/mesh-splitter/pull/29)). It has no UI, no three.js and no DOM, so all three front ends import the same file. The same mesh and settings give the same parts in each.
+The parsing, the splitting pipeline and the file writers live in one JavaScript module, `app/core.js` (added in [#29](https://github.com/d-carrigg/mesh-splitter/pull/29)), which re-exports the smaller modules next to it in `app/` (`mesh.js`, `graph.js`, `segment.js`, `parts.js`, `boundary.js`, `export.js`, `session.js`). It has no UI, no three.js and no DOM, so all three front ends import the same file. The same mesh and settings give the same parts in each.
 
 ```mermaid
 flowchart TB

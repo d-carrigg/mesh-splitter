@@ -28,6 +28,8 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv sync
       - run: npm ci
+      - name: Golden outputs (same parts and files as test/golden.json)
+        run: node test/golden.mjs
       - name: Test mesh (two spheres)
         run: |
           mkdir -p build
