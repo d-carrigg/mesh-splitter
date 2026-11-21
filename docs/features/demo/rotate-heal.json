@@ -35,7 +35,7 @@
   },
   {
    "do": "eval",
-   "js": "app.undo(); const x = app.ensureXf(4); x.r = [0, 0, 0]; x.t = [6, 0, 0]; app.applyXf(); app.S.active = 0; app.refreshUI()"
+   "js": "app.undo(); const x = app.ensureXf(4); x.r = [0, 0, 0]; x.t = [0, 0, 4]; app.applyXf(); app.S.active = 0; app.refreshUI()"
   },
   {
    "do": "shot",
@@ -68,7 +68,7 @@
    "left": "_move-plain",
    "right": "_heal-move",
    "labels": [
-    "Moved 6 mm, heal joint off",
+    "Lifted 4 mm, heal joint off",
     "Heal joint on"
    ],
    "name": "heal-joint"

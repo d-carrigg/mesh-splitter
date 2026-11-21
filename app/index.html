@@ -1344,6 +1344,14 @@ function planTris(pl, ctx, out = []) {
       rings.push(W);
     });
     const c = new THREE.Vector3(...P.c); if (M) c.applyMatrix4(M);
+    // a curved patch stays under the neighbor's moved cut while the neighbor is still over the hole (lifted a little),
+    // so it never pokes up through the neighbor
+    const cap = fitL === own ? cutPlaneOver(lp, own, nb, ctx) : null;
+    if (cap) {
+      const under = (v) => { const d = v.clone().sub(cap.C).dot(cap.N); if (d > 0) v.addScaledVector(cap.N, -d); return v; };
+      for (let k = 1; k < rings.length; k++) { const W = rings[k]; for (let j = 0; j < W.length; j += 3) under(t3.fromArray(W, j)).toArray(W, j); }
+      under(c);
+    }
     ringTris(rings, c.toArray(), flip, out); return out;
   }
   // bridge: sweep the cut from the neighbor's rim (t = 0) to this part's moved cut (t = 1) along the relative turn
@@ -1379,6 +1387,26 @@ function seatedOn(lp, own, nb, ctx) {
   N.normalize(); r /= n;
   const spread = (pts) => pts.reduce((m, p) => Math.max(m, Math.abs(p.clone().sub(C).dot(N))), 0);
   return spread(Q) <= spread(P) + 0.03 * r;
+}
+// The plane of part nb's moved cut ({C, N}, N pointing away from part own) while that cut still sits over own's side
+// of loop lp: its center within a loop radius of the hole's. Else null (nb moved clear of the hole).
+function cutPlaneOver(lp, own, nb, ctx) {
+  if (!(nb > 0)) return null;
+  const n = lp.length, P = lp.map(([a]) => ctx.wpos(own, a)), Q = lp.map(([a]) => ctx.wpos(nb, a));
+  const Cp = new THREE.Vector3(), C = new THREE.Vector3(), N = new THREE.Vector3(), Np = new THREE.Vector3();
+  P.forEach((p) => Cp.add(p)); Cp.divideScalar(n); Q.forEach((q) => C.add(q)); C.divideScalar(n);
+  let r = 0;
+  for (let k = 0; k < n; k++) {
+    Np.add(P[k].clone().sub(Cp).cross(P[(k+1) % n].clone().sub(Cp))); N.add(Q[k].clone().sub(C).cross(Q[(k+1) % n].clone().sub(C)));
+    r += P[k].distanceTo(Cp);
+  }
+  r /= n;
+  if (N.lengthSq() < 1e-18 || Np.lengthSq() < 1e-18 || C.distanceTo(Cp) > r) return null;
+  N.normalize(); Np.normalize();
+  const b = partBox(nb), mid = new THREE.Vector3((b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2), Mn = ctx.mat(nb);
+  if (Mn) mid.applyMatrix4(Mn);
+  if (mid.sub(C).dot(N) < 0) N.negate(); // toward the neighbor's body
+  return { C, N };
 }
 // Closing triangles for every loop of part i (or of the unchanged rest, in mergedSoup), world space.
 function capTris(plans, ctx) { const out = []; for (const pl of plans) planTris(pl, ctx, out); return Float32Array.from(out); }
