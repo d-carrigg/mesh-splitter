@@ -94,7 +94,26 @@ await page.addInitScript((theme) => {
 
 // ---------------------------------------------------------------- frame capture
 let n = 0;
-const snap = async () => gifOn && writeFile(path.join(framesDir, `f${String(n++).padStart(5, "0")}.png`), await page.screenshot());
+// The page's CSS / Web Animations run on a virtual clock: each frame moves them on by exactly one frame, so a
+// 160 ms fade spans the same frames in the GIF however long a screenshot takes. Still shots finish them first.
+if (gifOn) { // stop the page's animation clock, so an animation waits at its start for the next frame
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Animation.enable");
+  await cdp.send("Animation.setPlaybackRate", { playbackRate: 0 });
+}
+const tickAnimations = (dt) => page.evaluate((dt) => {
+  for (const a of document.getAnimations()) {
+    if (a.playState === "finished") continue;
+    if (a.__t === undefined) { a.__t = 0; a.pause(); } else a.__t += dt;
+    if (a.__t >= a.effect.getComputedTiming().endTime) a.finish(); else a.currentTime = a.__t;
+  }
+}, dt);
+const finishAnimations = () => page.evaluate(() => document.getAnimations().forEach((a) => { try { a.finish(); } catch {} }));
+const snap = async () => {
+  if (!gifOn) return;
+  await tickAnimations(1000 / fps);
+  await writeFile(path.join(framesDir, `f${String(n++).padStart(5, "0")}.png`), await page.screenshot());
+};
 const hold = async (s) => { for (let i = 0, k = Math.max(1, Math.round(s * fps)); i < k; i++) await snap(); };
 const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 const idle = () => page.waitForFunction(() => getComputedStyle(document.getElementById("busy")).display === "none", null, { timeout: 300000 });
@@ -239,6 +258,7 @@ const steps = {
   // {around: target, w, h} (a box centered on a target point, kept inside the page).
   async shot(s) {
     if (s.wait !== false) await idle();
+    await finishAnimations();
     await page.evaluate(() => app.render());
     let clip;
     if (typeof s.clip === "string") clip = await page.locator(s.clip).first().boundingBox();
