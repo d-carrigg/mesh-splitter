@@ -75,10 +75,12 @@ def inline_llm(src):
     if not m:
         sys.exit("plugin.py: llm_providers import marker not found")
     mod = (HERE.parent / "server" / "llm_providers.py").read_text(encoding="utf-8")
-    mod = re.sub(r'^""".*?"""\n', "", mod, count=1, flags=re.S)  # module docstring
+    doc = re.match(r'^"""(.*?)"""\n', mod, re.S)
+    mod = mod[doc.end():]  # the module docstring becomes comments: it says when the code connects and to where
+    notes = "\n".join(("# " + line).rstrip() for line in doc.group(1).strip().splitlines())
     aliases = "\n".join(f"{a.strip()} = {n.strip()}" for n, a in
                          (x.split(" as ") for x in m.group(1).split(",")) if n.strip() != a.strip())
-    block = f"# ---- inlined from server/llm_providers.py (AI part naming) ----\n{mod.strip()}\n{aliases}\n# ---- end llm_providers ----"
+    block = f"# ---- inlined from server/llm_providers.py (AI part naming) ----\n{notes}\n{mod.strip()}\n{aliases}\n# ---- end llm_providers ----"
     return src[:m.start()] + block + src[m.end():]
 
 
