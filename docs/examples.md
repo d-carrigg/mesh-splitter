@@ -10,7 +10,7 @@ To open one: open the STL, then **Open > Load session…** and pick its `.split.
 
 ## Robot
 
-A waving robot holding a wrench. Hard-surface style: boxes and cylinders joined with sharp concave creases. 31,496 faces, one shell, 82 × 27 × 125 mm.
+A waving robot holding a wrench. Hard-surface style: boxes and cylinders joined with sharp concave creases. 31,278 faces, one shell, 86 × 27 × 125 mm.
 
 | Model | Auto split on open | Final split |
 | --- | --- | --- |
@@ -33,7 +33,7 @@ A seated teddy bear. Organic style: smoothly blended blobs with soft creases, th
 | --- | --- | --- |
 | ![Bear model](examples/img/bear-model.png) | ![Bear auto split](examples/img/bear-auto.png) | ![Bear final split](examples/img/bear-final.png) |
 
-- **Auto split:** 4 parts (body with arms and legs, head, two ears). The soft blends at the arms and legs don't count as creases.
+- **Auto split:** 4 parts (body with arms and legs, head, two ears) at the default **Crease** of 2: the soft blends at the arms and legs don't count as creases. At **Crease** 1 it finds 8: body, head, ears, arms and legs.
 - **Final split:** 9 parts from seed points (`bear.seeds.json`): body, head, snout, ears, arms and legs.
 - **Edits:** the snout and ears move with the head. The head is turned 25° with [rotate on joint](features/transforms.md#rotate-on-joint), with [heal joint](features/transforms.md#heal-joint) on.
 - **Files:** `bear.stl`, `bear.seeds.json`, `bear.split.json`, `bear_parts.3mf`.
@@ -61,6 +61,7 @@ uv run mesh-splitter split examples/rocket/rocket.stl --shells -o rocket_shells.
 
 ## Tips from these models
 
-- **CAD-style meshes:** long, thin triangles (a box face made of two triangles) hide the creases from the splitter, and seeds grow into the wrong parts. Refine the mesh to short edges first; the robot and rocket here are refined to 2.5 mm.
-- **Soft blends:** organic models with smooth joins (the bear) need seeds; auto split finds few parts on them.
-- **Stretch** pivots on the part's main joint. Set the parts that hang off it (a hand on an arm) to move with it first, so it pivots at the shoulder, not the wrist.
+- **CAD-style meshes:** long, thin triangles (a box face made of two triangles) hide the creases. Mesh Splitter splits their long edges when it opens such a mesh; the robot and rocket here are already fine.
+- **Soft blends:** organic models with smooth joins (the bear) split into few parts at the default **Crease**. Lower it to 1 for more, or use seeds.
+- **Recesses** (the rocket's porthole and socket) export as a thin skin behind the surface, so they print as their own color.
+- **Stretch and rotate on joint** pivot at the cut toward the body. Set the parts that hang off a part (a hand on an arm) to move with it, so they come along.

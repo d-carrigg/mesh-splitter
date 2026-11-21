@@ -23,7 +23,9 @@ Splits the whole mesh into parts in one click. Cuts land on concave creases (the
 
 ### Tips
 
-- With the automatic count, it over-splits first, then merges neighbors whose shared edge isn't a real crease.
+- With the automatic count, it over-splits first, then merges neighbors whose shared edge isn't a real crease. For soft, rounded models (a plush toy) lower **Crease** below 2 before splitting so softer creases count.
+- With a set count you get exactly that many parts.
+- Opening a model fixes two things first, and the status bar says so: inside-out shells are turned right side out, and a mesh made mostly of long, thin triangles (a CAD export) gets its long edges split so the creases show. The surface doesn't change.
 - Each part gets its own color and filament slot (F2, F3, …). Change either in the sidebar's **Part** section.
 - To refine the result, use [seeds](#seeds-and-add-part), [fill, brush or merge](editing-parts.md#fill). Every step can be undone with Ctrl+Z.
 

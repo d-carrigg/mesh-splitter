@@ -61,14 +61,14 @@ def main():
     r = check(a.file)
     if a.parts is not None:
         assert len(r["parts"]) == a.parts, f"expected {a.parts} parts, got {len(r['parts'])}"
-    bad = [p for p in r["parts"] if not p["watertight"]]
+    bad = [p for p in r["parts"] if not p["watertight"] or p["volume_mm3"] <= 0]  # open, or inside out
     if a.json:
         print(json.dumps(r))
     else:
         print(f"{r['object']}: {len(r['parts'])} parts")
         for p in r["parts"]:
             print(f"  #{p['id']} {p['name']}: extruder {p['extruder']}, {p['faces']} faces, "
-                  f"{'closed' if p['watertight'] else 'OPEN'}, {p['volume_mm3']} mm3")
+                  f"{'closed' if p['watertight'] else 'OPEN'}, {p['volume_mm3']} mm3{'' if p['volume_mm3'] > 0 else ' INSIDE OUT'}")
     sys.exit(1 if bad else 0)
 
 

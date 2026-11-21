@@ -73,6 +73,8 @@ export function main(argv) {
   if (!fs.existsSync(file)) fail(`${file}: no such file`);
   const S = load(file);
   log(`${path.basename(file)}: ${S.nF.toLocaleString()} faces, ${S.G.shells} shell${S.G.shells > 1 ? "s" : ""}`);
+  if (S.refined) log(`  split long edges: +${S.refined.toLocaleString()} faces, so the creases show`);
+  if (S.flipped) log(`  turned ${S.flipped} inside-out shell${S.flipped > 1 ? "s" : ""} right side out`);
 
   const opts = { step, smooth };
   try {
@@ -183,9 +185,10 @@ function applySession(S, txt, log) {
   if (moved.length) log(`Note: ${moved.map((p) => p.name).join(", ")} moved or replaced in the app; written here in the original position and shape.`);
 }
 
-// Closed triangle soup per part: its faces plus caps over the cut openings.
+// Closed triangle soup per part: its faces plus caps over the cut openings (a recess gets a skin, see core.pocketShell).
 function soups(S, used) {
-  return used.map(([p, i]) => ({ name: p.name, filament: p.filament, soup: Float32Array.from(core.meshOf(S, (l) => l === i).verts) }));
+  const pockets = new Map();
+  return used.map(([p, i]) => ({ name: p.name, filament: p.filament, soup: core.closedPart(S, i, pockets) }));
 }
 function concat(arrs) { const v = new Float32Array(arrs.reduce((n, a) => n + a.length, 0)); let o = 0; for (const a of arrs) { v.set(a, o); o += a.length; } return v; }
 

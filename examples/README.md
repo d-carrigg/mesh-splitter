@@ -33,6 +33,6 @@ These models are made from code by [make_models.py](make_models.py) for this rep
 uv run --with manifold3d --with trimesh --with scikit-image --with scipy python examples/make_models.py
 ```
 
-The robot and rocket are refined to edges of 2.5 mm or less: CAD-style meshes with long, thin triangles split badly (see the Examples page).
+The robot and rocket are refined to edges of 2.5 mm or less, which is finer than Mesh Splitter's own refinement of coarse meshes.
 
 The docs images come from `node docs/demo/record.mjs docs/examples/demo/*.json`.

@@ -486,6 +486,8 @@ function loadRaw(name, raw) {
   syncSliders();
   lastActive = -1;
   if (!restoreAutosave() && S.nF >= 200) { autoSplit(0, true); S.hist = { past: [], future: [] }; refreshUI(); }
+  const fixes = [S.refined && `split long edges (+${S.refined.toLocaleString()} faces) so creases show`, S.flipped && `turned ${S.flipped} inside-out shell${S.flipped > 1 ? "s" : ""} right side out`].filter(Boolean);
+  if (fixes.length) status(`${$("status").textContent} · On open: ${fixes.join("; ")}`);
 }
 
 // The splitting algorithm lives in core.js (shared with the command line); these wrap it with the UI's
@@ -512,7 +514,7 @@ function autoSplit(k, scopeAll = false) {
   let n;
   try { n = core.autoSplit(S, k, { scope, step: creaseStep(), smooth: smoothIters() }); } catch (e) { alert(e.message); return; }
   pushUndo(snap); meshChanged(tri0);
-  afterEdit(`Auto split into ${n} parts`);
+  afterEdit(`Auto split into ${n} part${n === 1 ? "" : "s"}`);
 }
 
 function splitShells() {
@@ -637,8 +639,12 @@ function smoothBoundaries() {
 }
 
 // ---------------------------------------------------------------- mesh display
+// Shading: a vertex's normal is averaged over its faces, except where that average is more than ~37° off the face's own
+// normal (a box edge): there the face's normal is used, so flat faces next to sharp edges stay flat.
+const SMOOTH_COS = 0.8;
 function buildMesh() {
   if (mesh) { scene.remove(mesh); mesh.geometry.disposeBoundsTree?.(); mesh.geometry.dispose(); }
+  if (fillMesh) { scene.remove(fillMesh); fillMesh.geometry.dispose(); fillMesh = null; } // its parts may be gone (another model)
   const { pos, tri, nF, G } = S;
   // smooth vertex normals for shading
   const vn = new Float32Array(pos.length);
@@ -648,7 +654,7 @@ function buildMesh() {
     const v = tri[3*f+c];
     let nx = vn[3*v], ny = vn[3*v+1], nz = vn[3*v+2];
     // fall back to the face normal across sharp edges
-    if (nx*G.nrm[3*f] + ny*G.nrm[3*f+1] + nz*G.nrm[3*f+2] < 0.6 * Math.hypot(nx, ny, nz)) { nx = G.nrm[3*f]; ny = G.nrm[3*f+1]; nz = G.nrm[3*f+2]; }
+    if (nx*G.nrm[3*f] + ny*G.nrm[3*f+1] + nz*G.nrm[3*f+2] < SMOOTH_COS * Math.hypot(nx, ny, nz)) { nx = G.nrm[3*f]; ny = G.nrm[3*f+1]; nz = G.nrm[3*f+2]; }
     const l = Math.hypot(nx, ny, nz) || 1;
     for (let k = 0; k < 3; k++) P[9*f+3*c+k] = pos[3*v+k];
     N[9*f+3*c] = nx/l; N[9*f+3*c+1] = ny/l; N[9*f+3*c+2] = nz/l;
@@ -1163,7 +1169,8 @@ function partLoops(l, ctx) { // boundary loops of part l (geometry only, cached)
   return loopCache.get(key);
 }
 // What closes each boundary loop of a mesh: "fan" (no gap: a flat cap that the neighbor's cap meets), "patch" (Fill),
-// "bridge" (this side is anchored) or "under" (the neighbor is anchored and bridges over it).
+// "bridge" (this side is anchored), "under" (the neighbor is anchored and bridges over it) or "pocket" (a recess part and
+// its neighbor, both in place: the recess skin from core.pocketShell instead of a flat cap).
 function loopPlans(loops, ctx) {
   const tw = twinLabels(ctx.hash), nV = S.nV, out = [], a3 = new THREE.Vector3(), b3 = new THREE.Vector3();
   const major = (m) => { let best = -1, bn = 0; for (const [k, n] of m) if (n > bn) { bn = n; best = k; } return best; };
@@ -1185,9 +1192,21 @@ function loopPlans(loops, ctx) {
         else kind = "patch";
       }
     }
+    if (kind === "fan" && !ctx.mat(own) && !(nb > 0 && ctx.mat(nb))) { // a recess and its neighbor, both in place: the skin
+      const key = core.loopKey(lp), po = pocketOf(own, ctx.hash), pn = nb > 0 ? pocketOf(nb, ctx.hash) : null;
+      if (po?.key === key) { out.push({ lp, own, nb, kind: "pocket", tris: po.tris }); continue; }
+      if (pn?.key === key) { out.push({ lp, own, nb, kind: "pocket", tris: core.reverseSoup(pn.tris) }); continue; }
+    }
     out.push({ lp, own, nb, kind });
   }
   return out;
+}
+const pocketCache = new Map();
+function pocketOf(l, hash) { // core.pocketShell for part l, cached
+  if (!(l > 0) || !S.parts[l]) return null;
+  const key = `${l}|${S.nF}|${hash}`;
+  if (!pocketCache.has(key)) { if (pocketCache.size > 60) pocketCache.clear(); pocketCache.set(key, core.pocketShell(S, l, partMesh(l))); }
+  return pocketCache.get(key);
 }
 // Smooth patch over a loop, in original coordinates: rings shrinking from the loop to its center, lifted onto a
 // quadratic fitted to the surface of part fitL around the hole (the body's curve continues across it). fitL < 0: a
@@ -1281,6 +1300,7 @@ function planTris(pl, ctx, out = []) {
   const ring0 = new Float32Array(3 * n);
   lp.forEach(([a], j) => ctx.wpos(own, a, t3).toArray(ring0, 3 * j));
   const cen = (R) => { const c = [0, 0, 0]; for (let j = 0; j < n; j++) for (let k = 0; k < 3; k++) c[k] += R[3*j+k] / n; return c; };
+  if (kind === "pocket") { for (const x of pl.tris) out.push(x); return out; }
   if (kind === "fan" || kind === "under") { ringTris([ring0], cen(ring0), flip, out); return out; }
   if (kind === "patch") {
     const cntF = (l) => (l > 0 ? partCountsCached(ctx)[l] : 0);
@@ -2046,12 +2066,27 @@ function soupPCA(v) {
   return { mean: m, axes: eig3(C) };
 }
 
-function partJoint(pi) {
+// body: pick the cut toward the rest of the model (rotate on joint), not just the longest: cuts to parts that hang
+// off this one (what it carries, holds or reaches for) are skipped, and of the rest the cut to the biggest neighbor that
+// is bigger than this part wins (an arm's shoulder, not its wrist); with none bigger, the longest. Without body
+// (Replace), the longest cut.
+function partJoint(pi, body = false) {
   const pm = meshOf((l) => l === pi);
   if (!pm) return null;
   const P = (v) => new THREE.Vector3(S.pos[3*v], S.pos[3*v+1], S.pos[3*v+2]);
-  let best = null, bestLen = -1;
-  for (const loop of pm.loopList) {
+  let best = null, bestLen = -1, loops = pm.loopList;
+  if (body && loops.length > 1) {
+    const tw = twinLabels(fullHash()), nV = S.nV, cnt = partCounts(), u = S.parts[pi].uid;
+    const skip = new Set([pi, 0, ...followersOf(pi)]);
+    if (u) S.parts.forEach((q, j) => { if (j > 0 && (q.hold?.a === u || q.hold?.b === u)) skip.add(j); });
+    if (reachOf(pi) > 0) skip.add(reachOf(pi));
+    const nbOf = (lp) => { const m = new Map(); for (const [a, b] of lp) { const n = tw.get(b * nV + a); if (n !== undefined) m.set(n, (m.get(n) || 0) + 1); } return [...m].sort((x, y) => y[1] - x[1])[0]?.[0] ?? -1; };
+    const ok = loops.map((lp) => [lp, nbOf(lp)]).filter(([, n]) => n >= 0 && !skip.has(n));
+    const big = ok.filter(([, n]) => (cnt[n] || 0) > (cnt[pi] || 0)); // toward the body: a neighbor bigger than this part
+    if (big.length) { const top = Math.max(...big.map(([, n]) => cnt[n])); loops = big.filter(([, n]) => cnt[n] === top).map(([lp]) => lp); }
+    else if (ok.length) loops = ok.map(([lp]) => lp);
+  }
+  for (const loop of loops) {
     let len = 0; for (const [a, b] of loop) len += P(a).distanceTo(P(b));
     if (len > bestLen) { bestLen = len; best = loop; }
   }
@@ -2327,8 +2362,8 @@ let gzJointOn = false, gzJoint = null;
 try { gzJointOn = localStorage.getItem("meshsplit:gzJoint") === "1"; } catch {}
 const jointCache = new Map();
 function jointFrame(i) {
-  const key = `${i}|${S.nF}|${fullHash()}`;
-  if (!jointCache.has(key)) { jointCache.clear(); jointCache.set(key, partJoint(i)); }
+  const key = `${i}|${S.nF}|${fullHash()}|${S.parts.map((q) => (q.follow?.to ?? "") + "," + (q.hold ? q.hold.a + q.hold.b : "") + "," + (q.reach?.to ?? "")).join(";")}`;
+  if (!jointCache.has(key)) { jointCache.clear(); jointCache.set(key, partJoint(i, true)); }
   const pj = jointCache.get(key);
   if (!pj?.loopLen) return null; // no cut: plain world-axis rotation
   const M = xfMatrix(S.parts[i]) || new THREE.Matrix4();
@@ -2613,6 +2648,12 @@ function localChecks(st) {
     if (p.area_pct < 0.2) out.push({ severity: "low", parts: [p.id], problem: `#${p.id} ${p.name} is a sliver (${p.area_pct}% of area, ${p.faces} faces)`,
       fix: "Merge it into its neighbor unless it is a real detail" });
   }
+  for (const p of st.parts) { // a closed part that encloses negative volume prints as nothing or as a hole
+    if (p.id === 0) continue;
+    const v = partSoup(p.id);
+    if (v?.length && core.soupVolume(v) < 0) out.push({ severity: "high", parts: [p.id], problem: `#${p.id} ${p.name} is inside out as a separate solid (a recess with more than one cut)`,
+      fix: "Merge it into the part it is cut into, or Brush its rim so it has a single cut" });
+  }
   for (const h of hits) if (S.parts[h[0]] && S.parts[h[1]]) out.push({ severity: "high", parts: h, problem: hitText(h),
     fix: "Move, rotate or stretch one of them (e.g. stretch the arms that hold it) until the warning clears" });
   return out;
@@ -2844,7 +2885,7 @@ function restoreAutosave() {
   let txt = null;
   try { txt = localStorage.getItem(autosaveKey()); } catch {}
   if (!txt) return false;
-  try { applySession(txt); afterEdit("Restored previous session"); return true; } catch (e) { console.warn("autosave ignored:", e.message); return false; }
+  try { applySession(txt); afterEdit(`Restored your last session on ${S.name}. Auto split (A) starts over.`); return true; } catch (e) { console.warn("autosave ignored:", e.message); return false; }
 }
 $("exp3mf").onclick = () => { closeMenus(); later(exportPainted3MF); };
 $("expParts").onclick = () => { closeMenus(); later(exportParts3MF); };

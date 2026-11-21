@@ -51,3 +51,13 @@ jobs:
           uv run python verify_3mf.py ../build/auto.3mf
           uv run python verify_3mf.py ../build/auto4.3mf
           uv run python verify_3mf.py ../build/from3mf.3mf --parts 2
+      - name: Examples (exact part count, recesses, inside-out input)
+        run: |
+          uv run mesh-splitter split examples/robot/robot.stl --auto 16 -o build/robot16.3mf
+          uv run mesh-splitter split examples/rocket/rocket.stl -o build/rocket.3mf
+          uv run python -c "import trimesh; m=trimesh.load('examples/bear/bear.stl'); m.invert(); m.export('build/bear_inside_out.stl')"
+          uv run mesh-splitter split build/bear_inside_out.stl --seeds examples/bear/bear.seeds.json -o build/bear.3mf
+          cd plugin
+          uv run python verify_3mf.py ../build/robot16.3mf --parts 16
+          uv run python verify_3mf.py ../build/rocket.3mf --parts 7
+          uv run python verify_3mf.py ../build/bear.3mf --parts 9
