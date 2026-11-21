@@ -1293,17 +1293,36 @@ function patchRings(lp, fitL, hash) {
   const lo = Math.min(hmin, 0) - rbar * 0.5, hi = Math.max(hmax, 0) + rbar * 0.5;
   const fit = (x, y) => co ? Math.max(lo, Math.min(hi, co[0] + co[1]*x + co[2]*y + co[3]*x*x + co[4]*x*y + co[5]*y*y)) : 0;
   const P2 = pts.map(loc), K = Math.max(2, Math.min(6, Math.round(rbar / Math.max(3 * edge, 1e-6))));
+  // the loop as (x, y, height off the fit): a cut follows mesh edges, so it zigzags; copied inward unsmoothed, the
+  // zigzag shows as fine radial ridges (a "pie"). Each inner ring takes a copy smoothed over more of the loop.
+  const L3 = new Float64Array(3 * n); P2.forEach(([x, y, h], k) => { L3[3*k] = x; L3[3*k+1] = y; L3[3*k+2] = h - fit(x, y); });
   const rings = [], s = [], idx = [];
-  for (let k = 1; k < K; k++) { // inner rings get fewer points, keeping their edges about as long as the loop's
-    const t = 1 - k / K, m = Math.max(6, Math.round(n * t)), ring = new Float32Array(3 * m), ix = new Int32Array(m);
+  // a first ring close to the loop keeps the row that takes up the loop's zigzag narrow
+  for (const t of [1 - 0.3 / K, ...Array.from({ length: K - 1 }, (_, k) => 1 - (k + 1) / K)]) { // inner rings get fewer points, keeping their edges about as long as the loop's
+    const m = Math.max(6, Math.round(n * t)), ring = new Float32Array(3 * m), ix = new Int32Array(m);
+    const Ls = loopSmooth(L3, Math.round((1 - t) * rbar / Math.max(edge, 1e-6)));
     for (let j = 0; j < m; j++) {
-      const q = ix[j] = Math.round(j * n / m) % n, [x0, y0, h0] = P2[q], x = t * x0, y = t * y0, h = fit(x, y) + t * (h0 - fit(x0, y0));
+      const q = ix[j] = Math.round(j * n / m) % n, x = t * Ls[3*q], y = t * Ls[3*q+1], h = fit(x, y) + t * Ls[3*q+2];
       ring[3*j] = C.x + x*u.x + y*w.x + h*nrm.x; ring[3*j+1] = C.y + x*u.y + y*w.y + h*nrm.y; ring[3*j+2] = C.z + x*u.z + y*w.z + h*nrm.z;
     }
     rings.push(ring); s.push(t); idx.push(ix);
   }
   const hc = fit(0, 0), c = [C.x + hc*nrm.x, C.y + hc*nrm.y, C.z + hc*nrm.z];
   const out = { rings, t: s, idx, c }; patchCache.set(key, out); return out;
+}
+// Moving average around a closed loop (flat xyz array): a box of half-width h, twice. h < 1: a copy.
+function loopSmooth(P, h) {
+  const n = P.length / 3; let A = Float64Array.from(P);
+  h = Math.min(h, Math.floor((n - 1) / 2)); if (!(h >= 1)) return A;
+  for (let pass = 0; pass < 2; pass++) {
+    const B = new Float64Array(A.length), w = 2 * h + 1;
+    for (let c = 0; c < 3; c++) {
+      let sum = 0; for (let k = -h; k <= h; k++) sum += A[3 * ((k + n) % n) + c];
+      for (let j = 0; j < n; j++) { B[3*j+c] = sum / w; sum += A[3 * ((j + h + 1) % n) + c] - A[3 * ((j - h + n) % n) + c]; }
+    }
+    A = B;
+  }
+  return A;
 }
 // Triangles between rings (ring 0 = the loop as the part sees it, a->b along its boundary; each inner ring starts at
 // the same place and may have fewer points) and a center point, wound so they close the part's boundary.
@@ -1365,13 +1384,27 @@ function planTris(pl, ctx, out = []) {
   const res = p1.map((p, j) => p.clone().sub(p0[j].clone().applyMatrix4(Rel))); // heal / stretch beyond the rigid turn
   let per = 0, md = 0; for (let j = 0; j < n; j++) { per += p0[j].distanceTo(p0[(j+1) % n]); md = Math.max(md, p0[j].distanceTo(p1[j])); }
   const ang = 2 * Math.acos(Math.min(1, Math.abs(q.w))), steps = Math.max(1, Math.min(24, Math.max(Math.ceil(ang / 0.14), Math.ceil(md / Math.max(3 * per / n, 1e-6)))));
-  const rings = [ring0], I = new THREE.Quaternion(), qt = new THREE.Quaternion(), d = new THREE.Vector3(), kd = new THREE.Vector3();
+  // The two ends are the cut loops as they are (they meet the parts' edges); the rings between sweep a smoothed copy, as
+  // a cut zigzags along mesh edges and the zigzag swept along would show as ridges.
+  const flat = (A) => { const F = new Float64Array(3 * n); A.forEach((v, j) => v.toArray(F, 3*j)); return F; };
+  const D0 = flat(p0.map((p) => p.clone().sub(C0))), Rs = flat(res), hs = Math.max(1, Math.round(n / 60));
+  const Ds = loopSmooth(D0, hs), Rss = loopSmooth(Rs, hs);
+  const rings = [ring0], I = new THREE.Quaternion(), qt = new THREE.Quaternion(), d = new THREE.Vector3(), kd = new THREE.Vector3(), r3 = new THREE.Vector3();
   for (let k = 1; k <= steps; k++) {
-    const t = 1 - k / steps, R = new Float32Array(3 * n); qt.slerpQuaternions(I, q, t);
+    const t = 1 - k / steps, R = new Float32Array(3 * n), end = k === steps, Dk = end ? D0 : Ds, Rk = end ? Rs : Rss; qt.slerpQuaternions(I, q, t);
     for (let j = 0; j < n; j++) {
-      d.subVectors(p0[j], C0); kd.copy(d).applyMatrix3(Km);
-      t3.copy(d).lerp(kd, t).applyQuaternion(qt).add(C0.clone().lerp(C1, t)).addScaledVector(res[j], t).toArray(R, 3*j);
+      d.fromArray(Dk, 3*j); kd.copy(d).applyMatrix3(Km);
+      t3.copy(d).lerp(kd, t).applyQuaternion(qt).add(C0.clone().lerp(C1, t)).addScaledVector(r3.fromArray(Rk, 3*j), t).toArray(R, 3*j);
     }
+    rings.push(R);
+  }
+  // cap over the neighbor's hole: rings shrinking to the center, each smoothed more (one fan from the zigzag loop to the
+  // center would show as a pie)
+  const ed = per / n, rb = D0.reduce((m, _, i) => (i % 3 ? m : m + Math.hypot(D0[i], D0[i+1], D0[i+2]) / n), 0);
+  const Kc = Math.max(2, Math.min(6, Math.round(rb / Math.max(3 * ed, 1e-6))));
+  for (const t of [1 - 0.3 / Kc, ...Array.from({ length: Kc - 1 }, (_, k) => 1 - (k + 1) / Kc)]) {
+    const Ls = loopSmooth(D0, Math.round((1 - t) * rb / Math.max(ed, 1e-6))), R = new Float32Array(3 * n);
+    for (let j = 0; j < n; j++) { R[3*j] = C0.x + t * Ls[3*j]; R[3*j+1] = C0.y + t * Ls[3*j+1]; R[3*j+2] = C0.z + t * Ls[3*j+2]; }
     rings.push(R);
   }
   ringTris(rings, C0.toArray(), flip, out); return out;
