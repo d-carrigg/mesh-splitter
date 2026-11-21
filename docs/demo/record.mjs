@@ -12,9 +12,15 @@
 // Frames are captured step by step at a fixed frame rate, so the GIF's timing doesn't depend on how fast
 // the machine renders. Steps, timing, camera and size all come from the config (demo.config.json).
 // The demo meshes aren't in the repo: prep_curling.py makes them. --keep-frames leaves the PNGs in build/frames.
+// "llm": {reply, models, delay, port} runs AI part naming for real against a mock model: it starts the local server
+// (server/serve.py, settings in a temp file) and server/mock_llm_server.py (an OpenAI-compatible server, like
+// LM Studio, that answers with the canned reply), and sends the page's /api/llm/* requests to that local server.
+// Python: $PYTHON, else "python".
 import { mkdirSync, readFileSync, rmSync, existsSync, statSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
-import { spawnSync } from "node:child_process";
+import { spawnSync, spawn } from "node:child_process";
+import { createServer } from "node:net";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -60,6 +66,29 @@ const serve = (route, file) => {
   return route.fulfill({ status: 200, body: readFileSync(file), contentType: TYPES[file.split(".").pop().toLowerCase()] || "application/octet-stream" });
 };
 
+// ---------------------------------------------------------------- AI naming against a mock model ("llm")
+let llmUrl = null;
+const kids = [];
+process.on("exit", () => kids.forEach((k) => k.kill()));
+if (cfg.llm) {
+  const freePort = () => new Promise((res) => { const s = createServer().listen(0, "127.0.0.1", () => { const p = s.address().port; s.close(() => res(p)); }); });
+  const py = process.env.PYTHON || "python";
+  const start = (argv, env) => new Promise((res, rej) => {
+    const k = spawn(py, argv, { cwd: root, env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "ignore"] });
+    kids.push(k); k.on("error", rej); k.on("exit", (c) => rej(new Error(`${argv[0]} exited (${c})`)));
+    k.stdout.once("data", () => res(k));
+  });
+  const [mp, sp] = [cfg.llm.port || await freePort(), await freePort()]; // port: e.g. 1234, LM Studio's, as the GIF shows
+  const keys = Object.fromEntries(["OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "MESH_SPLITTER_LLM_KEY", "OPENROUTER_MODEL"].map((k) => [k, ""]));
+  const settings = path.join(tmpdir(), `mesh-splitter-demo-${process.pid}.json`);
+  rmSync(settings, { force: true });
+  process.on("exit", () => rmSync(settings, { force: true }));
+  await start(["server/mock_llm_server.py", "--port", String(mp), "--models", (cfg.llm.models || ["mock-vision-1"]).join(","),
+    "--delay", String(cfg.llm.delay ?? 0), ...(cfg.llm.reply ? ["--reply", path.resolve(root, cfg.llm.reply)] : [])], {});
+  await start(["server/serve.py", "--port", String(sp), "--no-browser"], { ...keys, MESH_SPLITTER_LLM_SETTINGS: settings, NO_PROXY: "127.0.0.1,localhost" });
+  llmUrl = `http://127.0.0.1:${sp}`;
+}
+
 const browser = await chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 const vp = cfg.viewport || { width: 1200, height: 720 };
 const page = await browser.newPage({ viewport: vp, deviceScaleFactor: cfg.deviceScaleFactor ?? 1 });
@@ -73,6 +102,7 @@ await page.route("https://cdn.jsdelivr.net/npm/**", (r) => {
 });
 await page.route(ORIGIN + "/**", (r) => {
   const p = decodeURIComponent(new URL(r.request().url()).pathname);
+  if (llmUrl && p.startsWith("/api/llm/")) return r.fetch({ url: llmUrl + p }).then((res) => r.fulfill({ response: res }));
   if (p === "/api/llm/status") return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(cfg.llmStatus || { configured: false, source: null, model: "" }) });
   return serve(r, path.join(root, p.endsWith("/") ? p + "index.html" : p));
 });
@@ -322,6 +352,7 @@ for (const [i, s] of cfg.steps.entries()) {
   if (errors.length) break;
 }
 await browser.close();
+kids.forEach((k) => { k.removeAllListeners("exit"); k.kill(); }); // the local server and mock model, if "llm"
 if (errors.length) { console.error("FAILED:", errors.join(" | ")); process.exit(1); }
 
 // ---------------------------------------------------------------- encode

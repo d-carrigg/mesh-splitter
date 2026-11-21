@@ -3,7 +3,8 @@
 
 The provider logic is in llm_providers.py (shared with the OrcaSlicer plugin). Keys never go to the page.
 
-Settings: server/llm.local.json (gitignored), written by the AI settings in the page.
+Settings: server/llm.local.json (gitignored), written by the AI settings in the page
+(or the file in env MESH_SPLITTER_LLM_SETTINGS, which the docs recorder uses).
 Key overrides (win over the saved key for that provider):
   1. env OPENROUTER_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY / MESH_SPLITTER_LLM_KEY (custom)
   2. the same names in .env in the repo root (gitignored); OPENROUTER_MODEL=... also works
@@ -18,7 +19,7 @@ from pathlib import Path
 import llm_providers as P
 
 HERE = Path(__file__).resolve().parent
-SETTINGS = HERE / "llm.local.json"
+SETTINGS = Path(os.environ.get("MESH_SPLITTER_LLM_SETTINGS") or HERE / "llm.local.json")  # env: docs recorder
 LOCAL_CFG = HERE / "openrouter.local.json"  # legacy
 DOTENV = HERE.parent / ".env"
 DEFAULT_MODEL = P.PROVIDERS["openrouter"]["model"]

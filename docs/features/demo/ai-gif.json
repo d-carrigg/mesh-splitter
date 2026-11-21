@@ -1,0 +1,148 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "curler.stl",
+ "out": "docs/features/img/ai-naming.gif",
+ "llm": {
+  "reply": "docs/features/demo/ai-reply.json",
+  "models": [
+   "qwen2.5-vl-7b-instruct"
+  ],
+  "delay": 1.5,
+  "port": 1234
+ },
+ "viewport": {
+  "width": 1200,
+  "height": 760
+ },
+ "fps": 12,
+ "gif": {
+  "width": 900,
+  "colors": 128,
+  "dither": "sierra2_4a",
+  "loop": 0
+ },
+ "camera": {
+  "az": 20,
+  "el": 15,
+  "dist": 0.85,
+  "lift": -0.02
+ },
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "key",
+   "key": "q",
+   "after": 0.6
+  },
+  {
+   "do": "click",
+   "target": "#aiToggle",
+   "after": 0.4
+  },
+  {
+   "do": "click",
+   "target": "#aiGear",
+   "after": 0.5
+  },
+  {
+   "do": "caption",
+   "text": "Pick a provider: OpenAI, OpenRouter, Claude, or a local model",
+   "s": 0.2
+  },
+  {
+   "do": "move",
+   "target": "#aiProv"
+  },
+  {
+   "do": "eval",
+   "js": "const s = document.getElementById('aiProv'); s.value = 'custom'; s.dispatchEvent(new Event('change'))"
+  },
+  {
+   "do": "hold",
+   "s": 1.4
+  },
+  {
+   "do": "caption",
+   "text": "LM Studio runs on localhost:1234, no key needed",
+   "s": 1.6
+  },
+  {
+   "do": "click",
+   "target": "#aiSave",
+   "after": 0.8
+  },
+  {
+   "do": "click",
+   "target": "#aiGear",
+   "after": 0.4
+  },
+  {
+   "do": "caption",
+   "text": ""
+  },
+  {
+   "do": "click",
+   "target": "#aiModel",
+   "after": 0.2
+  },
+  {
+   "do": "type",
+   "target": "#aiModel",
+   "text": "qwen2.5-vl-7b-instruct",
+   "perChar": 0.04
+  },
+  {
+   "do": "click",
+   "target": "#aiNote",
+   "after": 0.1
+  },
+  {
+   "do": "type",
+   "text": "curling stone character",
+   "perChar": 0.05
+  },
+  {
+   "do": "hold",
+   "s": 0.4
+  },
+  {
+   "do": "click",
+   "target": "#aiBtn",
+   "after": 2.2
+  },
+  {
+   "do": "caption",
+   "text": "Check the names, then Apply",
+   "s": 0.2
+  },
+  {
+   "do": "caption",
+   "text": "Check the names, then Apply",
+   "s": 0.2
+  },
+  {
+   "do": "hold",
+   "s": 0.8
+  },
+  {
+   "do": "click",
+   "target": "#aiOut button",
+   "after": 0.3
+  },
+  {
+   "do": "caption",
+   "text": ""
+  },
+  {
+   "do": "move",
+   "target": "#partsBody",
+   "s": 0.8
+  },
+  {
+   "do": "hold",
+   "s": 2.5
+  }
+ ]
+}

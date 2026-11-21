@@ -13,7 +13,7 @@ Optional. Sends pictures of the split model and each part's stats to a vision mo
 
 Works in the browser version and inside the OrcaSlicer plugin.
 
-![The AI panel next to the model, with the local check result](img/ai-panel.png)
+![Set up a local model (LM Studio), click Name parts, then Apply names](img/ai-naming.gif)
 
 ## Providers
 
