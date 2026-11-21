@@ -84,9 +84,9 @@ When a part moves away from the part it joined, the cut opens and both sides sho
 - **Fill** (default): the hole is patched. The bigger side (the body) gets a patch that follows its own curve, so the body stays smooth where a hand used to rest. The smaller side gets a flat face.
 - **Anchor**: the part stays joined where it attaches. New material sweeps from the neighbor's rim to the part's moved cut, along the same turn, so an arm raised at the shoulder stays on the body instead of lifting off.
 
-![An arm turned 55°: holes in the body, then patched with Fill](img/gap-fill.png)
+![The front arm turned up, carrying the hand, stick, broom and back arm: holes in the body, then closed with Fill](img/gap-fill.png)
 
-![Fill lets the arm lift off the body; Anchor keeps it joined with new material](img/gap-anchor.png)
+![Side view of the back arm: the hole at its shoulder, Fill closing the body while the arm floats off, and Anchor keeping it joined with new material](img/gap-anchor.png)
 
 ### How to use it
 
