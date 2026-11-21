@@ -130,7 +130,7 @@ A moved part's cut no longer lines up with its neighbor's edge. [Heal joint](fea
 2. After the transform, each loop vertex is matched to the rim point at the same angle, which gives a pull vector.
 3. Every vertex of the part takes the pull of its nearest loop vertex, faded by a cosine falloff over the blend distance (20% of the cut's radius by default, 1 to 15 mm). At the cut the pull is 100%. Past the blend distance it's 0, and the shape is exact.
 
-![Moved 6 mm: gap without heal, flush with heal](features/img/heal-joint.png)
+![Lifted 4 mm: a step without heal, flush with heal](features/img/heal-joint.png)
 
 The healed shape is computed on the fly from the transform, so changing the move or rotation re-heals it. Exports use the healed shape.
 

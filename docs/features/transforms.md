@@ -62,7 +62,7 @@ Spins a part about its cut instead of the world axes. The axis is the cut's norm
 
 After you move or rotate a part, its cut edge may no longer line up with its neighbor, which leaves a gap or a step. Heal joint stretches or squeezes the part near its cut so the cut's edge lands back on the neighbor's edge. Added in [#24](https://github.com/d-carrigg/mesh-splitter/pull/24).
 
-![The handle moved 6 mm: a gap without heal joint, flush with heal joint](img/heal-joint.png)
+![The handle lifted 4 mm: a step without heal joint, flush with heal joint](img/heal-joint.png)
 
 ### How to use it
 
