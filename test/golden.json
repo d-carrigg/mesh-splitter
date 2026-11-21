@@ -1,0 +1,204 @@
+{
+ "robot auto": {
+  "log": "df5dcd606d705a19",
+  "files": {
+   "robot_auto.3mf": {
+    "_rels/.rels": "465f67e7a55f044d",
+    "[Content_Types].xml": "e1c3af6da2b2500c",
+    "3D/3dmodel.model": "d8854b9e4a04cacc",
+    "Metadata/model_settings.config": "a757fb0d117483c3"
+   },
+   "robot_auto.json": "c233de76f05ad683"
+  }
+ },
+ "robot auto 12, 4 slots": {
+  "log": "bf7ade53bb8b0efc",
+  "files": {
+   "robot_f4.3mf": {
+    "_rels/.rels": "465f67e7a55f044d",
+    "[Content_Types].xml": "e1c3af6da2b2500c",
+    "3D/3dmodel.model": "3be8327b29fc31f2",
+    "Metadata/model_settings.config": "0fd70df22ee3eb97"
+   }
+  }
+ },
+ "robot auto 16, every output": {
+  "log": "d5854326fd34f9dc",
+  "files": {
+   "robot16.3mf": {
+    "_rels/.rels": "465f67e7a55f044d",
+    "[Content_Types].xml": "e1c3af6da2b2500c",
+    "3D/3dmodel.model": "c9da4256176c8a78",
+    "Metadata/model_settings.config": "fc547b0554b423f8"
+   },
+   "robot16_painted.3mf": {
+    "_rels/.rels": "465f67e7a55f044d",
+    "[Content_Types].xml": "ec0f198c3805b3ed",
+    "3D/3dmodel.model": "8b336b2822873a70"
+   },
+   "robot16_stl": {
+    "robot_Part_1.stl": "e3f6ec277a33f617",
+    "robot_Part_10.stl": "3e5e6fead2a579ff",
+    "robot_Part_11.stl": "a6b91a47394cc076",
+    "robot_Part_12.stl": "d1032fbd0b79f426",
+    "robot_Part_13.stl": "87a8d45f419e8e5b",
+    "robot_Part_14.stl": "8dba12ae8de7207c",
+    "robot_Part_15.stl": "55672b80cafe7709",
+    "robot_Part_16.stl": "e9ba4856907d2f6a",
+    "robot_Part_2.stl": "57efd10f72086170",
+    "robot_Part_3.stl": "704bab527719184a",
+    "robot_Part_4.stl": "75a288404a703f2a",
+    "robot_Part_5.stl": "3e1a42f68aef2833",
+    "robot_Part_6.stl": "28a3e26d1a05880c",
+    "robot_Part_7.stl": "69629fded40bbcde",
+    "robot_Part_8.stl": "0af52807a0262fb4",
+    "robot_Part_9.stl": "a999818cdfd32a22"
+   },
+   "robot16_merged.stl": "7a7d8d2678800545",
+   "robot16.split.json": "dfb29aa56432b571",
+   "robot16.json": "e04dc81bf6d8a1a1"
+  }
+ },
+ "robot seeds, crease/denoise": {
+  "log": "bccb983fa3556e6e",
+  "files": {
+   "robot_seeds.3mf": {
+    "_rels/.rels": "465f67e7a55f044d",
+    "[Content_Types].xml": "e1c3af6da2b2500c",
+    "3D/3dmodel.model": "f90d31da34b588fa",
+    "Metadata/model_settings.config": "0279fa33ac45d143"
+   }
+  }
+ },
+ "robot merge": {
+  "log": "ec1f69ed156a2934",
+  "files": {
+   "robot_merge.3mf": {
+    "_rels/.rels": "465f67e7a55f044d",
+    "[Content_Types].xml": "e1c3af6da2b2500c",
+    "3D/3dmodel.model": "0402977048b990fe",
+    "Metadata/model_settings.config": "81a50dcf491fd5d6"
+   },
+   "robot_merge.json": "d6decf725c4ebbdd"
+  }
+ },
+ "rocket auto (recesses)": {
+  "log": "804f2c914a484dd5",
+  "files": {
+   "rocket.3mf": {
+    "_rels/.rels": "465f67e7a55f044d",
+    "[Content_Types].xml": "e1c3af6da2b2500c",
+    "3D/3dmodel.model": "1bb7887214ee211d",
+    "Metadata/model_settings.config": "6ed4834cb7a1a334"
+   },
+   "rocket_stl": {
+    "rocket_Part_1.stl": "ee5d041114619f75",
+    "rocket_Part_2.stl": "029c35380f229a2e",
+    "rocket_Part_3.stl": "2d83594d85d4d2f7",
+    "rocket_Part_4.stl": "48149234a191c618",
+    "rocket_Part_5.stl": "16571b5e631605c6",
+    "rocket_Part_6.stl": "361d179bf35607b0",
+    "rocket_Part_7.stl": "9853f147ea5e7f7a"
+   },
+   "rocket.json": "0f6146f15d47354d"
+  }
+ },
+ "rocket session": {
+  "log": "3ba0d6de663a0127",
+  "files": {
+   "rocket_session.3mf": {
+    "_rels/.rels": "465f67e7a55f044d",
+    "[Content_Types].xml": "e1c3af6da2b2500c",
+    "3D/3dmodel.model": "089dcd1ba55ac74b",
+    "Metadata/model_settings.config": "f936e688d4e131ea"
+   }
+  }
+ },
+ "bear seeds": {
+  "log": "4750a23c8efccbe8",
+  "files": {
+   "bear.3mf": {
+    "_rels/.rels": "465f67e7a55f044d",
+    "[Content_Types].xml": "e1c3af6da2b2500c",
+    "3D/3dmodel.model": "14241ed0e289549f",
+    "Metadata/model_settings.config": "9db035872ea5554f"
+   },
+   "bear_painted.3mf": {
+    "_rels/.rels": "465f67e7a55f044d",
+    "[Content_Types].xml": "ec0f198c3805b3ed",
+    "3D/3dmodel.model": "d9cddd5d3b7db48a"
+   },
+   "bear.split.json": "f97df554d29dd09f"
+  }
+ },
+ "bear session": {
+  "log": "343e5b9a793a9fb7",
+  "files": {
+   "bear_session.3mf": {
+    "_rels/.rels": "465f67e7a55f044d",
+    "[Content_Types].xml": "e1c3af6da2b2500c",
+    "3D/3dmodel.model": "14241ed0e289549f",
+    "Metadata/model_settings.config": "9db035872ea5554f"
+   },
+   "bear_session_merged.stl": "e548b416f17d72f3"
+  }
+ },
+ "shells (bear and rocket side by side)": {
+  "log": "beb7a369c21f54f0",
+  "files": {
+   "two_shells.3mf": {
+    "_rels/.rels": "465f67e7a55f044d",
+    "[Content_Types].xml": "e1c3af6da2b2500c",
+    "3D/3dmodel.model": "be5f886f584e148b",
+    "Metadata/model_settings.config": "1a226893c0ee1399"
+   },
+   "two_shells_stl": {
+    "two_shells_Shell_1.stl": "59e34882a5922e5e",
+    "two_shells_Shell_2.stl": "7de17927b13791ed",
+    "two_shells_Shell_3.stl": "420131c7df29ad56"
+   },
+   "two_shells.json": "30e5a5f609acaae3"
+  }
+ },
+ "inside-out input (bear, flipped)": {
+  "log": "fce151b55671b825",
+  "files": {
+   "bear_inside_out.3mf": {
+    "_rels/.rels": "465f67e7a55f044d",
+    "[Content_Types].xml": "e1c3af6da2b2500c",
+    "3D/3dmodel.model": "18cc5f14a3ce17c8",
+    "Metadata/model_settings.config": "035b6d50f49cebb2"
+   }
+  }
+ },
+ "3MF input (robot parts)": {
+  "log": "e5bd895174262d87",
+  "files": {
+   "robot_from3mf.3mf": {
+    "_rels/.rels": "465f67e7a55f044d",
+    "[Content_Types].xml": "e1c3af6da2b2500c",
+    "3D/3dmodel.model": "82b29c486058b7d5",
+    "Metadata/model_settings.config": "2c07a534a1854ddb"
+   },
+   "robot_from3mf_painted.3mf": {
+    "_rels/.rels": "465f67e7a55f044d",
+    "[Content_Types].xml": "e1c3af6da2b2500c",
+    "3D/3dmodel.model": "d053f3ae4e9cbc8f",
+    "Metadata/model_settings.config": "0279fa33ac45d143"
+   }
+  }
+ },
+ "core functions": {
+  "exports": "100140cdf7812c3d",
+  "meshOf": "a8cec2875bea7a27",
+  "soupVolume": "13896.868176",
+  "reverseSoup": "02bb4e706b840986",
+  "paintCode": "4,8,0C,1C,5C,DC",
+  "snapCreases": 999,
+  "smoothCut": 1062,
+  "labelsAfterCleanup": "88bba62c9642a6f5",
+  "meshAfterCleanup": "1c1e1db5675b57ab50c480182066ab0f",
+  "session": "4615b9a66a65280d",
+  "sessionRoundTrip": "88bba62c9642a6f5"
+ }
+}
