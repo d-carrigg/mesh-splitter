@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.17](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.16...v0.3.17) (2026-11-21)
+
+
+### Features
+
+* publish the browser app to Azure Static Web Apps, with AI naming straight from the browser ([#85](https://github.com/d-carrigg/mesh-splitter/issues/85)) ([eb20dd6](https://github.com/d-carrigg/mesh-splitter/commit/eb20dd6be17966578796c38f65d6f1e8b5118200))
+* Transform panel shows only the options for the active tool ([#79](https://github.com/d-carrigg/mesh-splitter/issues/79)) ([5e85256](https://github.com/d-carrigg/mesh-splitter/commit/5e852568816ce2ea2767dc21b47240fb9b9fabd4))
+
+
+### Bug Fixes
+
+* Check parts shows its results instead of opening them behind the Transform or Split panel ([#83](https://github.com/d-carrigg/mesh-splitter/issues/83)) ([ad8b881](https://github.com/d-carrigg/mesh-splitter/commit/ad8b8817fbdcf12734f9b6907e597f87a893f202))
+* draw the export menu over the Transform panel ([#80](https://github.com/d-carrigg/mesh-splitter/issues/80)) ([46ff865](https://github.com/d-carrigg/mesh-splitter/commit/46ff86573175b573fc1d37f68809c8d1ead76289))
+* issues from the full-app check, plus a manual check list ([#84](https://github.com/d-carrigg/mesh-splitter/issues/84)) ([e55f0d4](https://github.com/d-carrigg/mesh-splitter/commit/e55f0d40e2c688b90bc937f3d56c6d46f453fdf4))
+* stop the browser's own menu showing over the part menu on the first right-click ([#82](https://github.com/d-carrigg/mesh-splitter/issues/82)) ([cd10707](https://github.com/d-carrigg/mesh-splitter/commit/cd107074e0ad88d9e02055282d247b55692630d6))
+
+
+### Documentation
+
+* link the hosted app at splitmesh.carrigg.dev ([#86](https://github.com/d-carrigg/mesh-splitter/issues/86)) ([9c5f972](https://github.com/d-carrigg/mesh-splitter/commit/9c5f9726a3f1e1b8cf7ccb218641e344ea54268c))
+
 ## [0.3.16](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.15...v0.3.16) (2026-11-21)
 
 
