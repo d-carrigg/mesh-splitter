@@ -9,8 +9,8 @@ For the example photo, I made the eyes 1 part, then replaced them with a flipped
 ## Features
 
 - **Split in a few clicks:** auto split, split by shells, or click a seed per part. Cuts follow the model's creases.
-- **One color per part:** each part gets its own filament slot. Rename, hide, or show only one part.
-- **Move, rotate, scale:** drag handles in the view (W / E / R, Shift to snap), with undo.
+- **Move, rotate, scale:** move, rotate, and scale both within the context of the world axes and of the part orientation. This means you can do things like rotate limbs and increase specific part sizes.
+- **Multicolor / multi-material printing:** individual parts can be given their own materials and colors pulled from your printer.
 - **Replace with…:** right-click a part and swap in another STL. It snaps onto the joint and keeps the part's name and filament.
 - **Send to Orca:** one multi-part 3MF with every part on its filament. Painted 3MF, merged STL and per-part STLs are also available.
 
