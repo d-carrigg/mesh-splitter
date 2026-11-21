@@ -141,7 +141,7 @@ When a part moves, the cut loop it shares with a neighbor opens if the loop's ve
 
 Each part's export is then its faces plus these patches, a closed solid.
 
-![Fill vs. anchor on a turned arm](features/img/gap-anchor.png)
+![Before, Fill and Anchor on the back arm after the front arm turns](features/img/gap-anchor.png)
 
 ### Move with, Reach and Hold
 
