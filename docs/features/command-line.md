@@ -38,7 +38,9 @@ uv run mesh-splitter split figure.stl --seeds seeds.json -o figure.3mf
 uv run mesh-splitter split figure.stl --session figure.split.json --stl parts/
 ```
 
-It prints each part with its filament slot and face count, then the files it wrote.
+It prints each part with its filament slot and face count, then the files it wrote ("Replaced" for a file that was already there). Cutting along the part boundaries adds faces, so the part list also gives the face count after the split.
+
+Auto and shells splits number parts from slot 2 (slot 1 is **Unassigned**). If two parts end up on the same slot, for example more than 15 parts, it prints a warning. After `--merge` on an auto or shells split, the slots are renumbered with no gaps.
 
 ## Methods
 
@@ -68,7 +70,7 @@ With no output option, it writes `<name>_parts.3mf` next to the mesh. Use any mi
 | `-o, --out FILE` | Multi-part 3MF: one object, one part per split part with its name and filament slot. The same file as **Send to Orca**. Import it with **Ctrl+I**. |
 | `--painted FILE` | Painted 3MF: one mesh, each face painted with its part's filament slot. |
 | `--stl DIR` | One closed STL per part, with the cut openings capped. |
-| `--merged FILE` | All parts in one STL. |
+| `--merged FILE` | All parts in one STL. Each part is closed, so the cut caps stay inside where parts touch. |
 | `--save-session FILE` | A `.split.json` you can load in the app (**Load session**) to keep editing. |
 | `--report FILE` | JSON summary: the mesh's bounds, and each part's name, filament slot, face count, bounds and center. |
 
@@ -80,6 +82,7 @@ See [Exporting](exporting.md) for how each format loads in the slicer.
 | --- | --- | --- |
 | `--crease DEG` | **Crease** slider: concave creases sharper than this separate parts. Lower is more sensitive. | 2 |
 | `--denoise N` | **Denoise** slider: smoothing passes on the concavity map. Higher ignores small dents. | 4 |
+| `--filaments N` | Your printer has N filament slots (1 to 16, such as 4 for one AMS). Parts are numbered 1 to N, reusing slots when there are more parts than slots. Replaces slots from a seeds file or session. | |
 | `-q, --quiet` | Print only errors. | |
 
 ## Seeds file

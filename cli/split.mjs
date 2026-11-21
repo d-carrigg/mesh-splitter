@@ -11,6 +11,7 @@ const HELP = `Split a mesh into parts without opening the app.
 
 Usage:
   mesh-splitter split MESH [method] [outputs] [options]
+  ("split" is optional: node cli/split.mjs MESH ... and the Claude Code plugin's run.mjs MESH ... work the same)
 
 MESH is an .stl or .3mf file.
 
@@ -28,20 +29,23 @@ Outputs (default: MESH_parts.3mf next to MESH):
   -o, --out FILE        multi-part 3MF: one object, one part per split part with its filament slot
   --painted FILE        painted 3MF: one mesh, each face painted with its part's filament slot
   --stl DIR             one closed STL per part
-  --merged FILE         all parts in one STL
+  --merged FILE         all parts in one STL (each part closed, so the cut caps stay inside where parts touch)
   --save-session FILE   .split.json to open in the app and keep editing
   --report FILE         JSON summary: the mesh's bounds and each part's name, filament, faces, bounds and center
 
 Options:
   --crease DEG          crease step, the app's Crease slider (default ${core.DEFAULTS.step})
   --denoise N           concavity smoothing passes, the app's Denoise slider (default ${core.DEFAULTS.smooth})
+  --filaments N         the printer has N filament slots (1-16, e.g. 4 for one AMS): number the parts 1..N,
+                        reusing slots when there are more parts than slots. Replaces slots from seeds or a session
   -q, --quiet           print nothing but errors
   -h, --help
 
 Seeds file: a list of parts, each with seed points (x, y, z in the mesh's units) and/or face indices:
   [{ "name": "Head", "filament": 2, "points": [[0, 0, 40]] },
    { "name": "Body", "points": [[0, 0, 10], [0, 5, 0]] }]
-Each point picks the nearest face. Parts without a filament get the next free slot.`;
+Each point picks the nearest face. Parts without a filament get the next free slot.
+Existing output files are replaced; the log says "Replaced" for those.`;
 
 const fail = (msg) => { console.error(`mesh-splitter: ${msg}`); process.exit(1); };
 
@@ -56,7 +60,7 @@ export function main(argv) {
       args: argv, allowPositionals: true, options: {
         auto: { type: "string" }, shells: { type: "boolean" }, seeds: { type: "string" }, session: { type: "string" },
         out: { type: "string", short: "o" }, painted: { type: "string" }, stl: { type: "string" }, merged: { type: "string" },
-        "save-session": { type: "string" }, report: { type: "string" }, merge: { type: "string", multiple: true }, crease: { type: "string" }, denoise: { type: "string" },
+        "save-session": { type: "string" }, report: { type: "string" }, merge: { type: "string", multiple: true }, crease: { type: "string" }, denoise: { type: "string" }, filaments: { type: "string" },
         quiet: { type: "boolean", short: "q" }, help: { type: "boolean", short: "h" },
       },
     });
@@ -71,12 +75,14 @@ export function main(argv) {
   const smooth = o.denoise !== undefined ? Math.round(+o.denoise) : core.DEFAULTS.smooth;
   if (!(step >= 0 && step <= 90)) fail("--crease must be a number of degrees from 0 to 90");
   if (!(smooth >= 0 && smooth <= 50)) fail("--denoise must be a whole number from 0 to 50");
+  const nFil = o.filaments !== undefined ? +o.filaments : 0;
+  if (o.filaments !== undefined && !(Number.isInteger(nFil) && nFil >= 1 && nFil <= 16)) fail("--filaments N must be a whole number from 1 to 16");
 
   const k = +(o.auto ?? 0);
   if (k && (k < 2 || k > 32 || !Number.isInteger(k))) fail("--auto N must be a whole number from 2 to 32");
   const file = a.positionals[0];
   if (!fs.existsSync(file)) fail(`${file}: no such file`);
-  const S = load(file);
+  const S = load(file), loadedFaces = S.nF;
   log(`${path.basename(file)}: ${S.nF.toLocaleString()} faces, ${S.G.shells} shell${S.G.shells > 1 ? "s" : ""}`);
   if (S.refined) log(`  split long edges: +${S.refined.toLocaleString()} faces, so the creases show`);
   if (S.flipped) log(`  turned ${S.flipped} inside-out shell${S.flipped > 1 ? "s" : ""} right side out`);
@@ -91,8 +97,13 @@ export function main(argv) {
   } catch (e) { fail(e.message); }
 
   const cnt = core.partCounts(S), used = S.parts.map((p, i) => [p, i]).filter(([, i]) => cnt[i] > 0);
-  log(`${used.length} part${used.length > 1 ? "s" : ""}:`);
+  const auto = !o.seeds && !o.session;
+  if (nFil) used.forEach(([p], j) => { p.filament = (j % nFil) + 1; });
+  else if (auto && o.merge?.length) used.forEach(([p], j) => { p.filament = Math.min(j + 2, 16); }); // no gaps left by merged parts
+  const nF = S.tri.length / 3;
+  log(`${used.length} part${used.length > 1 ? "s" : ""}${nF !== loadedFaces ? ` (${nF.toLocaleString()} faces: cutting along the part boundaries added ${(nF - loadedFaces).toLocaleString()})` : ""}:`);
   for (const [p, i] of used) log(`  ${p.name.padEnd(16)} filament ${String(p.filament).padStart(2)}  ${cnt[i].toLocaleString()} faces`);
+  slotWarnings(used, nFil, o.quiet);
 
   const outs = ["out", "painted", "stl", "merged", "save-session", "report"].some((k) => o[k] !== undefined);
   const base = path.join(path.dirname(file), S.name);
@@ -108,6 +119,16 @@ export function main(argv) {
       write(path.join(o.stl, `${nm}.stl`), () => core.stlBinary(p.soup), log);
     }
   }
+}
+
+// Parts that share a filament slot print in the same filament: say so, unless --filaments asked for it.
+function slotWarnings(used, nFil, quiet) {
+  const by = new Map();
+  for (const [p] of used) by.set(p.filament, [...(by.get(p.filament) ?? []), p.name]);
+  const shared = [...by].filter(([, names]) => names.length > 1);
+  if (!shared.length) return;
+  if (nFil) { if (!quiet) console.error(`Note: ${used.length} parts on ${nFil} filament slots, so some parts share a slot. Change a part's filament in the slicer if two neighbors match.`); return; }
+  for (const [f, names] of shared) console.error(`Warning: ${names.join(", ")} all use filament ${f}${f === 16 ? " (16 is the last slot)" : ""}. Use --merge to combine parts, or --filaments N to number them for your printer.`);
 }
 
 // --merge "NAME=A,B,...": relabel parts B... into A, then call A NAME. Names are matched before any rename in this call.
@@ -243,12 +264,14 @@ function concat(arrs) { const v = new Float32Array(arrs.reduce((n, a) => n + a.l
 
 function write(file, make, log) {
   if (!file) return;
+  let existed = false;
   try {
     const data = make();
+    existed = fs.existsSync(file);
     fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
     fs.writeFileSync(file, data);
   } catch (e) { fail(`${file}: ${e.message}`); }
-  log(`Wrote ${file}`);
+  log(`${existed ? "Replaced" : "Wrote"} ${file}`);
 }
 
 main(process.argv.slice(2));
