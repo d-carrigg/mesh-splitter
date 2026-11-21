@@ -1,85 +1,85 @@
 {
  "robot auto": {
-  "log": "df5dcd606d705a19",
+  "log": "b98905fc1975dfc5",
   "files": {
    "robot_auto.3mf": {
     "_rels/.rels": "465f67e7a55f044d",
     "[Content_Types].xml": "e1c3af6da2b2500c",
-    "3D/3dmodel.model": "d8854b9e4a04cacc",
+    "3D/3dmodel.model": "0b75a0ea4dc31286",
     "Metadata/model_settings.config": "a757fb0d117483c3"
    },
-   "robot_auto.json": "c233de76f05ad683"
+   "robot_auto.json": "6472d81240bf6df5"
   }
  },
  "robot auto 12, 4 slots": {
-  "log": "bf7ade53bb8b0efc",
+  "log": "ef96ca8fd523b8fb",
   "files": {
    "robot_f4.3mf": {
     "_rels/.rels": "465f67e7a55f044d",
     "[Content_Types].xml": "e1c3af6da2b2500c",
-    "3D/3dmodel.model": "3be8327b29fc31f2",
+    "3D/3dmodel.model": "d0d2713e909c8b9a",
     "Metadata/model_settings.config": "0fd70df22ee3eb97"
    }
   }
  },
  "robot auto 16, every output": {
-  "log": "d5854326fd34f9dc",
+  "log": "76b81bd4059b6171",
   "files": {
    "robot16.3mf": {
     "_rels/.rels": "465f67e7a55f044d",
     "[Content_Types].xml": "e1c3af6da2b2500c",
-    "3D/3dmodel.model": "c9da4256176c8a78",
+    "3D/3dmodel.model": "47a5219bf9f26aa9",
     "Metadata/model_settings.config": "fc547b0554b423f8"
    },
    "robot16_painted.3mf": {
     "_rels/.rels": "465f67e7a55f044d",
     "[Content_Types].xml": "ec0f198c3805b3ed",
-    "3D/3dmodel.model": "8b336b2822873a70"
+    "3D/3dmodel.model": "4767e96ff1841f9a"
    },
    "robot16_stl": {
-    "robot_Part_1.stl": "e3f6ec277a33f617",
-    "robot_Part_10.stl": "3e5e6fead2a579ff",
-    "robot_Part_11.stl": "a6b91a47394cc076",
-    "robot_Part_12.stl": "d1032fbd0b79f426",
-    "robot_Part_13.stl": "87a8d45f419e8e5b",
-    "robot_Part_14.stl": "8dba12ae8de7207c",
-    "robot_Part_15.stl": "55672b80cafe7709",
-    "robot_Part_16.stl": "e9ba4856907d2f6a",
-    "robot_Part_2.stl": "57efd10f72086170",
-    "robot_Part_3.stl": "704bab527719184a",
-    "robot_Part_4.stl": "75a288404a703f2a",
-    "robot_Part_5.stl": "3e1a42f68aef2833",
-    "robot_Part_6.stl": "28a3e26d1a05880c",
-    "robot_Part_7.stl": "69629fded40bbcde",
-    "robot_Part_8.stl": "0af52807a0262fb4",
-    "robot_Part_9.stl": "a999818cdfd32a22"
+    "robot_Part_1.stl": "8b19dec942f5efa5",
+    "robot_Part_10.stl": "b42deaceeb546de6",
+    "robot_Part_11.stl": "7f6e042c715192d1",
+    "robot_Part_12.stl": "3562970db400beb8",
+    "robot_Part_13.stl": "df46bc202108d15f",
+    "robot_Part_14.stl": "53577d583589fac0",
+    "robot_Part_15.stl": "22a3d94e72b6920a",
+    "robot_Part_16.stl": "046808558144e04f",
+    "robot_Part_2.stl": "4a68347438a5f92c",
+    "robot_Part_3.stl": "d33048977f3e4f01",
+    "robot_Part_4.stl": "4f7d2120eab8ce62",
+    "robot_Part_5.stl": "23e132e060ade20b",
+    "robot_Part_6.stl": "ca8f9918c7171bc5",
+    "robot_Part_7.stl": "53b46ca56bd8d1a7",
+    "robot_Part_8.stl": "353e3a0805d0c65d",
+    "robot_Part_9.stl": "196a446c411e3e16"
    },
-   "robot16_merged.stl": "7a7d8d2678800545",
-   "robot16.split.json": "dfb29aa56432b571",
-   "robot16.json": "e04dc81bf6d8a1a1"
+   "robot16_merged.stl": "512a5b4931134965",
+   "robot16.split.json": "c6ed4c9c0e4b6274",
+   "robot16.json": "65b06c9ef60a0633"
   }
  },
  "robot seeds, crease/denoise": {
-  "log": "bccb983fa3556e6e",
+  "log": "9a1b05c6710331bb",
   "files": {
    "robot_seeds.3mf": {
     "_rels/.rels": "465f67e7a55f044d",
     "[Content_Types].xml": "e1c3af6da2b2500c",
-    "3D/3dmodel.model": "f90d31da34b588fa",
+    "3D/3dmodel.model": "4a394424fbfcb6cd",
     "Metadata/model_settings.config": "0279fa33ac45d143"
    }
   }
  },
  "robot merge": {
-  "log": "ec1f69ed156a2934",
+  "log": "151e330486c3cb7a",
   "files": {
    "robot_merge.3mf": {
     "_rels/.rels": "465f67e7a55f044d",
     "[Content_Types].xml": "e1c3af6da2b2500c",
-    "3D/3dmodel.model": "0402977048b990fe",
+    "3D/3dmodel.model": "50bb4912f0d97267",
     "Metadata/model_settings.config": "81a50dcf491fd5d6"
    },
-   "robot_merge.json": "d6decf725c4ebbdd"
+   "robot_merge.json": "57ea04f4e490c4b1"
   }
  },
  "rocket auto (recesses)": {
@@ -172,33 +172,33 @@
   }
  },
  "3MF input (robot parts)": {
-  "log": "e5bd895174262d87",
+  "log": "bc56677f47b9dacc",
   "files": {
    "robot_from3mf.3mf": {
     "_rels/.rels": "465f67e7a55f044d",
     "[Content_Types].xml": "e1c3af6da2b2500c",
-    "3D/3dmodel.model": "82b29c486058b7d5",
+    "3D/3dmodel.model": "a98abf1ec8a63bc9",
     "Metadata/model_settings.config": "2c07a534a1854ddb"
    },
    "robot_from3mf_painted.3mf": {
     "_rels/.rels": "465f67e7a55f044d",
     "[Content_Types].xml": "e1c3af6da2b2500c",
-    "3D/3dmodel.model": "d053f3ae4e9cbc8f",
+    "3D/3dmodel.model": "e6ccd551d256677d",
     "Metadata/model_settings.config": "0279fa33ac45d143"
    }
   }
  },
  "core functions": {
   "exports": "100140cdf7812c3d",
-  "meshOf": "a8cec2875bea7a27",
-  "soupVolume": "13896.868176",
-  "reverseSoup": "02bb4e706b840986",
+  "meshOf": "149fb027eb144377",
+  "soupVolume": "30594.711181",
+  "reverseSoup": "c270f30c20593398",
   "paintCode": "4,8,0C,1C,5C,DC",
-  "snapCreases": 999,
-  "smoothCut": 1062,
-  "labelsAfterCleanup": "88bba62c9642a6f5",
-  "meshAfterCleanup": "1c1e1db5675b57ab50c480182066ab0f",
-  "session": "4615b9a66a65280d",
-  "sessionRoundTrip": "88bba62c9642a6f5"
+  "snapCreases": 1119,
+  "smoothCut": 1155,
+  "labelsAfterCleanup": "7332fbf49c21f13c",
+  "meshAfterCleanup": "eb1cd14e82038dbb40b112fde48444e7",
+  "session": "55ac9221f74f2a5c",
+  "sessionRoundTrip": "7332fbf49c21f13c"
  }
 }
