@@ -1,6 +1,8 @@
 # Mesh Splitter
 
-Split one solid mesh into separate, color-coded parts for multi-color or multi-piece printing, right inside OrcaSlicer. You can also scale, rotate, transform, or replace subsections of a mesh. For the example photo, I made the eyes 1 part, then replaced them with a flipped version to change where the figure looked. It also runs in **any browser**.
+Split one solid mesh into separate, color-coded parts for multi-color or multi-piece printing, right inside OrcaSlicer. Scale, rotate, or completely replace sections of the mesh for easy customization of single or multi-material prints. If you have ever been asked to print a part and customize "just this one thing," you may like this plugin.
+
+For the example photo, I made the eyes 1 part, then replaced them with a flipped version to change where the figure looked. It also runs in **any browser**.
 
 ![Splitting a curling-stone figure, picking the eyes as a part, and replacing them with a flipped version](docs/demo.gif)
 
