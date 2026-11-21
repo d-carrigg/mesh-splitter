@@ -79,9 +79,10 @@ After you move or rotate a part, its cut edge may no longer line up with its nei
 
 ## Fill and anchor
 
-When a part moves away from the part it joined, the cut opens and both sides show a hole. Each part chooses what happens there, under **At the cut** in the Transform panel.
+When a part moves away from the part it joined, the cut opens and both sides show a hole. By default the gap stays open; each part can choose otherwise, under **At the cut** in the Transform panel.
 
-- **Fill** (default): the hole is patched. The bigger side (the body) gets a patch that follows its own curve, so the body stays smooth where a hand used to rest. The smaller side gets a flat face.
+- **Open** (default): the gap shows, as cut. Exports close each side with a flat cap.
+- **Fill**: the hole is patched. The bigger side (the body) gets a patch that follows its own curve, so the body stays smooth where a hand used to rest. The smaller side gets a flat face.
 - **Anchor**: the part stays joined where it attaches. New material sweeps from the neighbor's rim to the part's moved cut, along the same turn, so an arm raised at the shoulder stays on the body instead of lifting off.
 
 ![The front arm turned up, carrying the hand, stick, broom and back arm: holes in the body, then closed with Fill](img/gap-fill.png)
@@ -92,9 +93,9 @@ When a part moves away from the part it joined, the cut opens and both sides sho
 
 1. Select the part (Ctrl+click to select more).
 2. Open the Transform panel (move, rotate or scale in the toolbar).
-3. Under **At the cut**, pick **Fill** or **Anchor**. It applies to every selected part.
+3. Under **At the cut**, pick **Open**, **Fill** or **Anchor**. It applies to every selected part.
 
-![At the cut: Fill or Anchor](img/gap-ui.png)
+![At the cut: Open, Fill or Anchor](img/gap-ui.png)
 
 ### Tips
 

@@ -173,7 +173,7 @@ console.log("heal:", JSON.stringify(hl));
 if (!hl.heal || hl.maxGap > 0.05 || hl.open) errors.push("heal joint failed: " + JSON.stringify(hl));
 await page.keyboard.press("Control+z");
 await page.keyboard.press("Control+z");
-// Fill / Anchor: lift the cap 4 mm off the body. Fill patches the hole on both sides (both parts stay closed);
+// Open / Fill / Anchor: lift the cap 4 mm off the body. Open (default) leaves the gap with flat caps; Fill patches the hole on both sides (both parts stay closed);
 // Anchor sweeps new material from the body's rim to the cap instead (closed, more volume, no patch on the body).
 const fa = await page.evaluate(() => {
   const { S } = app, i = S.active, x = app.ensureXf(i); x.t = [x.t[0], x.t[1], x.t[2] + 4]; app.applyXf();
@@ -183,14 +183,17 @@ const fa = await page.evaluate(() => {
     return { open: [...E.values()].filter((c) => c !== 2).length, vol: +vol.toFixed(1) }; };
   const ctx = app.fillCtx(), nb = app.loopPlans(app.partLoops(i, ctx), ctx).find((p) => p.nb > 0)?.nb;
   const kinds = () => { const c = app.fillCtx(); return app.loopPlans(app.partLoops(i, c), c).map((p) => p.kind).join(","); };
+  const open = { kinds: kinds(), shown: !!app.fillMesh(), me: solid(app.partSoup(i)), nb: solid(app.partSoup(nb)) }; // Open, the default
+  app.setGap([i], "fill");
   const fill = { kinds: kinds(), shown: !!app.fillMesh(), me: solid(app.partSoup(i)), nb: solid(app.partSoup(nb)) };
-  app.setAnchor([i], true);
+  app.setGap([i], "anchor");
   const anchor = { kinds: kinds(), me: solid(app.partSoup(i)), nb: solid(app.partSoup(nb)), saved: S.parts[i].anchor };
-  app.undo(); x.t = [x.t[0], x.t[1], x.t[2] - 4]; app.applyXf();
-  return { fill, anchor, after: !!S.parts[i].anchor };
+  app.undo(); app.undo(); x.t = [x.t[0], x.t[1], x.t[2] - 4]; app.applyXf();
+  return { open, fill, anchor, after: !!S.parts[i].anchor || !!S.parts[i].fill };
 });
 console.log("fill/anchor:", JSON.stringify(fa));
-if (!fa.fill.kinds.includes("patch") || !fa.fill.shown || fa.fill.me.open || fa.fill.nb.open || !fa.anchor.kinds.includes("bridge") || fa.anchor.me.open
+if (fa.open.kinds.includes("patch") || fa.open.shown || fa.open.me.open || fa.open.nb.open
+  || !fa.fill.kinds.includes("patch") || !fa.fill.shown || fa.fill.me.open || fa.fill.nb.open || !fa.anchor.kinds.includes("bridge") || fa.anchor.me.open
   || fa.anchor.nb.open || !(fa.anchor.me.vol > fa.fill.me.vol + 1) || !fa.anchor.saved || fa.after) errors.push("fill/anchor failed: " + JSON.stringify(fa));
 await page.evaluate(() => app.setGizmoJoint(false));
 if (shot) await page.screenshot({ path: shot });
