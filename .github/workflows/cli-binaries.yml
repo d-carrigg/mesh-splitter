@@ -1,0 +1,130 @@
+name: Command line binaries
+
+# Builds the command line (cli/split.mjs) into one standalone file per OS with `bun build --compile`, so people can
+# download it from a release and run it without Node.js or uv. Every binary runs test/golden.mjs or a split on its
+# own OS before anything is uploaded.
+# - On a published vX.Y.Z release (Release Please): builds at that tag and attaches the binaries to the release.
+# - On the Release Please PR (branch release-please--*) or when run by hand: builds and tests only, no upload.
+on:
+  release:
+    types: [published]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  BUN_VERSION: 1.4.4
+
+jobs:
+  build:
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'release-please--') || github.head_ref == 'claude/project-thread-vr5l0l'  # TEMP test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'release' && github.ref_name || '' }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci --omit=dev
+      - name: Build (one file per OS, version from pyproject.toml)
+        run: |
+          VERSION=$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)
+          mkdir -p dist
+          for t in windows-x64 macos-arm64 macos-x64 linux-x64 linux-arm64; do
+            ext=""; [ "${t%%-*}" = windows ] && ext=".exe"
+            bun build cli/split.mjs --compile --minify --define "MESH_SPLITTER_VERSION=\"$VERSION\"" \
+              --target "bun-${t/macos/darwin}" --outfile "dist/mesh-splitter-$t$ext"
+          done
+          ls -l dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: binaries
+          path: dist/
+          retention-days: 7
+
+  test:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, file: mesh-splitter-linux-x64 }
+          - { os: ubuntu-24.04-arm, file: mesh-splitter-linux-arm64 }
+          - { os: windows-latest, file: mesh-splitter-windows-x64.exe }
+          - { os: macos-latest, file: mesh-splitter-macos-arm64 }
+          - { os: macos-15-intel, file: mesh-splitter-macos-x64 }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'release' && github.ref_name || '' }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: binaries
+          path: dist
+      - run: chmod +x dist/*
+      - name: Runs with nothing installed
+        run: |
+          VERSION=$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)
+          dist/${{ matrix.file }} --version | tee v.txt
+          grep -qx "mesh-splitter $VERSION" v.txt
+          dist/${{ matrix.file }} examples/robot/robot.stl --auto 6 -o out/robot.3mf --stl out/stl --report out/robot.json
+          test -s out/robot.3mf && test "$(ls out/stl | wc -l)" -eq 6
+      # Same parts and files as test/golden.json (Linux only: the golden log hashes use / in paths)
+      - if: runner.os == 'Linux'
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - if: runner.os == 'Linux'
+        run: npm ci && node test/golden.mjs --bin dist/${{ matrix.file }}
+
+  upload:
+    if: github.event_name == 'release'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: binaries
+          path: dist
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.ref_name }}" dist/* --clobber --repo "${{ github.repository }}"
+
+  # TEMP: test the upload path on a throwaway draft release, then delete it
+  upload-test:
+    if: github.event_name == 'pull_request'
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      R: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: binaries
+          path: dist
+      - run: |
+          gh release create cli-binaries-test --draft --title "CLI binaries test (temporary)" --notes "temp" --target "${{ github.event.pull_request.head.sha }}" --repo "$R"
+          gh release upload cli-binaries-test dist/* --clobber --repo "$R"
+          mkdir got && gh release download cli-binaries-test --dir got --repo "$R"
+          ls -l got && cmp got/mesh-splitter-linux-x64 dist/mesh-splitter-linux-x64 && test "$(ls got | wc -l)" -eq 5
+          chmod +x got/mesh-splitter-linux-x64 && got/mesh-splitter-linux-x64 --version
+      - if: always()
+        run: gh release delete cli-binaries-test --yes --cleanup-tag --repo "$R" || true

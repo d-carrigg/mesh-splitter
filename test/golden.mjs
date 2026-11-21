@@ -4,6 +4,7 @@
 // produce, and compares the hashes with test/golden.json. A refactor that changes no behavior keeps every hash.
 //   node test/golden.mjs            check against test/golden.json
 //   node test/golden.mjs --update   rewrite test/golden.json (only when an output is meant to change)
+//   node test/golden.mjs --bin FILE run a built command line (a release binary) instead of node cli/split.mjs
 // 3MFs are zips with timestamps, so each file inside is hashed, not the zip itself.
 import fs from "node:fs";
 import os from "node:os";
@@ -17,6 +18,7 @@ import * as core from "../app/core.js";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const goldenFile = path.join(root, "test", "golden.json");
 const update = process.argv.includes("--update");
+const bi = process.argv.indexOf("--bin"), bin = bi > 0 ? path.resolve(process.argv[bi + 1]) : null;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mesh-splitter-golden-"));
 const ex = (p) => path.join(root, "examples", p);
 const out = (p) => path.join(tmp, p);
@@ -60,7 +62,7 @@ fs.writeFileSync(out("bear_inside_out.stl"), core.stlBinary(core.reverseSoup(cor
 
 const got = {};
 for (const [name, [args]] of Object.entries(CASES)) {
-  const r = spawnSync(process.execPath, [path.join(root, "cli", "split.mjs"), "split", ...args], { encoding: "utf8" });
+  const r = spawnSync(bin ?? process.execPath, [...(bin ? [] : [path.join(root, "cli", "split.mjs")]), "split", ...args], { encoding: "utf8" });
   if (r.status !== 0) { console.error(`${name}: the command line failed\n${r.stderr}`); process.exit(1); }
   const log = (r.stdout + r.stderr).split(tmp).join("<tmp>").split(root).join("<root>");
   const files = {};
