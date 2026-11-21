@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.16](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.15...v0.3.16) (2026-11-21)
+
+
+### Bug Fixes
+
+* ship the OrcaSlicer plugin as a plain wheel to get back to a Low risk rating ([#77](https://github.com/d-carrigg/mesh-splitter/issues/77)) ([62c78df](https://github.com/d-carrigg/mesh-splitter/commit/62c78df74f61db4f9ba964f9fac93224e73293a1))
+
 ## [0.3.15](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.14...v0.3.15) (2026-11-21)
 
 
