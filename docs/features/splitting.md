@@ -16,7 +16,7 @@ Splits the whole mesh into parts in one click. Cuts land on concave creases (the
 
 1. Open an STL or 3MF. A single-shell mesh is auto split as soon as it opens.
 2. To split again, click **Split** in the toolbar (or press **A**). The Split panel opens at the right of the view on **Auto**.
-3. Set **Parts**, or leave it empty to pick the count automatically. Tick **Only inside the selected part** to split just that part.
+3. Set **Parts**, or leave it empty to pick the count automatically. Tick **Only inside the selected part** to split just that part: its biggest piece keeps the part's name, color and filament slot, and the other pieces become new parts.
 4. Click **Split**.
 
 ![Auto split options](img/auto-popup.png)

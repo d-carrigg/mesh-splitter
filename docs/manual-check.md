@@ -39,7 +39,7 @@ A hands-on pass over every feature, run on request ("check the whole app") rathe
 | 2.7 | Pick the fill tool (F), click a region of another part. | The clicked region floods into the selected part up to creases sharper than **Fill stop angle**. |
 | 2.8 | Right-click a grey (unassigned) face. | Menu offers **Fill into nearest part** and **Fill all unassigned**; both clear the grey. |
 | 2.9 | **Smooth boundaries**. | Part borders look smooth (no stair steps along triangles). |
-| 2.10 | Open `rocket.stl`, Split > **Shells** > **Split by shells**. | Header said `2 shells`; result is `Shell 1`, `Shell 2`, each on its own slot. On `robot.stl` (1 shell) it says it can't split by shells (in the status bar, not a browser pop-up). 📷 |
+| 2.10 | Open `rocket.stl`, Split > **Shells** > **Split by shells**. | Header said `2 shells`; result is `Shell 1`, `Shell 2`, each on its own slot. On `robot.stl` (1 shell) it says it can't split by shells (a message in the page, not a browser pop-up). 📷 |
 | 2.11 | Back on `robot.stl`: Parts header **Add** (+), click a spot on the model. | A new part grows from the point at once; a small card shows **Point**, **Crease** slider and **Done**. Moving Crease regrows it live; **Point** + click adds more area; **Done** closes. 📷 |
 | 2.12 | Split panel **Done**. | Panel closes. |
 

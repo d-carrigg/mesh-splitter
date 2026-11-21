@@ -1111,18 +1111,18 @@ function solveAutoStretch() {
   const moved = autoMoved(A), carried = new Set([...moved].filter((i) => !A.includes(i))), only = carried.size ? carried : moved;
   const gap = Math.max(...A.map((i) => +S.parts[i].xf.st.gap || 0)), cache = new Map();
   const test = (k) => { for (const i of A) { S.parts[i].xf.st.k = k; xfEdited(i); } return findHits({ only, gap, cache, live: moved }).length; };
-  let k = 1, n = test(1), best = { k: 1, n };
-  if (n) {
+  let k = 1;
+  if (test(1)) {
     let lo = 1, hi = 0;
-    for (let t = 1.1; t <= 3.0001; t += 0.1) { const c = test(+t.toFixed(2)); if (c < best.n) best = { k: +t.toFixed(2), n: c }; if (!c) { hi = +t.toFixed(2); break; } lo = +t.toFixed(2); }
+    for (let t = 1.1; t <= 3.0001; t += 0.1) { if (!test(+t.toFixed(2))) { hi = +t.toFixed(2); break; } lo = +t.toFixed(2); }
     if (hi) { for (let it = 0; it < 6; it++) { const m = (lo + hi) / 2; if (test(m)) lo = m; else hi = m; } k = +hi.toFixed(3); }
-    else k = best.k;
+    else k = 1; // nothing up to 300% clears it: a stretch that still collides only distorts the part, so stay at 100%
   }
   const left = test(k);
   for (const g of cache.values()) g?.disposeBoundsTree();
   const names = A.map((i) => S.parts[i].name).join(", ");
-  status(left ? `Auto stretch: ${names} at ${+(k * 100).toFixed(1)}%, still within ${gap} mm of another part (limit 300%)`
-    : k === 1 ? `Auto stretch: ${names} need no stretch (${gap} mm gap)` : `Auto stretch: ${names} at ${+(k * 100).toFixed(1)}% to clear by ${gap} mm`);
+  status(left ? `Auto stretch: no stretch up to 300% keeps ${names} ${gap} mm clear, so ${A.length > 1 ? "they stay" : "it stays"} at 100%`
+    : k === 1 ? `Auto stretch: ${names} ${A.length > 1 ? "need" : "needs"} no stretch (${gap} mm gap)` : `Auto stretch: ${names} at ${+(k * 100).toFixed(1)}% to clear by ${gap} mm`);
 }
 function setAutoStretch(js, on, gap) {
   js = js.filter((j) => j > 0 && S.parts[j] && !hasRep(S.parts[j]));
@@ -1138,6 +1138,7 @@ function setAutoStretch(js, on, gap) {
   }
   lastAutoKey = null;
   afterEdit(on ? "Auto stretch on: finding the smallest stretch that clears…" : "Auto stretch off");
+  scheduleHits(); // applyXf skips it when no part has a transform yet, and the solve runs from it
 }
 function renderFollowRow(i) {
   const row = $("followRow"); row.innerHTML = "";
@@ -2357,7 +2358,7 @@ function refreshXfPanel() {
     $("clrSeeds").disabled = !p.seeds.length;
   }
   $("clrAllSeeds").disabled = !S.G || !S.parts.some((q) => q.seeds.length);
-  $("xfReset").disabled = !ok || isIdXf(p?.xf);
+  $("xfReset").disabled = !ok || (isIdXf(p?.xf) && !p?.xf?.st?.auto);
   $("gzCenter").classList.toggle("on", !gzJointOn);
   $("healRow").classList.toggle("hide", !ok || !!p?.rep);
   $("anchorRow").classList.toggle("hide", !ok || !!p?.rep);
@@ -3235,11 +3236,12 @@ function orcaMesh(m) { // chunks of the requested transfer, in any order
   } catch (e) { console.error(e); alert(e.message); }
   finally { busy(false); }
 }
+// Messages show in the page (the toast), not as a browser pop-up: the same in the browser and in OrcaSlicer, whose
+// plugin webviews don't document alert().
+window.alert = (t) => { const d = $("toast"); d.textContent = String(t); d.hidden = false; clearTimeout(d._t); d._t = setTimeout(() => (d.hidden = true), 8000); };
+$("toast").onclick = () => ($("toast").hidden = true);
 if (ORCA.on) {
   document.body.classList.add("inOrca");
-  // alert() is not a documented part of OrcaSlicer's plugin webviews: show messages in the page instead.
-  window.alert = (t) => { const d = $("toast"); d.textContent = String(t); d.hidden = false; clearTimeout(d._t); d._t = setTimeout(() => (d.hidden = true), 8000); };
-  $("toast").onclick = () => ($("toast").hidden = true);
   document.querySelectorAll("#fileMenu .meta").forEach((e) => e.remove()); // Ctrl+O is OrcaSlicer's Open project
   document.querySelectorAll(".orcaOnly").forEach((e) => (e.hidden = false));
   $("fileBtnLbl").textContent = "From plate";
