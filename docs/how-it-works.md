@@ -132,6 +132,17 @@ A moved part's cut no longer lines up with its neighbor's edge. [Heal joint](fea
 
 The healed shape is computed on the fly from the transform, so changing the move or rotation re-heals it. Exports use the healed shape.
 
+### Fill and anchor
+
+When a part moves, the cut loop it shares with a neighbor opens if the loop's vertices no longer land on the same place for both parts. [Fill and anchor](features/transforms.md#fill-and-anchor) close each open loop in one of two ways:
+
+1. **Fill** builds rings that shrink from the loop to its center. On the bigger side, the rings are lifted onto a quadratic surface fitted (least squares) to that part's vertices around the hole, so its curve continues across it. The smaller side uses a plane fitted to the loop.
+2. **Anchor** sweeps the loop from the neighbor's rim (where it was) to the part's moved cut. The turn between them is split into steps (about 8° each) and each ring is the rim turned part of the way, so the new material follows an arc, like a bent joint.
+
+Each part's export is then its faces plus these patches, a closed solid.
+
+![Fill vs. anchor on a turned arm](features/img/gap-anchor.png)
+
 ### Move with, Reach and Hold
 
 These link parts so that moving one updates others ([#31](https://github.com/d-carrigg/mesh-splitter/pull/31)). Each is stored on the following part and refreshed whenever its leader changes.
