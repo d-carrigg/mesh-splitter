@@ -19,6 +19,11 @@ file (dist/mesh_splitter_any.py) from Plugins > Install local plugin, then tick 
   page --orca.postMessage({cmd: 'llm_*', ...})-----------> plugin: AI part naming settings / one request, only when
                                                            the user clicks (llm_providers below, from server/)
 
+Internet access: only AI part naming connects, and only when the user clicks Connect or Name parts. It sends the
+part images and stats to the provider the user picked (OpenRouter, OpenAI, Anthropic, or a base URL they enter,
+such as a local LM Studio server), after OrcaSlicer asks the user's permission for that host
+(ask_network_permission). Nothing else in the plugin uses the network.
+
 OrcaSlicer 2.5's plugin API reads the model but cannot add or replace objects, so the split comes back as
 a 3MF (one object, one part per split part, filament slot per part) that you import with Ctrl+I.
 """
@@ -41,7 +46,13 @@ except Exception:  # numpy is declared above; uv installs it when the plugin loa
 
 from llm_providers import abort as llm_abort, call as llm_call, check as llm_check, resolve as llm_resolve, status as llm_status, update as llm_update  # noqa: E402  __LLM_PROVIDERS__
 
-PAGE_Z = "__PAGE_Z__"  # zlib + base64 of the bundled page, filled in by build.py
+# The plugin's page: app/index.html with three.js, three-mesh-bvh and fflate, bundled and minified by esbuild,
+# then zlib-compressed and base64-encoded by plugin/build.py (the plain page is about 0.9 MB). page_html()
+# decodes it and OrcaSlicer shows it in the Mesh Splitter tab. Source: app/ in github.com/d-carrigg/mesh-splitter.
+# To read it, rebuild the same page from source: python plugin/build.py --page-out page.html
+# Inside OrcaSlicer the page sends every request through this plugin (window.orca.postMessage); its fetch() calls
+# are only for the standalone web app's local server.
+PAGE_Z = "__PAGE_Z__"
 CHUNK = 512 * 1024
 
 

@@ -106,7 +106,7 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(url, "https://api.anthropic.com/v1/messages")
         self.assertEqual((h["x-api-key"], h["anthropic-version"]), ("k", "2023-06-01"))
         self.assertNotIn("Authorization", h)
-        self.assertEqual(body["system"], P.SYSTEM)
+        self.assertEqual(body["system"], P.NAMING_PROMPT)
         img = [c for c in body["messages"][0]["content"] if c["type"] == "image"][0]
         self.assertEqual(img["source"], {"type": "base64", "media_type": "image/jpeg", "data": "AAAA"})
         self.assertNotIn("temperature", body)

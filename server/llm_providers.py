@@ -1,7 +1,7 @@
 """AI part naming: provider settings and one request to the provider the user picked.
 
 Shared by the local server (server/llm_review.py) and the OrcaSlicer plugin (plugin/build.py inlines this file),
-so both send the same request. Standard library only. Nothing here runs unless the user clicks Name parts, and
+so both send the same request. Standard library only. Nothing here runs unless the user clicks Connect (connection test) or Name parts, and
 the request goes only to the chosen provider's base URL.
 
 Providers:
@@ -37,7 +37,9 @@ MAX_IMAGES = 6
 LIMITS = {"cloud": {"first_byte": 90, "total": 300}, "local": {"first_byte": 300, "total": 900}}
 TIMEOUT = LIMITS["local"]["total"]
 
-SYSTEM = """You review a 3D mesh that a user split into parts for multi-color / multi-piece 3D printing (FDM).
+# System prompt sent to the AI provider the user picked, with the part images and stats, when they click
+# Name parts. It is not used for anything else.
+NAMING_PROMPT = """You review a 3D mesh that a user split into parts for multi-color / multi-piece 3D printing (FDM).
 You get rendered views (each part drawn in its own color, labeled #id) and per-part stats as JSON.
 Tasks:
 1. Name each part with a short, specific noun phrase (e.g. "left boot", "broom head", "helmet visor"). Use the object's context.
@@ -164,7 +166,7 @@ def build_messages(body):
     """OpenAI chat-completions messages (also what OpenRouter and local servers take)."""
     content = [{"type": "text", "text": v} if k == "text" else {"type": "image_url", "image_url": {"url": v}}
                for k, v in user_parts(body)]
-    return [{"role": "system", "content": SYSTEM}, {"role": "user", "content": content}]
+    return [{"role": "system", "content": NAMING_PROMPT}, {"role": "user", "content": content}]
 
 
 def anthropic_content(body):
@@ -185,7 +187,7 @@ def build_request(cfg, body):
     headers = {"Content-Type": "application/json"}
     if cfg["api"] == "anthropic":
         headers.update({"x-api-key": cfg["api_key"], "anthropic-version": "2023-06-01"})
-        payload = {"model": model, "max_tokens": 16000, "system": SYSTEM,
+        payload = {"model": model, "max_tokens": 16000, "system": NAMING_PROMPT,
                    "messages": [{"role": "user", "content": anthropic_content(body)}],
                    "output_config": {"effort": "low"}, "stream": True}
         if re.match(r"claude-(opus-5|sonnet-5-5|fable-5)", model):
