@@ -19,7 +19,7 @@ Every feature is documented with pictures on the [docs site](https://d-carrigg.g
 - **[Replace with…](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#replace-with):** right-click a part and swap in another STL. It snaps onto the joint and keeps the part's name and filament. A replacement made from the same model, such as edited eyes, stays in place.
 - **[Send to Orca](https://d-carrigg.github.io/mesh-splitter/features/exporting/#send-to-orca):** one multi-part 3MF, every part on its filament. Painted 3MF, merged STL and per-part STLs are also available.
 - **[Command line](https://d-carrigg.github.io/mesh-splitter/features/command-line/):** `uv run mesh-splitter split model.stl --auto 6 -o model.3mf` splits and exports without opening the app, with the same results.
-- **Optional [AI part naming](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#ai-part-naming):** suggests part names and flags bad cuts (browser version).
+- **Optional [AI part naming](https://d-carrigg.github.io/mesh-splitter/features/ai-naming/):** suggests part names and flags bad cuts (browser version).
 
 ## Install in OrcaSlicer
 
