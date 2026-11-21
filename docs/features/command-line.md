@@ -51,6 +51,12 @@ Pick one. Without one, it auto splits.
 | `--seeds FILE` | Grow parts from seed points, like [seeds](splitting.md#seeds-and-add-part) in the app. See [Seeds file](#seeds-file). |
 | `--session FILE` | Apply a `.split.json` saved from the app (**Save session**). It must be for the same mesh. |
 
+After the method, `--merge "NAME=A,B"` joins parts A and B (by name, such as `Part 3`) into one part called NAME, like Ctrl+click merge in the app. Give it one part to just rename it (`--merge "Head=Part 3"`). Repeat it for more groups:
+
+```
+uv run mesh-splitter split figure.stl --merge "Body=Part 1,Part 4" --merge "Head=Part 2" -o figure.3mf
+```
+
 Moves, rotations, scaling and replacements from a session are not applied: those parts are written in their original position and shape, and it prints a note naming them.
 
 ## Outputs

@@ -44,7 +44,7 @@ Claude asks before running the command the first time, unless you allow it. It t
 | Ask for | Claude uses |
 | --- | --- |
 | A number of parts, or "split it at the creases" | [Auto split](splitting.md#auto-split) (`--auto`) |
-| Named parts (head, body, base) | Seed points (`--seeds`), placed from the model's bounds and an auto split's part positions (`--report`) |
+| Named parts (head, body, base) | An auto split, with its parts grouped and renamed (`--merge`) from their positions and sizes (`--report`), or seed points (`--seeds`) |
 | One part per separate piece | [Split by shells](splitting.md#split-by-shells) (`--shells`) |
 | Finishing a split you saved in the app | `--session` |
 | A multi-part 3MF, painted 3MF, per-part STLs or one merged STL | The [command line outputs](command-line.md#outputs) |

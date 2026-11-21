@@ -26,6 +26,8 @@ node "${CLAUDE_PLUGIN_ROOT}/claude/run.mjs" MESH [method] [outputs] [options]
 | `--seeds FILE` | The user names the parts they want ("head, body, base"). Grows each part from seed points. |
 | `--session FILE` | The user saved a `.split.json` from the app. Re-exports that exact split. |
 
+Combine and rename after any method: `--merge "NAME=A,B"` joins parts A and B (by their names in the output or report, such as `Part 3`) into one part called NAME; with one part it just renames it. Repeat it for each group. The auto split is deterministic, so the same command gives the same part names every run.
+
 Settings: `--crease DEG` (default 2; lower makes more, smaller parts) and `--denoise N` (default 4; higher ignores small dents).
 
 ## Outputs (any mix; with none, writes `<name>_parts.3mf` next to the mesh)
@@ -41,13 +43,14 @@ Settings: `--crease DEG` (default 2; lower makes more, smaller parts) and `--den
 
 ## Workflow
 
-You can't see the model, so use `--report` to learn where things are.
+You can't see the model, so use `--report` to learn where things are. If you can render images (for example with Python and matplotlib from the `--stl` files), a colored render is a good check before you report back.
 
 1. **Look first.** Run `--auto --report report.json` (add `-o` only if the user wants a file now). Read the report: the mesh bounds tell you which axis is up (usually Z, with the model sitting at Z = 0) and how big it is (mm); each part's center and bounds tell you where it is.
 2. **Name parts from geometry.** Describe the auto parts to the user by position and size ("top part, 40 mm tall, centered above the body" is probably the head). Don't guess beyond what the numbers show.
-3. **For specific parts, use seeds.** Write a seeds file with one entry per wanted part and seed points placed on that part's surface, inside its region of the bounds. Several points per part help for long or branching parts. Then run with `--seeds` and `--report` again and check that each named part got a sensible face count and bounds. If one part swallowed another, add or move seed points, or lower `--crease`.
-4. **Export** what the user asked for. For multi-color printing in OrcaSlicer or Bambu Studio, prefer `-o model_parts.3mf`; tell them to import it with Ctrl+I. For printing parts separately (or gluing), use `--stl DIR`.
-5. **Hand off when needed.** Moving, rotating, scaling, healing joints and replacing parts happen in the app, not the command line. Write `--save-session` and tell the user to open it in the app (`uv run mesh-splitter` from a clone of the repo, or the OrcaSlicer plugin) with **Load session**.
+3. **Group auto parts into the parts the user named.** Usually the best route: every cut stays on a real crease. Add one `--merge "Head=Part 2"` or `--merge "Body=Part 1,Part 4"` per wanted part to the same auto split command, Auto parts you leave out of every `--merge` stay as their own parts, so assign all of them. Run `--report` again to check the result.
+4. **Or use seeds** when the auto parts don't line up with what the user wants. Write a seeds file with one entry per wanted part and seed points placed on that part's surface, inside its region of the bounds. Several points per part help for long or branching parts. Then run with `--seeds` and `--report` again and check that each named part got a sensible face count and bounds. If one part swallowed another, add or move seed points, or lower `--crease`.
+5. **Export** what the user asked for. For multi-color printing in OrcaSlicer or Bambu Studio, prefer `-o model_parts.3mf`; tell them to import it with Ctrl+I. For printing parts separately (or gluing), use `--stl DIR`.
+6. **Hand off when needed.** Moving, rotating, scaling, healing joints and replacing parts happen in the app, not the command line. Write `--save-session` and tell the user to open it in the app (`uv run mesh-splitter` from a clone of the repo, or the OrcaSlicer plugin) with **Load session**.
 
 Seeds file format (`filament` 1 to 16 and `name` are optional; `faces` takes face indices):
 

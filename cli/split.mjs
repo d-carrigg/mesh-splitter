@@ -20,6 +20,10 @@ Method (pick one; default --auto):
   --seeds FILE          grow parts from seed points (JSON, see below)
   --session FILE        apply a .split.json saved from the app (Export > Save session)
 
+Combine and rename (after the method, any number of times):
+  --merge "NAME=A,B"    join parts A and B (by name, such as "Part 3") into one part called NAME;
+                        with one part it just renames it: --merge "Head=Part 3"
+
 Outputs (default: MESH_parts.3mf next to MESH):
   -o, --out FILE        multi-part 3MF: one object, one part per split part with its filament slot
   --painted FILE        painted 3MF: one mesh, each face painted with its part's filament slot
@@ -52,7 +56,7 @@ export function main(argv) {
       args: argv, allowPositionals: true, options: {
         auto: { type: "string" }, shells: { type: "boolean" }, seeds: { type: "string" }, session: { type: "string" },
         out: { type: "string", short: "o" }, painted: { type: "string" }, stl: { type: "string" }, merged: { type: "string" },
-        "save-session": { type: "string" }, report: { type: "string" }, crease: { type: "string" }, denoise: { type: "string" },
+        "save-session": { type: "string" }, report: { type: "string" }, merge: { type: "string", multiple: true }, crease: { type: "string" }, denoise: { type: "string" },
         quiet: { type: "boolean", short: "q" }, help: { type: "boolean", short: "h" },
       },
     });
@@ -81,6 +85,7 @@ export function main(argv) {
     else if (o.seeds) seedSplit(S, JSON.parse(read(o.seeds, "utf8")), opts);
     else if (o.session) applySession(S, read(o.session, "utf8"), log);
     else core.autoSplit(S, +(o.auto ?? 0), opts);
+    for (const m of o.merge ?? []) merge(S, m);
   } catch (e) { fail(e.message); }
 
   const cnt = core.partCounts(S), used = S.parts.map((p, i) => [p, i]).filter(([, i]) => cnt[i] > 0);
@@ -101,6 +106,25 @@ export function main(argv) {
       write(path.join(o.stl, `${nm}.stl`), () => core.stlBinary(p.soup), log);
     }
   }
+}
+
+// --merge "NAME=A,B,...": relabel parts B... into A, then call A NAME. Names are matched before any rename in this call.
+function merge(S, spec) {
+  const eq = spec.indexOf("=");
+  const name = spec.slice(0, eq).trim(), list = spec.slice(eq + 1).split(",").map((t) => t.trim()).filter(Boolean);
+  if (eq < 1 || !name || !list.length) throw new Error(`--merge "${spec}": expected NAME=PART[,PART...]`);
+  const idx = list.map((t) => {
+    const i = S.parts.findIndex((p, j) => j > 0 && p.name === t);
+    if (i < 0) throw new Error(`--merge "${spec}": no part named "${t}" (parts: ${S.parts.slice(1).map((p) => p.name).join(", ")})`);
+    return i;
+  });
+  const [keep, ...rest] = [...new Set(idx)], gone = new Set(rest);
+  for (let f = 0; f < S.nF; f++) if (gone.has(S.labels[f])) S.labels[f] = keep;
+  for (const i of gone) S.parts[i].seeds = [];
+  if (S.parts.some((p, j) => j !== keep && !gone.has(j) && p.name === name)) throw new Error(`--merge "${spec}": another part is already called "${name}"`);
+  S.parts[keep].name = name;
+  if (gone.has(S.active)) S.active = keep;
+  core.dropEmptyParts(S);
 }
 
 // Bounds and center of the whole mesh and of each part, so a script (or Claude) can tell the parts apart.
