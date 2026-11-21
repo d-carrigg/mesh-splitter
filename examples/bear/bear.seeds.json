@@ -1,0 +1,6 @@
+[{ "name": "Body", "points": [[0, -22, 28], [0, 22, 28]] },
+ { "name": "Head", "points": [[0, 12, 66], [0, -6, 76]] },
+ { "name": "Snout", "points": [[0, -22, 58]] },
+ { "name": "Left ear", "points": [[-14, 2, 82]] }, { "name": "Right ear", "points": [[14, 2, 82]] },
+ { "name": "Left arm", "points": [[-30, -18, 24]] }, { "name": "Right arm", "points": [[30, -18, 24]] },
+ { "name": "Left leg", "points": [[-21, -14, 8]] }, { "name": "Right leg", "points": [[21, -14, 8]] }]

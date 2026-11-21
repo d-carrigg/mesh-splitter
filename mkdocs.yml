@@ -7,6 +7,7 @@ edit_uri: edit/main/docs/
 docs_dir: docs
 exclude_docs: |
   demo/
+  examples/demo/
   features/demo/
   features/README.md
   screenshot.png
@@ -19,6 +20,7 @@ nav:
   - Exporting: features/exporting.md
   - Command line: features/command-line.md
   - Claude Code plugin: features/claude-code.md
+  - Examples: examples.md
   - How it works: how-it-works.md
 theme:
   name: material

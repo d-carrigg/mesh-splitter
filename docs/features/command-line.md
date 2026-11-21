@@ -84,7 +84,7 @@ See [Exporting](exporting.md) for how each format loads in the slicer.
 
 ## Seeds file
 
-A JSON list of parts. Each part has seed points (x, y, z in the mesh's units, usually mm), face indices, or both. Each point picks the face whose center is nearest. `name` and `filament` (1 to 16) are optional; a part without a filament gets the next free slot.
+A JSON list of parts. Each part has seed points (x, y, z in the mesh's units, usually mm), face indices, or both. Each point picks the nearest face. `name` and `filament` (1 to 16) are optional; a part without a filament gets the next free slot.
 
 ```json
 [

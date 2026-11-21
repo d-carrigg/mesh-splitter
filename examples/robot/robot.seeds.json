@@ -1,0 +1,4 @@
+[{ "name": "Head", "points": [[0, -11, 101], [0, 0, 112]] }, { "name": "Antenna", "points": [[0, 0, 124]] },
+ { "name": "Torso", "points": [[0, -11, 62], [0, 11, 62]] }, { "name": "Left arm", "points": [[-31, 0, 58]] }, { "name": "Left hand", "points": [[-36, 0, 39]] },
+ { "name": "Wrench", "points": [[-31, -11, 30], [-31, -11, 48]] }, { "name": "Right arm", "points": [[34, -5, 92]] }, { "name": "Right hand", "points": [[45, -5, 104]] },
+ { "name": "Left leg", "points": [[-9, -6, 21]] }, { "name": "Right leg", "points": [[9, -6, 21]] }, { "name": "Left foot", "points": [[-9, -16, 3]] }, { "name": "Right foot", "points": [[9, -16, 3]] }]

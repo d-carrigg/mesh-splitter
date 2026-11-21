@@ -1,5 +1,7 @@
 # How it works
 
+![Concave creases on the figure, and the auto split that follows them](how-it-works/img/crease-map.png)
+
 What happens between opening a mesh and getting a multi-part 3MF back: how the splitter decides where parts end, how the same code runs in the browser, in OrcaSlicer and on the command line, and the math behind moving parts that are joined to each other.
 
 - [The splitting pipeline](#the-splitting-pipeline)
@@ -141,7 +143,7 @@ When a part moves, the cut loop it shares with a neighbor opens if the loop's ve
 
 Each part's export is then its faces plus these patches, a closed solid.
 
-![Fill vs. anchor on a turned arm](features/img/gap-anchor.png)
+![Before, Fill and Anchor on the back arm after the front arm turns](features/img/gap-anchor.png)
 
 ### Move with, Reach and Hold
 
