@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.14](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.13...v0.3.14) (2026-11-21)
+
+
+### Features
+
+* standalone command line downloads for Windows, Mac and Linux on each release ([#66](https://github.com/d-carrigg/mesh-splitter/issues/66)) ([70f4af8](https://github.com/d-carrigg/mesh-splitter/commit/70f4af8e9013c957ae172cf1fe7402a66f3e4bed))
+
+
+### Bug Fixes
+
+* **ci:** pin astral-sh/setup-uv to v10.4.0 (no v10 tag exists) ([#71](https://github.com/d-carrigg/mesh-splitter/issues/71)) ([617a927](https://github.com/d-carrigg/mesh-splitter/commit/617a927fa0b11d8871bd526685a109c55b3d86ed))
+* smooth the Fill patch and Anchor sleeve over jagged cuts ([#68](https://github.com/d-carrigg/mesh-splitter/issues/68)) ([341345d](https://github.com/d-carrigg/mesh-splitter/commit/341345d14d6d1655b9b25bb224a6dab9a7c2fd40))
+
+
+### Documentation
+
+* link the Examples page from the plugin description ([#73](https://github.com/d-carrigg/mesh-splitter/issues/73)) ([421e178](https://github.com/d-carrigg/mesh-splitter/commit/421e178ca79feda004abca69db205553afe9894a))
+* make the robot example's wrench look like a wrench ([#74](https://github.com/d-carrigg/mesh-splitter/issues/74)) ([52a8513](https://github.com/d-carrigg/mesh-splitter/commit/52a851347e8d40f86faf1357eb4cb3c88af11850))
+* move Docs links below the intro and reword feature bullets ([#72](https://github.com/d-carrigg/mesh-splitter/issues/72)) ([da8d58c](https://github.com/d-carrigg/mesh-splitter/commit/da8d58c1217467577e09bbb680ce84075cb40c6e))
+* set Fill on the arm's followers in the Fill and anchor example ([#70](https://github.com/d-carrigg/mesh-splitter/issues/70)) ([3b3ff33](https://github.com/d-carrigg/mesh-splitter/commit/3b3ff338e73bbdd0b4c338cdea2401602eb89634))
+
 ## [0.3.13](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.12...v0.3.13) (2026-11-21)
 
 
