@@ -290,6 +290,8 @@ const steps = {
   async set(s) { await page.locator(s.target).fill(String(s.value)); await idle(); await hold(s.after ?? 0.3); }, // e.g. a color input
   async key(s) { await page.keyboard.press(s.key); await idle(); await hold(s.after ?? 0.3); },
   async eval(s) { await page.evaluate(s.js); await idle(); }, // escape hatch: run JS in the page
+  async script(s) { await page.evaluate(readFileSync(path.resolve(path.dirname(cfgPath), s.file), "utf8")); await idle(); }, // run a JS file (path relative to the config)
+  async file(s) { await page.setInputFiles(s.input, asset(s.file)); await page.waitForTimeout(300); await idle(); }, // pick a file in a hidden <input type=file>, e.g. "#repIn" (Replace with…)
   // Animate over s.s seconds: js is a function source "(t) => ..." run in the page once per frame with t going
   // 0..1 (eased unless "linear": true); the step renders and captures a frame after each call.
   async tween(s) {

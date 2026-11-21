@@ -1,0 +1,93 @@
+{
+ "assets": "examples/bear",
+ "model": "bear.stl",
+ "out": null,
+ "shots": "docs/examples/img",
+ "viewport": {
+  "width": 1300,
+  "height": 900
+ },
+ "camera": {
+  "az": 20,
+  "el": 12,
+  "dist": 0.8,
+  "lift": 0
+ },
+ "css": "#view > :not(canvas) { visibility: hidden !important }",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "session",
+   "file": "bear.split.json"
+  },
+  {
+   "do": "script",
+   "file": "gallery.js"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Body\": \"#c98f55\", \"Head\": \"#c98f55\", \"Snout\": \"#dcae78\", \"Left ear\": \"#9c6434\", \"Right ear\": \"#9c6434\", \"Left arm\": \"#bb8249\", \"Right arm\": \"#bb8249\", \"Left leg\": \"#bb8249\", \"Right leg\": \"#bb8249\"}); ; G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "bear-model",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Body\": \"#c98f55\", \"Head\": \"#c98f55\", \"Snout\": \"#dcae78\", \"Left ear\": \"#9c6434\", \"Right ear\": \"#9c6434\", \"Left arm\": \"#bb8249\", \"Right arm\": \"#bb8249\", \"Left leg\": \"#bb8249\", \"Right leg\": \"#bb8249\"}); G.rotate('Left arm',[0,1,0],100); G.rotate('Right arm',[0,1,0],-100); G.heal('Left arm'); G.heal('Right arm'); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "bear-arms-up",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Body\": \"#c98f55\", \"Head\": \"#c98f55\", \"Snout\": \"#dcae78\", \"Left ear\": \"#9c6434\", \"Right ear\": \"#9c6434\", \"Left arm\": \"#bb8249\", \"Right arm\": \"#bb8249\", \"Left leg\": \"#bb8249\", \"Right leg\": \"#bb8249\"}); G.rotate('Right arm',[0,1,0],-100); G.heal('Right arm'); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "bear-wave",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Body\": \"#c98f55\", \"Head\": \"#c98f55\", \"Snout\": \"#dcae78\", \"Left ear\": \"#9c6434\", \"Right ear\": \"#9c6434\", \"Left arm\": \"#bb8249\", \"Right arm\": \"#bb8249\", \"Left leg\": \"#bb8249\", \"Right leg\": \"#bb8249\"}); G.spin('Head',35); G.heal('Head'); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "bear-head-turn",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Body\": \"#c98f55\", \"Head\": \"#c98f55\", \"Snout\": \"#dcae78\", \"Left ear\": \"#9c6434\", \"Right ear\": \"#9c6434\", \"Left arm\": \"#bb8249\", \"Right arm\": \"#bb8249\", \"Left leg\": \"#bb8249\", \"Right leg\": \"#bb8249\"}); G.scale('Head',125); G.heal('Head'); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "bear-big-head",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Body\": \"#c98f55\", \"Head\": \"#c98f55\", \"Snout\": \"#dcae78\", \"Left ear\": \"#9c6434\", \"Right ear\": \"#9c6434\", \"Left arm\": \"#bb8249\", \"Right arm\": \"#bb8249\", \"Left leg\": \"#bb8249\", \"Right leg\": \"#bb8249\"}); G.scale('Left ear',170); G.scale('Right ear',170); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "bear-big-ears",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Body\": \"#c98f55\", \"Head\": \"#c98f55\", \"Snout\": \"#dcae78\", \"Left ear\": \"#9c6434\", \"Right ear\": \"#9c6434\", \"Left arm\": \"#bb8249\", \"Right arm\": \"#bb8249\", \"Left leg\": \"#bb8249\", \"Right leg\": \"#bb8249\"}); G.rotate('Left leg',[1,0,0],-35); G.rotate('Right leg',[1,0,0],-35); G.heal('Left leg'); G.heal('Right leg'); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "bear-legs-up",
+   "clip": "#view"
+  }
+ ]
+}

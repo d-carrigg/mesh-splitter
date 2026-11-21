@@ -1,67 +1,38 @@
 # Examples
 
-Three test models in different styles, each split with Mesh Splitter. The models, seed files, sessions and exported 3MFs are in the repo's [examples folder](https://github.com/d-carrigg/mesh-splitter/tree/main/examples). They are made from code for this repo and share its MIT license.
-
-To open one: open the STL, then **Open > Load session…** and pick its `.split.json`.
-
-- [Robot](#robot)
-- [Teddy bear](#teddy-bear)
-- [Rocket](#rocket)
+Split a model once, then pose it, resize parts, or swap them out. Every picture below is the same model, edited in Mesh Splitter.
 
 ## Robot
 
-A waving robot holding a wrench. Hard-surface style: boxes and cylinders joined with sharp concave creases. 31,278 faces, one shell, 86 × 27 × 125 mm.
+Move, rotate, stretch and scale parts, or replace them with your own.
 
-| Model | Auto split on open | Final split |
+| | | |
 | --- | --- | --- |
-| ![Robot model](examples/img/robot-model.png) | ![Robot auto split](examples/img/robot-auto.png) | ![Robot final split](examples/img/robot-final.png) |
-
-- **Auto split:** 12 parts. Most joints separate; the neck stays with the head, and the raised hand splits into palm and fingers.
-- **Final split:** 12 parts from [seed points](features/splitting.md#seeds-and-add-part) (`robot.seeds.json`): head, antenna, torso, arms, hands, wrench, legs and feet.
-- **Edits:** each hand [moves with](features/editing-parts.md) its arm and the wrench with the left hand. The right arm is [stretched](features/transforms.md#stretch) to 125%, and the hand rides out with it.
-- **Files:** `robot.stl`, `robot.seeds.json`, `robot.split.json`, `robot_parts.3mf`.
-
-```
-uv run mesh-splitter split examples/robot/robot.stl --seeds examples/robot/robot.seeds.json -o robot_parts.3mf
-```
+| ![Original](examples/img/robot-model.png)<br>Original | ![Both arms up](examples/img/robot-arms-up.png)<br>Both arms up | ![Arm lowered](examples/img/robot-arms-down.png)<br>Arm lowered |
+| ![Longer arm (stretch)](examples/img/robot-long-arm.png)<br>Longer arm (stretch) | ![Head turned](examples/img/robot-head-turn.png)<br>Head turned | ![Walking legs](examples/img/robot-walk.png)<br>Walking legs |
+| ![Bigger wrench](examples/img/robot-big-wrench.png)<br>Bigger wrench | ![Antenna swapped for a top hat](examples/img/robot-top-hat.png)<br>Antenna swapped for a top hat | ![Party hat](examples/img/robot-party-hat.png)<br>Party hat |
+| ![Crown](examples/img/robot-crown.png)<br>Crown | ![New round head](examples/img/robot-round-head.png)<br>New round head |  |
 
 ## Teddy bear
 
-A seated teddy bear. Organic style: smoothly blended blobs with soft creases, the hard case for crease detection. 61,688 faces, one shell, 65 × 58 × 82 mm.
+Turn parts on their joints; heal joint keeps them attached.
 
-| Model | Auto split on open | Final split |
+| | | |
 | --- | --- | --- |
-| ![Bear model](examples/img/bear-model.png) | ![Bear auto split](examples/img/bear-auto.png) | ![Bear final split](examples/img/bear-final.png) |
-
-- **Auto split:** 4 parts (body with arms and legs, head, two ears) at the default **Crease** of 2: the soft blends at the arms and legs don't count as creases. At **Crease** 1 it finds 8: body, head, ears, arms and legs.
-- **Final split:** 9 parts from seed points (`bear.seeds.json`): body, head, snout, ears, arms and legs.
-- **Edits:** the snout and ears move with the head. The head is turned 25° with [rotate on joint](features/transforms.md#rotate-on-joint), with [heal joint](features/transforms.md#heal-joint) on.
-- **Files:** `bear.stl`, `bear.seeds.json`, `bear.split.json`, `bear_parts.3mf`.
-
-```
-uv run mesh-splitter split examples/bear/bear.stl --seeds examples/bear/bear.seeds.json -o bear_parts.3mf
-```
+| ![Original](examples/img/bear-model.png)<br>Original | ![Arms up](examples/img/bear-arms-up.png)<br>Arms up | ![Waving](examples/img/bear-wave.png)<br>Waving |
+| ![Head turned](examples/img/bear-head-turn.png)<br>Head turned | ![Bigger head](examples/img/bear-big-head.png)<br>Bigger head | ![Bigger ears](examples/img/bear-big-ears.png)<br>Bigger ears |
+| ![Legs raised](examples/img/bear-legs-up.png)<br>Legs raised |  |  |
 
 ## Rocket
 
-A rocket with three fins and two recessed portholes, on a separate launch stand. Two shells, thin fins. 20,778 faces, 60 × 60 × 113 mm.
+Resize parts, move them apart, or merge them.
 
-| Model | Auto split on open | Final split |
+| | | |
 | --- | --- | --- |
-| ![Rocket model](examples/img/rocket-model.png) | ![Rocket auto split](examples/img/rocket-auto.png) | ![Rocket final split](examples/img/rocket-final.png) |
+| ![Original](examples/img/rocket-model.png)<br>Original | ![Bigger fins](examples/img/rocket-big-fins.png)<br>Bigger fins | ![Smaller fins](examples/img/rocket-small-fins.png)<br>Smaller fins |
+| ![Longer body](examples/img/rocket-long-body.png)<br>Longer body | ![Wider body](examples/img/rocket-wide-body.png)<br>Wider body | ![Bigger window](examples/img/rocket-big-window.png)<br>Bigger window |
+| ![Lifted off the stand](examples/img/rocket-lift-off.png)<br>Lifted off the stand | ![Fins merged into one part](examples/img/rocket-merged-fins.png)<br>Fins merged into one part |  |
 
-- **Auto split:** 7 parts: body, stand, the stand's socket, three fins and one porthole. The nose cone stays with the body, since it meets it at a convex edge, not a concave crease.
-- **Final split:** the auto split with the parts renamed.
-- **Files:** `rocket.stl`, `rocket.split.json`, `rocket_parts.3mf`.
+## Try them
 
-```
-uv run mesh-splitter split examples/rocket/rocket.stl -o rocket_parts.3mf
-uv run mesh-splitter split examples/rocket/rocket.stl --shells -o rocket_shells.3mf
-```
-
-## Tips from these models
-
-- **CAD-style meshes:** long, thin triangles (a box face made of two triangles) hide the creases. Mesh Splitter splits their long edges when it opens such a mesh; the robot and rocket here are already fine.
-- **Soft blends:** organic models with smooth joins (the bear) split into few parts at the default **Crease**. Lower it to 1 for more, or use seeds.
-- **Recesses** (the rocket's porthole and socket) export as a thin skin behind the surface, so they print as their own color.
-- **Stretch and rotate on joint** pivot at the cut toward the body. Set the parts that hang off a part (a hand on an arm) to move with it, so they come along.
+The models, sessions and replacement parts are in the repo's [examples folder](https://github.com/d-carrigg/mesh-splitter/tree/main/examples). Open an STL, then **Open > Load session…** and pick its `.split.json`.
