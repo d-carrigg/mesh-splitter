@@ -36,7 +36,7 @@ Options:
 Seeds file: a list of parts, each with seed points (x, y, z in the mesh's units) and/or face indices:
   [{ "name": "Head", "filament": 2, "points": [[0, 0, 40]] },
    { "name": "Body", "points": [[0, 0, 10], [0, 5, 0]] }]
-Each point picks the face whose center is nearest. Parts without a filament get the next free slot.`;
+Each point picks the nearest face. Parts without a filament get the next free slot.`;
 
 const fail = (msg) => { console.error(`mesh-splitter: ${msg}`); process.exit(1); };
 
@@ -114,10 +114,35 @@ function load(file) {
   return core.newSplit(path.basename(file), raw);
 }
 
-function nearestFace(S, [x, y, z]) {
-  const c = S.G.cen; let best = -1, bd = Infinity;
-  for (let f = 0; f < S.nF; f++) { const d = (c[3*f]-x)**2 + (c[3*f+1]-y)**2 + (c[3*f+2]-z)**2; if (d < bd) { bd = d; best = f; } }
+// The face nearest to a point: distance to the triangle itself, not its center, so a point on a big flat face
+// (CAD-style meshes with long thin triangles) doesn't pick a small face nearby whose center happens to be closer.
+function nearestFace(S, p) {
+  let best = -1, bd = Infinity;
+  for (let f = 0; f < S.nF; f++) {
+    const d = triDist2(p, ...[0, 1, 2].map((c) => { const v = S.tri[3 * f + c]; return [S.pos[3 * v], S.pos[3 * v + 1], S.pos[3 * v + 2]]; }));
+    if (d < bd) { bd = d; best = f; }
+  }
   return best;
+}
+// Squared distance from point p to triangle abc (closest-point regions, Ericson, Real-Time Collision Detection 5.1.5).
+function triDist2(p, a, b, c) {
+  const sub = (u, v) => [u[0] - v[0], u[1] - v[1], u[2] - v[2]], dot = (u, v) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+  const at = (o, u, s, w, t) => [o[0] + u[0] * s + w[0] * t, o[1] + u[1] * s + w[1] * t, o[2] + u[2] * s + w[2] * t];
+  const d2 = (q) => { const d = sub(p, q); return dot(d, d); };
+  const ab = sub(b, a), ac = sub(c, a), ap = sub(p, a), d1 = dot(ab, ap), d2_ = dot(ac, ap);
+  if (d1 <= 0 && d2_ <= 0) return d2(a);
+  const bp = sub(p, b), d3 = dot(ab, bp), d4 = dot(ac, bp);
+  if (d3 >= 0 && d4 <= d3) return d2(b);
+  const vc = d1 * d4 - d3 * d2_;
+  if (vc <= 0 && d1 >= 0 && d3 <= 0) return d2(at(a, ab, d1 / (d1 - d3), ac, 0));
+  const cp = sub(p, c), d5 = dot(ab, cp), d6 = dot(ac, cp);
+  if (d6 >= 0 && d5 <= d6) return d2(c);
+  const vb = d5 * d2_ - d1 * d6;
+  if (vb <= 0 && d2_ >= 0 && d6 <= 0) return d2(at(a, ab, 0, ac, d2_ / (d2_ - d6)));
+  const va = d3 * d6 - d5 * d4;
+  if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) { const w = (d4 - d3) / ((d4 - d3) + (d5 - d6)); return d2(at(b, sub(c, b), w, ab, 0)); }
+  const den = 1 / (va + vb + vc);
+  return d2(at(a, ab, vb * den, ac, vc * den));
 }
 
 function seedSplit(S, spec, opts) {

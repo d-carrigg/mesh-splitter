@@ -186,6 +186,11 @@ const steps = {
     if (!(s.split ?? true)) await steps.unsplit();
     await setCam(cam);
   },
+  async session(s) { // load a .split.json saved from the app (Save session), as Load session does
+    await page.setInputFiles("#sessIn", asset(s.file));
+    await page.waitForFunction(() => /Session loaded/.test(document.getElementById("status").textContent), null, { timeout: 60000 });
+    await idle();
+  },
   async unsplit() { // back to one unassigned part
     await page.evaluate(() => { app.S.labels.fill(0); app.S.parts.splice(1); app.S.active = 0; app.S.hist = { past: [], future: [] }; app.afterEdit(""); document.getElementById("status").textContent = ""; });
   },
