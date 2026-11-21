@@ -1332,7 +1332,9 @@ function planTris(pl, ctx, out = []) {
   if (kind === "fan" || kind === "under") { ringTris([ring0], cen(ring0), flip, out); return out; }
   if (kind === "patch") {
     const cntF = (l) => (l > 0 ? partCountsCached(ctx)[l] : 0);
-    const fitL = cntF(own) >= cntF(nb) ? own : -1; // the bigger side continues its surface; the smaller gets a flat face
+    // the bigger side continues its surface; the smaller gets a flat face. So does the bigger side while the neighbor is
+    // still seated on the cut (e.g. turned on its joint): a curved patch would bulge up through the neighbor's base.
+    const fitL = cntF(own) >= cntF(nb) && !seatedOn(lp, own, nb, ctx) ? own : -1;
     const P = patchRings(lp, fitL, ctx.hash), rings = [ring0];
     // interior points ride with the part; the loop's own offset (heal) fades out toward the center
     const off = lp.map(([a]) => { const o = new THREE.Vector3(S.pos[3*a], S.pos[3*a+1], S.pos[3*a+2]); if (M) o.applyMatrix4(M); return ctx.wpos(own, a, new THREE.Vector3()).sub(o); });
@@ -1365,6 +1367,19 @@ function planTris(pl, ctx, out = []) {
   ringTris(rings, C0.toArray(), flip, out); return out;
 }
 function partCountsCached(ctx) { return (ctx.cnt ||= partCounts()); }
+// Is part nb's moved cut still in the plane of part own's side of loop lp (turned in place on its joint, not lifted
+// or tilted off it)? Compared with the loop's own out-of-plane spread, so a cut on a curved surface still counts.
+function seatedOn(lp, own, nb, ctx) {
+  if (!(nb > 0)) return false;
+  const n = lp.length, P = lp.map(([a]) => ctx.wpos(own, a)), Q = lp.map(([a]) => ctx.wpos(nb, a)), C = new THREE.Vector3(), N = new THREE.Vector3();
+  P.forEach((p) => C.add(p)); C.divideScalar(n);
+  let r = 0;
+  for (let k = 0; k < n; k++) { const a = P[k].clone().sub(C), b = P[(k+1) % n].clone().sub(C); N.add(a.cross(b)); r += P[k].distanceTo(C); }
+  if (N.lengthSq() < 1e-18) return false;
+  N.normalize(); r /= n;
+  const spread = (pts) => pts.reduce((m, p) => Math.max(m, Math.abs(p.clone().sub(C).dot(N))), 0);
+  return spread(Q) <= spread(P) + 0.03 * r;
+}
 // Closing triangles for every loop of part i (or of the unchanged rest, in mergedSoup), world space.
 function capTris(plans, ctx) { const out = []; for (const pl of plans) planTris(pl, ctx, out); return Float32Array.from(out); }
 
