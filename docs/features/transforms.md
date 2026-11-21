@@ -54,6 +54,7 @@ Spins a part about its cut instead of the world axes. The axis is the cut's norm
 ### Tips
 
 - A part with no cut (a separate shell) rotates on the world axes instead, and the status bar says so.
+- A part with several cuts (an arm with a hand) turns on the cut toward the body: cuts to parts it carries, holds or reaches for are skipped, then the cut to the biggest neighbor that is bigger than the part wins (the shoulder, not the wrist).
 - The rotation is stored as a normal rotation plus move, so its values stay editable in the Transform panel.
 - If a rotated part still doesn't meet its neighbor exactly (an oval cut, for example), turn on [heal joint](#heal-joint).
 
