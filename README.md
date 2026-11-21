@@ -42,7 +42,7 @@ It opens at `http://127.0.0.1:8766/app/`. Everything runs locally, and nothing i
 
 ## Command line
 
-Split and export from a terminal or script. It needs [Node.js](https://nodejs.org/) 20+ as well as uv, and runs the same splitting code as the app:
+Split and export from a terminal or script. It runs the same splitting code as the app. The easiest way is to download the file for your computer from the [latest release](https://github.com/d-carrigg/mesh-splitter/releases/latest) (Windows, Mac, Linux; nothing to install) and run it, for example `mesh-splitter-windows-x64.exe figure.stl --auto 6 -o figure.3mf`. With [Node.js](https://nodejs.org/) 20+, `npx github:d-carrigg/mesh-splitter figure.stl` also works without a clone. From the repo folder, with uv and Node.js:
 
 ```
 uv run mesh-splitter split figure.stl --auto 6 -o figure.3mf --stl parts/

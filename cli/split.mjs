@@ -7,6 +7,11 @@ import { parseArgs } from "node:util";
 import { DOMParser } from "@xmldom/xmldom";
 import * as core from "../app/core.js";
 
+// Release binaries (bun build --compile) get the version baked in with --define; from source it's read from pyproject.toml.
+const VERSION = typeof MESH_SPLITTER_VERSION !== "undefined" ? MESH_SPLITTER_VERSION : (() => {
+  try { return fs.readFileSync(new URL("../pyproject.toml", import.meta.url), "utf8").match(/^version = "(.+)"/m)[1]; } catch { return "dev"; }
+})();
+
 const HELP = `Split a mesh into parts without opening the app.
 
 Usage:
@@ -39,6 +44,7 @@ Options:
   --filaments N         the printer has N filament slots (1-16, e.g. 4 for one AMS): number the parts 1..N,
                         reusing slots when there are more parts than slots. Replaces slots from seeds or a session
   -q, --quiet           print nothing but errors
+  -v, --version         print the version
   -h, --help
 
 Seeds file: a list of parts, each with seed points (x, y, z in the mesh's units) and/or face indices:
@@ -61,11 +67,12 @@ export function main(argv) {
         auto: { type: "string" }, shells: { type: "boolean" }, seeds: { type: "string" }, session: { type: "string" },
         out: { type: "string", short: "o" }, painted: { type: "string" }, stl: { type: "string" }, merged: { type: "string" },
         "save-session": { type: "string" }, report: { type: "string" }, merge: { type: "string", multiple: true }, crease: { type: "string" }, denoise: { type: "string" }, filaments: { type: "string" },
-        quiet: { type: "boolean", short: "q" }, help: { type: "boolean", short: "h" },
+        quiet: { type: "boolean", short: "q" }, version: { type: "boolean", short: "v" }, help: { type: "boolean", short: "h" },
       },
     });
   } catch (e) { fail(`${e.message}\nRun with --help for usage.`); }
   const o = a.values;
+  if (o.version) { console.log(`mesh-splitter ${VERSION}`); return; }
   if (o.help || !a.positionals.length) { console.log(HELP); return; }
   if (a.positionals.length > 1) fail(`one mesh at a time (got ${a.positionals.join(", ")})`);
   const log = o.quiet ? () => {} : (...m) => console.log(...m);
