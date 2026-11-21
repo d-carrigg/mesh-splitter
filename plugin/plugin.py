@@ -29,6 +29,7 @@ import re
 import sys
 import tempfile
 import threading
+import time
 import zlib
 
 import orca
@@ -38,7 +39,7 @@ try:
 except Exception:  # numpy is declared above; uv installs it when the plugin loads
     np = None
 
-from llm_providers import call as llm_call, list_models as llm_list_models, resolve as llm_resolve, status as llm_status, update as llm_update  # noqa: E402  __LLM_PROVIDERS__
+from llm_providers import abort as llm_abort, call as llm_call, check as llm_check, resolve as llm_resolve, status as llm_status, update as llm_update  # noqa: E402  __LLM_PROVIDERS__
 
 PAGE_Z = "__PAGE_Z__"  # zlib + base64 of the bundled page, filled in by build.py
 CHUNK = 512 * 1024
@@ -95,6 +96,14 @@ def ask_network_permission(url):
     the request (a prompt raised off the UI thread is denied the first time). OrcaSlicer saves a Yes for the
     whole host, so this asks once per provider. Raises if the user says No."""
     sys.audit("urllib.Request", network_origin(url), None, {}, "POST")
+
+
+def permission_text(e):
+    """OrcaSlicer's PermissionError says 'audit permission required': say what to do instead."""
+    if isinstance(e, PermissionError) or "permission" in str(e).lower():
+        return ("OrcaSlicer did not allow Mesh Splitter to connect to the provider. Try again and click Yes "
+                "when OrcaSlicer asks.")
+    return f"Mesh Splitter: {e}"
 
 
 def downloads_dir():
@@ -222,7 +231,8 @@ class Bridge:
     def __init__(self, send):
         self.send = send
         self.saves = {}
-        self.llm_jobs = {}
+        self.llm_jobs = {}  # naming request id -> body chunks received so far
+        self.llm_running = {}  # naming request id -> {"cancel": Event, "resp": [open response]}
 
     def handle(self, msg):
         if not isinstance(msg, dict):
@@ -247,34 +257,37 @@ class Bridge:
                 store = llm_update(load_ai_settings(), msg.get("settings"))
                 save_ai_settings(store)
                 self.send({"cmd": "llm_status", "saved": True, **llm_status(store)})
-            elif cmd == "llm_models":
+            elif cmd == "llm_test":
                 cfg = llm_resolve(load_ai_settings())
                 ask_network_permission(cfg["base_url"] + "/models")
-                self.run_async(lambda: {"cmd": "llm_models", "models": llm_list_models(cfg)},
-                               lambda e: {"cmd": "llm_models", "models": [], "error": str(e)})
+                self.run_async(lambda: {"cmd": "llm_test", **llm_check(cfg)},
+                               lambda e: {"cmd": "llm_test", "ok": False, "models": [], "error": str(e)})
             elif cmd == "llm_name":
                 self.name_chunk(msg)
+            elif cmd == "llm_cancel":
+                self.cancel_naming(msg.get("id"))
         except Exception as e:  # report to the page instead of failing silently
-            if cmd in ("llm_status", "llm_settings", "llm_models"):
-                self.send({"cmd": "llm_models" if cmd == "llm_models" else "llm_status", "ok": False, "error": str(e),
-                           "models": []})
+            if cmd in ("llm_status", "llm_settings", "llm_test"):
+                self.send({"cmd": "llm_test" if cmd == "llm_test" else "llm_status", "ok": False,
+                           "error": permission_text(e), "models": []})
             elif cmd == "llm_name":
                 self.llm_jobs.pop(msg.get("id"), None)
-                self.send({"cmd": "llm_result", "id": msg.get("id"), "ok": False, "error": f"Mesh Splitter: {e}"})
+                self.llm_running.pop(msg.get("id"), None)
+                self.send({"cmd": "llm_result", "id": msg.get("id"), "ok": False, "error": permission_text(e)})
             elif cmd == "save":
                 self.saves.pop(msg.get("id"), None)
                 self.send({"cmd": "save_error", "id": msg.get("id"), "message": str(e)})
             else:
                 self.send({"cmd": "error", "message": f"Mesh Splitter: {e}"})
 
-    def run_async(self, work, on_error):
+    def run_async(self, work, on_error, done=None):
         """Run a slow network call off the UI thread; the host marshals post_message back to it."""
         def go():
             try:
                 out = work()
-            except Exception as e:  # e.g. OrcaSlicer denied the request
+            except BaseException as e:  # e.g. OrcaSlicer denied the request; never leave the page waiting
                 out = on_error(e)
-            self.send(out)
+            (done or self.send)(out)
         threading.Thread(target=go, daemon=True).start()
 
     def name_chunk(self, msg):
@@ -287,13 +300,38 @@ class Bridge:
         del self.llm_jobs[jid]
         body = json.loads("".join(buf))
         cfg = llm_resolve(load_ai_settings())
+        job = self.llm_running[jid] = {"cancel": threading.Event(), "resp": []}
+        self.send({"cmd": "llm_progress", "id": jid, "stage": "permission"})
         if cfg["base_url"]:
             ask_network_permission(cfg["base_url"] + ("/messages" if cfg["api"] == "anthropic" else "/chat/completions"))
+        last = [0.0, ""]
+
+        def progress(stage, info):  # every stage change, then a few times a second
+            now = time.monotonic()
+            if not job["cancel"].is_set() and (stage != last[1] or now - last[0] > 0.4):
+                last[0], last[1] = now, stage
+                self.send({"cmd": "llm_progress", "id": jid, "stage": stage, **info})
 
         def work():
-            code, out = llm_call(cfg, body)
+            code, out = llm_call(cfg, body, progress=progress, cancel=job["cancel"].is_set,
+                                 on_response=job["resp"].append)
             return {"cmd": "llm_result", "id": jid, **out}
-        self.run_async(work, lambda e: {"cmd": "llm_result", "id": jid, "ok": False, "error": f"Mesh Splitter: {e}"})
+
+        def finish(out):  # a cancelled request already answered the page
+            if self.llm_running.pop(jid, None) is not None:
+                self.send(out)
+        self.run_async(work, lambda e: {"cmd": "llm_result", "id": jid, "ok": False, "error": f"Mesh Splitter: {e}"},
+                       finish)
+
+    def cancel_naming(self, jid):
+        """Cancel: answer the page now, then stop the request (shut the socket so a blocked read returns)."""
+        self.llm_jobs.pop(jid, None)
+        job = self.llm_running.pop(jid, None)
+        if job:
+            job["cancel"].set()
+            for r in job["resp"]:
+                llm_abort(r)
+        self.send({"cmd": "llm_result", "id": jid, "ok": False, "cancelled": True, "error": "Cancelled"})
 
     def save_chunk(self, msg):
         sid, part, of = msg["id"], int(msg["part"]), int(msg["of"])

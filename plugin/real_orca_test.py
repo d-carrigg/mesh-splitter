@@ -85,10 +85,13 @@ def main():
 
     report = a.out / "probe.json"
     report.unlink(missing_ok=True)
-    llm_ctx = mock_llm_server.running()  # keep a reference: the server stops when this is collected
+    llm_ctx = mock_llm_server.running(think=0.5)  # keep a reference: the server stops when this is collected
     llm = llm_ctx.__enter__()
+    stall_ctx = mock_llm_server.running(stall=True)  # never answers: for Cancel
+    stall = stall_ctx.__enter__()
     env = dict(os.environ, MESH_SPLITTER_PROBE_OUT=str(report.resolve()), LIBGL_ALWAYS_SOFTWARE="1",
-               LANG=os.environ.get("LANG", "C.UTF-8"), MESH_SPLITTER_MOCK_LLM=llm.base_url)
+               LANG=os.environ.get("LANG", "C.UTF-8"), MESH_SPLITTER_MOCK_LLM=llm.base_url,
+               MESH_SPLITTER_MOCK_LLM_STALL=stall.base_url)
     # Without SSL_CERT_FILE, OrcaSlicer on Linux asks "use system SSL certificate ...?" in a modal at startup.
     env.setdefault("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt")
     with open(a.out / "orca-stdout.log", "w") as log:
@@ -135,8 +138,15 @@ def main():
             res = ai.get("result") or {}
             names = [x.get("name") for x in (res.get("result") or {}).get("parts", [])]
             if not (ai.get("status", {}).get("configured") and res.get("ok") and names == ["mock part 1", "mock part 2"]
-                    and llm.requests):
+                    and llm.requests and llm.requests[-1]["stream"]):
                 problems.append(f"AI part naming via the local server failed: {ai}")
+            if not (ai.get("test") or {}).get("ok") or (ai.get("test") or {}).get("models") != ["mock-vision-1"]:
+                problems.append(f"AI connection test failed: {ai.get('test')}")
+            if ai.get("stages") != ["permission", "sending", "waiting", "thinking", "writing"]:
+                problems.append(f"AI progress stages: {ai.get('stages')}")
+            cancel = ai.get("cancel") or {}
+            if not (cancel.get("result") or {}).get("cancelled") or cancel.get("late") or not cancel.get("seconds", 99) < 5:
+                problems.append(f"AI Cancel failed: {cancel}")
             want = split_parts(a.split_3mf)
             split = [o for o in r["objects"] if o["name"] != a.mesh.name]
             got = [v["name"] for v in split[0]["volumes"] if v["part"]] if len(split) == 1 else None
@@ -145,6 +155,7 @@ def main():
 
     shutil.rmtree(data, ignore_errors=True)
     llm_ctx.__exit__(None, None, None)
+    stall_ctx.__exit__(None, None, None)
     if problems:
         # Enough to diagnose a CI failure from the job log alone (a modal dialog shows up in the window list).
         print("Open windows: " + ", ".join(windows), file=sys.stderr)

@@ -196,14 +196,27 @@ await page.evaluate(() => app.setGizmoJoint(false));
 if (shot) await page.screenshot({ path: shot });
 // AI part naming from inside OrcaSlicer: set up a local OpenAI-compatible server (no key), as with LM Studio,
 // name the parts through the plugin, and apply the names.
-const mock = spawn(py, [path.join(here, "..", "server", "mock_llm_server.py"), "--port", "18765"], { stdio: ["ignore", "pipe", "ignore"] });
+const mock = spawn(py, [path.join(here, "..", "server", "mock_llm_server.py"), "--port", "18765", "--think", "2"], { stdio: ["ignore", "pipe", "ignore"] });
 process.on("exit", () => mock.kill());
 await new Promise((r) => mock.stdout.once("data", r));
-await page.evaluate(() => { document.getElementById("xfDone")?.click(); document.getElementById("aiToggle").click(); document.getElementById("aiGear").click(); });
+// Not connected yet: opening the panel shows the Connect step.
+await page.evaluate(() => { document.getElementById("xfDone")?.click(); document.getElementById("aiToggle").click(); });
+await page.waitForSelector("#aiSet:not([hidden])", { timeout: 5000 });
 await page.selectOption("#aiProv", "custom");
 await page.fill("#aiUrl", "http://127.0.0.1:18765/v1"); await page.click("#aiSave");
-await page.waitForFunction(() => document.getElementById("aiState").textContent.includes("127.0.0.1:18765"), null, { timeout: 10000 });
-await page.waitForFunction(() => [...document.querySelectorAll("#aiModels option")].some((o) => o.value === "mock-vision-1"), null, { timeout: 10000 });
+await page.waitForFunction(() => document.getElementById("aiConn").classList.contains("ok"), null, { timeout: 10000 })
+  .catch(async () => errors.push("AI connect failed: " + await page.textContent("#aiConn")));
+await page.waitForSelector("#aiMain:not([hidden])", { timeout: 5000 });
+if (!(await page.textContent("#aiState")).includes("127.0.0.1:18765")) errors.push("AI state: " + await page.textContent("#aiState"));
+if (!await page.evaluate(() => [...document.querySelectorAll("#aiModels option")].some((o) => o.value === "mock-vision-1"))) errors.push("AI model list not filled");
+// Progress shows the stage and elapsed time; Cancel stops it without an error.
+await page.click("#aiBtn");
+await page.waitForFunction(() => /thinking/.test(document.getElementById("aiStage").textContent), null, { timeout: 20000 })
+  .catch(async () => errors.push("AI progress never showed thinking: " + await page.textContent("#aiStage")));
+console.log("ai progress:", await page.textContent("#aiStage"), await page.textContent("#aiDetail"), await page.textContent("#aiTime"));
+await page.click("#aiStop");
+await page.waitForSelector("#aiProg[hidden]", { state: "attached", timeout: 5000 }).catch(() => errors.push("AI cancel did not stop"));
+if (await page.$("#aiOut .nm")) errors.push("AI names shown after cancel");
 await page.click("#aiBtn");
 const aiErr = () => [...document.querySelectorAll("#aiOut .iss.high")].find((d) => !d.querySelector(".small"))?.textContent; // check issues carry "· check"
 await page.waitForFunction((f) => document.querySelector("#aiOut .nm") || eval(f)(), aiErr.toString(), { timeout: 60000 });

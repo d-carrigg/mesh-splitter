@@ -4,8 +4,10 @@
 uv run mesh-splitter [--port 8766] [--no-browser]
 uv run mesh-splitter split MESH [options]     (command line; needs Node.js, see --help)
 
-Static files from the repo root plus the AI part-naming endpoints (/api/llm/status, /api/llm/models,
-/api/llm/settings, /api/llm/name-parts), which keep the API key on this machine.
+Static files from the repo root plus the AI part-naming endpoints (/api/llm/status, /api/llm/test,
+/api/llm/settings, /api/llm/name-parts), which keep the API key on this machine. name-parts answers with
+one JSON object per line: progress lines ({"progress": stage, ...}) and then the result; closing the
+connection (Cancel in the page) stops the request to the provider.
 """
 from __future__ import annotations
 
@@ -15,6 +17,8 @@ import shutil
 import socket
 import subprocess
 import sys
+import threading
+import time
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -53,8 +57,8 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/llm/status":
             self._json(200, llm_review.status())
             return
-        if path == "/api/llm/models":
-            self._json(*llm_review.models())
+        if path == "/api/llm/test":
+            self._json(*llm_review.test())
             return
         super().do_GET()
 
@@ -74,7 +78,49 @@ class Handler(SimpleHTTPRequestHandler):
         except ValueError:
             self._json(400, {"ok": False, "error": "bad json"})
             return
-        self._json(*(llm_review.save_settings(body) if path == "/api/llm/settings" else llm_review.review(body)))
+        if path == "/api/llm/settings":
+            self._json(*llm_review.save_settings(body))
+        else:
+            self._name_parts(body)
+
+    def _name_parts(self, body: dict) -> None:
+        """Stream progress lines, then the result. A write error means the page cancelled: stop the request."""
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson")
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        self.close_connection = True
+        gone, lock, last, resp = threading.Event(), threading.Lock(), [0.0, ""], []
+
+        def line(d: dict | None) -> None:
+            with lock:
+                if gone.is_set():
+                    return
+                try:
+                    self.wfile.write((json.dumps(d) + "\n" if d else "\n").encode("utf-8"))
+                    self.wfile.flush()
+                except OSError:
+                    gone.set()
+                    for r in resp:
+                        llm_review.P.abort(r)
+
+        def progress(stage: str, info: dict) -> None:
+            now = time.monotonic()
+            if stage != last[1] or now - last[0] > 0.4:  # every stage change, then a few times a second
+                last[0], last[1] = now, stage
+                line({"progress": stage, **info})
+
+        done = threading.Event()
+
+        def heartbeat() -> None:  # a blank line every 2 s, so a closed page is noticed while the model is silent
+            while not done.wait(2):
+                line(None)
+        threading.Thread(target=heartbeat, daemon=True).start()
+        try:
+            code, out = llm_review.review(body, progress=progress, cancel=gone.is_set, on_response=resp.append)
+        finally:
+            done.set()
+        line({"status": code, **out})
 
 
 def port_in_use(port: int) -> bool:

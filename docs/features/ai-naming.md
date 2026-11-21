@@ -2,11 +2,11 @@
 
 !!! info "Privacy: opt-in only, sent only to the provider you choose"
 
-    - **Opt-in only.** Nothing is sent until you pick a provider and click **Name parts**. Splitting, **Check** and everything else run on your machine.
+    - **Opt-in only.** No model data is sent until you connect a provider and click **Name parts**. Splitting, **Check** and everything else run on your machine.
     - **Sent only to the provider you choose.** Requests go straight from your computer (the OrcaSlicer plugin or your local server) to that provider: OpenAI, OpenRouter, Anthropic, or the base URL you enter. Their data policies apply. OpenRouter passes requests on to the model you pick.
     - **Fully local option.** With a local server such as LM Studio or Ollama, nothing leaves your computer.
     - **Not shared with anyone else.** Your models and info are never sent to the Mesh Splitter developer, OrcaSlicer or any other provider. There is no telemetry.
-    - **What is sent:** rendered pictures of the split model, each part's stats and your optional hint. The mesh file itself is not sent. Saving settings also asks the provider for its list of models (no model data).
+    - **What is sent:** rendered pictures of the split model, each part's stats and your optional hint. The mesh file itself is not sent. **Connect** only checks your key and asks the provider for its list of models (no model data).
     - **Your key stays on your computer**, in a settings file only Mesh Splitter reads. It is never shown to the page.
 
 Optional. Sends pictures of the split model and each part's stats to a vision model, which suggests a name for every part and points out bad cuts, such as stray fragments, slivers or a feature split in two. Nothing changes until you click **Apply names**.
@@ -28,11 +28,13 @@ The model must accept images. Type any model id the provider offers; after you s
 
 ## Setup
 
-1. Click **AI names** in the Parts header to open the panel.
-2. Click the settings button (sliders) next to the close button.
-3. Pick a provider, paste your API key, then click **Save**.
+1. Click **AI names** in the Parts header. The first time, the panel opens on **Connect an AI model**.
+2. Pick a provider, paste your API key, and check the model (it must accept images).
+3. Click **Connect**. Mesh Splitter checks that the provider answers, takes the key, and offers the model. Only a short test is sent, with no pictures. If something is wrong, the panel says what, for example a rejected key or a model name the provider doesn't list.
 
-![AI settings: provider, base URL, API key and model](img/ai-settings.png)
+![Connect an AI model: provider, API key and model](img/ai-settings.png)
+
+To switch provider, key or model later, click **Change** next to the model name.
 
 The key is saved on this computer:
 
@@ -45,7 +47,7 @@ In the browser version you can also set the key in the environment or in a `.env
 
 ### OrcaSlicer permission prompt
 
-The first time you click **Name parts** in OrcaSlicer, it asks whether Mesh Splitter may connect to the provider's address. Click **Yes**. OrcaSlicer remembers the answer for that address. If you click **No**, nothing is sent.
+The first time you click **Connect** or **Name parts** in OrcaSlicer, it asks whether Mesh Splitter may connect to the provider's address. Click **Yes**. OrcaSlicer remembers a Yes for that address. If you click **No**, nothing is sent, and the panel says so; click again to be asked again.
 
 ## Local models (LM Studio, Ollama)
 
@@ -57,14 +59,25 @@ Any server with an OpenAI-compatible `/v1/chat/completions` endpoint works, with
 2. In the AI settings, pick **Custom or local** and enter the base URL, then click **Save**.
 3. Pick the model from the model box, or leave it blank to use the loaded model.
 
-Local models can be slow on a large request. Mesh Splitter waits up to 5 minutes.
+Local models can be slow to read the pictures, so Mesh Splitter waits longer for them (see below).
 
 ## How to use it
 
 1. Open and split a model.
 2. Click **AI names** in the Parts header to open the panel.
-3. Optionally change the model, and type a hint about what the object is.
+3. Optionally type a hint about what the object is.
 4. Click **Name parts**, read the suggested names and issues, then click **Apply names** to keep the names.
+
+### Progress, Cancel and time limits
+
+While it works, the panel shows what is happening and for how long: sending, waiting for the model to start, the model thinking (with how much it has written), then receiving the names. Click **Cancel** to stop at any time; the request to the provider stops too.
+
+If something goes wrong, the panel shows the error instead of waiting. Mesh Splitter gives up when:
+
+| | Cloud provider | Custom or local |
+| --- | --- | --- |
+| No answer at all | 90 s | 5 min |
+| Whole answer | 5 min | 15 min |
 
 ## Check (no AI)
 

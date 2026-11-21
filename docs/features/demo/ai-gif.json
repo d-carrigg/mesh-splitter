@@ -7,8 +7,10 @@
   "models": [
    "qwen2.5-vl-7b-instruct"
   ],
-  "delay": 1.5,
-  "port": 1234
+  "delay": 0.8,
+  "port": 1234,
+  "think": 2.5,
+  "chunkDelay": 0.03
  },
  "viewport": {
   "width": 1200,
@@ -39,16 +41,11 @@
   {
    "do": "click",
    "target": "#aiToggle",
-   "after": 0.4
-  },
-  {
-   "do": "click",
-   "target": "#aiGear",
    "after": 0.5
   },
   {
    "do": "caption",
-   "text": "Pick a provider: OpenAI, OpenRouter, Claude, or a local model",
+   "text": "Connect a provider: OpenAI, OpenRouter, Claude, or a local model",
    "s": 0.2
   },
   {
@@ -61,26 +58,12 @@
   },
   {
    "do": "hold",
-   "s": 1.4
+   "s": 1.2
   },
   {
    "do": "caption",
    "text": "LM Studio runs on localhost:1234, no key needed",
-   "s": 1.6
-  },
-  {
-   "do": "click",
-   "target": "#aiSave",
-   "after": 0.8
-  },
-  {
-   "do": "click",
-   "target": "#aiGear",
-   "after": 0.4
-  },
-  {
-   "do": "caption",
-   "text": ""
+   "s": 0.2
   },
   {
    "do": "click",
@@ -92,6 +75,19 @@
    "target": "#aiModel",
    "text": "qwen2.5-vl-7b-instruct",
    "perChar": 0.04
+  },
+  {
+   "do": "hold",
+   "s": 0.4
+  },
+  {
+   "do": "click",
+   "target": "#aiSave",
+   "after": 1.6
+  },
+  {
+   "do": "caption",
+   "text": ""
   },
   {
    "do": "click",
@@ -110,12 +106,12 @@
   {
    "do": "click",
    "target": "#aiBtn",
-   "after": 2.2
+   "after": 0.3
   },
   {
    "do": "caption",
-   "text": "Check the names, then Apply",
-   "s": 0.2
+   "text": "Progress shows what the model is doing; Cancel any time",
+   "s": 4.6
   },
   {
    "do": "caption",
@@ -124,7 +120,7 @@
   },
   {
    "do": "hold",
-   "s": 0.8
+   "s": 1.0
   },
   {
    "do": "click",

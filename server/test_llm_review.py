@@ -8,6 +8,7 @@ import json
 import os
 import sys
 import tempfile
+import urllib.error
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -148,6 +149,69 @@ class LocalServerTests(unittest.TestCase):
             self.assertEqual(req["path"], "/v1/chat/completions")
             self.assertIsNone(req["auth"])
             self.assertEqual(req["images"], 1)
+
+    def test_streamed_with_progress(self):
+        with mock_llm_server.running(think=0.3) as srv:
+            c = cfg("custom", key="", base_url=srv.base_url)
+            seen = []
+            code, out = P.call(c, {"images": [IMG], "stats": {"parts": [{"id": 1}, {"id": 2}]}},
+                               progress=lambda stage, info: seen.append(stage))
+            self.assertEqual(code, 200, out)
+            self.assertTrue(srv.requests[-1]["stream"])
+            self.assertEqual([p["name"] for p in out["result"]["parts"]], ["mock part 1", "mock part 2"])
+            self.assertEqual(out["usage"]["completion_tokens"], 20)
+            stages = list(dict.fromkeys(seen))
+            self.assertEqual(stages, ["sending", "waiting", "thinking", "writing"])
+
+    def test_stall_hits_total_limit(self):
+        """A server that keeps the connection alive but never answers (keep-alive comments only) still ends."""
+        with mock.patch.dict(P.LIMITS["local"], {"total": 1}), mock_llm_server.running(stall=True) as srv:
+            code, out = P.call(cfg("custom", key="", base_url=srv.base_url), {"images": [IMG]})
+        self.assertEqual(code, 504)
+        self.assertIn("still answering", out["error"])
+
+    def test_no_bytes_hits_first_byte_limit(self):
+        with mock.patch.dict(P.LIMITS["local"], {"first_byte": 0.5}):
+            with mock_llm_server.running(delay=3) as srv:
+                code, out = P.call(cfg("custom", key="", base_url=srv.base_url), {"images": [IMG]})
+        self.assertEqual(code, 504)
+        self.assertIn("No answer from", out["error"])
+
+    def test_cancel_aborts_blocked_read(self):
+        import threading
+        with mock_llm_server.running(stall=True) as srv:
+            box, stop = {}, threading.Event()
+            th = threading.Thread(target=lambda: box.setdefault("out", P.call(
+                cfg("custom", key="", base_url=srv.base_url), {"images": [IMG]}, cancel=stop.is_set,
+                on_response=lambda r: box.setdefault("r", r))))
+            th.start()
+            for _ in range(50):
+                if "r" in box:
+                    break
+                threading.Event().wait(0.05)
+            stop.set()
+            P.abort(box["r"])
+            th.join(5)
+        self.assertFalse(th.is_alive())
+        self.assertEqual(box["out"][0], 499)
+        self.assertTrue(box["out"][1]["cancelled"])
+
+    def test_check(self):
+        with mock_llm_server.running(models=("a-vision",)) as srv:
+            ok = P.check(cfg("custom", key="", base_url=srv.base_url) | {"model": "a-vision"})
+            self.assertEqual((ok["ok"], ok["models"], ok.get("warning")), (True, ["a-vision"], None))
+            typo = P.check(cfg("custom", key="", base_url=srv.base_url) | {"model": "a-visoin"})
+            self.assertIn("does not list", typo["warning"])
+        down = P.check(cfg("custom", key="", base_url="http://127.0.0.1:9/v1"))
+        self.assertFalse(down["ok"])
+        self.assertIn("local server running", down["error"])
+        self.assertIn("API key", P.check(cfg("openai", key=""))["error"])
+
+    def test_check_rejected_key(self):
+        def opener(req, timeout):
+            raise urllib.error.HTTPError(req.full_url, 401, "no", {}, io.BytesIO(b"{}"))
+        out = P.check(cfg("openrouter"), opener=opener)
+        self.assertIn("rejected the API key", out["error"])
 
     def test_server_down(self):
         code, out = P.call(cfg("custom", key="", base_url="http://127.0.0.1:9/v1"), {"images": [IMG]})

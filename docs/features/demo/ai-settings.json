@@ -1,0 +1,54 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "curler.stl",
+ "out": null,
+ "llm": {
+  "models": [
+   "qwen2.5-vl-7b-instruct"
+  ],
+  "port": 1234
+ },
+ "viewport": {
+  "width": 1200,
+  "height": 760
+ },
+ "camera": {
+  "az": 20,
+  "el": 15,
+  "dist": 0.85,
+  "lift": -0.02
+ },
+ "css": "#__cursor { display: none !important }",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "key",
+   "key": "q"
+  },
+  {
+   "do": "click",
+   "target": "#aiToggle",
+   "after": 0.3
+  },
+  {
+   "do": "eval",
+   "js": "const s = document.getElementById('aiProv'); s.value = 'openrouter'; s.dispatchEvent(new Event('change'))"
+  },
+  {
+   "do": "hold",
+   "s": 0.3
+  },
+  {
+   "do": "shot",
+   "name": "ai-settings",
+   "clip": [
+    876,
+    76,
+    324,
+    350
+   ]
+  }
+ ]
+}

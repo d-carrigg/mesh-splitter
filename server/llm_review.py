@@ -116,10 +116,13 @@ def save_settings(patch: dict) -> tuple[int, dict]:
     return 200, {"ok": True, **status()}
 
 
-def models() -> tuple[int, dict]:
-    return 200, {"ok": True, "models": P.list_models(active())}
+def test() -> tuple[int, dict]:
+    """Connect test for the page: reaches the provider, checks the key and the model. Sends no model data."""
+    return 200, P.check(active())
 
 
-def review(body: dict, opener=None) -> tuple[int, dict]:
-    kw = {"opener": opener} if opener else {}
+def review(body: dict, opener=None, **kw) -> tuple[int, dict]:
+    """One naming request. kw: progress, cancel, on_response (see llm_providers.call)."""
+    if opener:
+        kw["opener"] = opener
     return P.call(active(), body, **kw)
