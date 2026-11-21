@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.12](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.11...v0.3.12) (2026-11-21)
+
+
+### Features
+
+* Open is the default at the cut, so a moved part shows its gap; Fill and Anchor are opt-in ([#60](https://github.com/d-carrigg/mesh-splitter/issues/60)) ([ed614fd](https://github.com/d-carrigg/mesh-splitter/commit/ed614fd8d0a496c9893e0f8d5bb36ecb7e44f690))
+
 ## [0.3.11](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.10...v0.3.11) (2026-11-21)
 
 
