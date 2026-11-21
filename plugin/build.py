@@ -1,6 +1,12 @@
-"""Build the OrcaSlicer plugin: bundle app/index.html into one self-contained page and embed it.
+"""Build the OrcaSlicer plugin: bundle app/index.html into one self-contained page and package it in a wheel.
 
-    cd plugin && npm ci && python build.py      ->  dist/mesh_splitter_any.py
+    cd plugin && npm ci && python build.py      ->  dist/mesh_splitter_any.whl
+
+The wheel holds the package mesh_splitter_any/ (__init__.py = plugin.py with llm_providers inlined, page.html =
+the bundled page) and its .dist-info. Everything is plain text, so a reviewer can read it as shipped. OrcaSlicer
+installs .whl plugins (Plugins > Install local plugin) and imports the package named in top_level.txt.
+The file name has no version so the local plugin key, and with it the plugin's saved settings, stay the same
+across updates.
 
 OrcaSlicer loads plugin pages with wxWebView::SetPage (WebView2 NavigateToString on Windows, ~2 MB cap),
 from a file:// base and with no network promise, so the CDN importmap is replaced by an esbuild bundle of
@@ -9,12 +15,13 @@ package.json to match the importmap).
 """
 import argparse
 import base64
+import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
-import zlib
+import zipfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -92,10 +99,52 @@ def project_version():
     return m.group(1)
 
 
+PACKAGE = "mesh_splitter_any"
+HEADER_RE = re.compile(r"\A# /// script\n(.*?)^# ///\n", re.S | re.M)
+
+
+def header_field(header, key):
+    m = re.search(rf'^# {key} = "(.*)"$', header, re.M)
+    if not m:
+        sys.exit(f"plugin.py: no {key} in the script header")
+    return m.group(1)
+
+
+def write_wheel(out, src, page, version):
+    """A pure-Python wheel: OrcaSlicer reads Name/Version/Summary/Author/Requires-Dist from METADATA."""
+    m = HEADER_RE.match(src)
+    if not m:
+        sys.exit("plugin.py: script header not found")
+    header, code = m.group(1), src[m.end():]
+    deps = json.loads(re.search(r"^# dependencies = (\[.*\])$", header, re.M).group(1))
+    info = f"{PACKAGE}-{version}.dist-info/"
+    files = {
+        f"{PACKAGE}/__init__.py": code,
+        f"{PACKAGE}/page.html": page,
+        info + "METADATA": "Metadata-Version: 2.1\n"
+                           f"Name: {header_field(header, 'name')}\nVersion: {version}\n"
+                           f"Summary: {header_field(header, 'description')}\nAuthor: {header_field(header, 'author')}\n"
+                           "Requires-Python: >=3.12\n" + "".join(f"Requires-Dist: {d}\n" for d in deps),
+        info + "WHEEL": "Wheel-Version: 1.0\nGenerator: mesh-splitter plugin/build.py\nRoot-Is-Purelib: true\n"
+                        "Tag: py3-none-any\n",
+        info + "top_level.txt": PACKAGE + "\n",
+    }
+    record = ""
+    for name, text in files.items():
+        data = text.encode("utf-8")
+        digest = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode("ascii")
+        record += f"{name},sha256={digest},{len(data)}\n"
+    files[info + "RECORD"] = record + f"{info}RECORD,,\n"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, text in files.items():
+            z.writestr(zipfile.ZipInfo(name, (2026, 1, 1, 0, 0, 0)), text.encode("utf-8"), zipfile.ZIP_DEFLATED)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--version", default=project_version(), help="defaults to [project].version in pyproject.toml")
-    ap.add_argument("--out", default=str(HERE / "dist" / "mesh_splitter_any.py"))
+    ap.add_argument("--out", default=str(HERE / "dist" / f"{PACKAGE}.whl"))
     ap.add_argument("--page-out", help="also write the bundled page here (for testing in a browser)")
     a = ap.parse_args()
     page = build_page()
@@ -103,14 +152,11 @@ def main():
     if size > MAX_PAGE:
         sys.exit(f"bundled page is {size:,} bytes; OrcaSlicer's webview limit is about 2 MB")
     src = inline_llm((HERE / "plugin.py").read_text(encoding="utf-8"))
-    z = base64.b64encode(zlib.compress(page.encode("utf-8"), 9)).decode("ascii")
-    for key, val in (("__VERSION__", a.version), ("__PAGE_Z__", z)):
-        if src.count(key) != 1:
-            sys.exit(f"plugin.py: expected one {key}")
-        src = src.replace(key, val)
+    if src.count("__VERSION__") != 1:
+        sys.exit("plugin.py: expected one __VERSION__")
+    src = src.replace("__VERSION__", a.version)
     out = Path(a.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(src, encoding="utf-8", newline="\n")
+    write_wheel(out, src, page, a.version)
     if a.page_out:
         Path(a.page_out).write_text(page, encoding="utf-8")
     print(f"{out}  (page {size:,} bytes, plugin {out.stat().st_size:,} bytes, v{a.version})")

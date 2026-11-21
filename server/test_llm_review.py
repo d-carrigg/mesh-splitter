@@ -204,7 +204,7 @@ class LocalServerTests(unittest.TestCase):
             self.assertIn("does not list", typo["warning"])
         down = P.check(cfg("custom", key="", base_url="http://127.0.0.1:9/v1"))
         self.assertFalse(down["ok"])
-        self.assertIn("local server running", down["error"])
+        self.assertIn("model app", down["error"])
         self.assertIn("API key", P.check(cfg("openai", key=""))["error"])
 
     def test_check_rejected_key(self):
@@ -216,7 +216,7 @@ class LocalServerTests(unittest.TestCase):
     def test_server_down(self):
         code, out = P.call(cfg("custom", key="", base_url="http://127.0.0.1:9/v1"), {"images": [IMG]})
         self.assertEqual(code, 502)
-        self.assertIn("local server running", out["error"])
+        self.assertIn("model app", out["error"])
 
 
 class ReviewTests(unittest.TestCase):

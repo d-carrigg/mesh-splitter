@@ -237,13 +237,24 @@ class AiNamingTests(unittest.TestCase):
 
 
 class RegistrationTests(unittest.TestCase):
-    def test_requests_downloads_only_write_permission(self):
+    def register(self, ai_settings):
         p = load_plugin([])
         import orca
+        p.load_ai_settings = lambda: ai_settings
         with mock.patch.object(os.path, "expanduser", return_value=os.path.join("C:", "Users", "d")):
             p.MeshSplitterPlugin().register_capabilities()
-        st = orca._state
-        self.assertEqual(st["permissions"], [{"fs_readwrite": [os.path.join("C:", "Users", "d", "Downloads", "*")]}])
+        return orca._state["permissions"]
+
+    def test_no_network_declared_until_ai_naming_is_set_up(self):
+        self.assertEqual(self.register({}), [{
+            "fs_readwrite": [os.path.join("C:", "Users", "d", "Downloads", "*")], "network": [], "threading": False}])
+
+    def test_declares_only_the_saved_provider_host(self):
+        perms = self.register({"provider": "openrouter", "providers": {"openrouter": {"api_key": "k"}}})
+        self.assertEqual(perms[0]["network"], ["https://openrouter.ai"])
+        self.assertTrue(perms[0]["threading"])
+        custom = self.register({"provider": "custom", "providers": {"custom": {"base_url": "http://localhost:1234/v1"}}})
+        self.assertEqual(custom[0]["network"], ["http://localhost"])
 
     def test_window_and_page_share_bridge(self):
         p = load_plugin([fake_orca.FakeObject("cube", [fake_orca.FakeVolume(TET_V, TET_F)])])
@@ -262,16 +273,24 @@ class RegistrationTests(unittest.TestCase):
 
 class BuildTests(unittest.TestCase):
     @unittest.skipUnless((HERE / "node_modules" / "three").is_dir(), "run npm ci in plugin/ first")
-    def test_build_embeds_self_contained_page(self):
+    def test_build_writes_plain_wheel_with_self_contained_page(self):
         with tempfile.TemporaryDirectory() as d:
-            out = Path(d) / "mesh_splitter.py"
-            import subprocess
+            out = Path(d) / "mesh_splitter_any.whl"
+            import subprocess, zipfile
             subprocess.run([sys.executable, str(HERE / "build.py"), "--version", "9.9.9", "--out", str(out)], check=True,
                            capture_output=True)
-            src = out.read_text()
-            self.assertIn('version = "9.9.9"', src)
+            z = zipfile.ZipFile(out)
+            info = "mesh_splitter_any-9.9.9.dist-info/"
+            self.assertEqual(sorted(z.namelist()), sorted([
+                "mesh_splitter_any/__init__.py", "mesh_splitter_any/page.html",
+                info + "METADATA", info + "WHEEL", info + "top_level.txt", info + "RECORD"]))
+            meta = z.read(info + "METADATA").decode()
+            for line in ("Name: Mesh Splitter", "Version: 9.9.9", "Author: d-carrigg", "Requires-Dist: numpy"):
+                self.assertIn(line, meta)
+            self.assertIn("Tag: py3-none-any", z.read(info + "WHEEL").decode())
+            z.extractall(d)
             fake_orca.install([])
-            spec = importlib.util.spec_from_file_location("built", out)
+            spec = importlib.util.spec_from_file_location("built", Path(d) / "mesh_splitter_any" / "__init__.py")
             mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
             html = mod.page_html()
             self.assertNotIn("cdn.jsdelivr.net", html)

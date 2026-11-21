@@ -9,7 +9,7 @@
 # ///
 """CI-only helper plugin for real_orca_test.py. Never shipped.
 
-Installed next to the real mesh_splitter_any.py in a real OrcaSlicer. Once loaded it waits for the
+Installed next to the real mesh_splitter_any.whl in a real OrcaSlicer. Once loaded it waits for the
 models passed on OrcaSlicer's command line, then drives the Mesh Splitter plugin's own Bridge with
 the real `orca` bindings (no fakes) and writes what it saw to $MESH_SPLITTER_PROBE_OUT as JSON:
   - the Mesh Splitter module loaded and its page decodes

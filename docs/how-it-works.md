@@ -84,7 +84,7 @@ The parsing, the splitting pipeline and the file writers live in one JavaScript 
 flowchart TB
   core["app/core.js<br/>STL/3MF reading · face graph · grow · auto split · shells<br/>snap · smooth cut · 3MF/STL writers · sessions"]
   app["Browser app<br/>app/index.html<br/>(uv run mesh-splitter)"]
-  plugin["OrcaSlicer plugin<br/>plugin/build.py bundles app + core<br/>into one mesh_splitter_any.py"]
+  plugin["OrcaSlicer plugin<br/>plugin/build.py bundles app + core<br/>into mesh_splitter_any.whl"]
   cli["Command line<br/>cli/split.mjs<br/>(uv run mesh-splitter split)"]
   core --> app
   core --> plugin

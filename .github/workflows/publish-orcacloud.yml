@@ -50,7 +50,7 @@ jobs:
       - name: Attach the plugin to the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" dist/mesh_splitter_any.py --clobber
+        run: gh release upload "$TAG" dist/mesh_splitter_any.whl --clobber
       - name: Publish release to OrcaCloud
         run: |
           set -euo pipefail
@@ -62,7 +62,7 @@ jobs:
             '{version: $version} + (if $changelog == "" then {} else {changelog: $changelog} end)')"
           status="$(curl -sS -o response.json -w '%{http_code}' \
             -H "Authorization: Bearer $oidc_token" \
-            --form-string "metadata=$metadata" -F "files=@dist/mesh_splitter_any.py" \
+            --form-string "metadata=$metadata" -F "files=@dist/mesh_splitter_any.whl" \
             https://api.orcaslicer.com/api/v1/plugin-publish/releases)"
           cat response.json
           echo
