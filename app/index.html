@@ -156,6 +156,21 @@
   #aiOut .iss:hover { background:#3a3a3f; }
   #aiOut .iss.high { border-color:#ff5d5d; } #aiOut .iss.medium { border-color:#f5a623; } #aiOut .iss.low { border-color:#6fa8ff; }
   #aiOut .fix { color:var(--mute); font-size:11px; }
+  /* Motion: panels, menus, rows and notices ease in and out quickly (~150 ms), and not at all when the
+     system asks for reduced motion. Entering uses keyframes, which run whenever an element stops being
+     display:none. Leaving uses a display transition (allow-discrete), so a webview without it just hides. */
+  @keyframes msDrop { from { opacity:0; transform:translateY(-6px); } }
+  @keyframes msFade { from { opacity:0; } }
+  @keyframes msToast { from { opacity:0; transform:translate(-50%, 8px); } }
+  @media (prefers-reduced-motion: no-preference) {
+    .gp, .menu, #aiCard, #flowPop, #hitRow { animation:msDrop .18s ease-out; }
+    #partCard, #info, #mergeBtn, #followRow, #splitPanel [data-m].show, #repOpts { animation:msFade .18s ease-out; }
+    #toast { animation:msToast .18s ease-out; }
+    .gp, .menu, #aiCard, #flowPop, #toast { transition:opacity .12s ease-in, transform .12s ease-in, display .12s allow-discrete; }
+    .gp[hidden], .menu[hidden], #aiCard[hidden], #flowPop[hidden] { opacity:0; transform:translateY(-6px); }
+    #toast[hidden] { opacity:0; transform:translate(-50%, 8px); }
+  }
+  table.parts.ghost { position:fixed; pointer-events:none; z-index:1; }
 </style>
 </head>
 <body class="empty">
@@ -546,7 +561,7 @@ const newPart = (o = {}) => core.newPart(S, o);
 const dropEmptyParts = () => core.dropEmptyParts(S);
 const partCounts = () => core.partCounts(S);
 
-function snapshot() { return { labels: S.labels.slice(), parts: JSON.parse(JSON.stringify(S.parts)), active: S.active, mesh: [S.pos, S.tri, S.G] }; }
+function snapshot() { return { labels: S.labels.slice(), parts: JSON.parse(JSON.stringify(S.parts)), keys: S.parts.map(rowKey), active: S.active, mesh: [S.pos, S.tri, S.G] }; }
 function pushUndo(snap = snapshot()) {
   S.hist.past.push(snap); S.hist.future = [];
   if (S.hist.past.length > 40) S.hist.past.shift();
@@ -555,6 +570,7 @@ function travel(from, to, msg) {
   const u = from.pop(); if (!u) return;
   to.push(snapshot());
   S.labels = u.labels; S.parts = u.parts; S.active = u.active;
+  u.keys?.forEach((k, i) => rowKeys.set(u.parts[i], k)); // undo/redo keeps each part's row, so only real changes animate
   if (u.mesh && u.mesh[1] !== S.tri) setMesh(...u.mesh); // undo/redo across a boundary smoothing
   afterEdit(msg);
 }
@@ -1326,8 +1342,47 @@ function syncSliders() {
 let lastActive = -1;
 const mergeSel = new Set(); // parts Shift+clicked in the list, merged into the selected part
 function selectPart(i) { if (flow && flow.part !== i) closeFlow(); S.active = i; mergeSel.clear(); refreshUI(); }
+// Parts list motion. Each part keeps a row key across re-renders and undo (kept beside the part, not in it, so
+// sessions don't change). After a re-render, new rows fade in, removed rows fade out where they were, and the
+// other rows glide from their old place to the new one (FLIP), instead of the list jumping.
+const rowKeys = new WeakMap();
+let rowSeq = 0;
+function rowKey(p) { let k = rowKeys.get(p); if (!k) rowKeys.set(p, (k = ++rowSeq)); return k; }
+const motionOK = () => !matchMedia("(prefers-reduced-motion: reduce)").matches;
+const EASE = "cubic-bezier(.2, .8, .3, 1)";
+// Rows are reused by key (not rebuilt), so a row's animation survives the many re-renders an edit triggers.
+function animateRows(body, before) {
+  if (!before || !motionOK() || !body.isConnected) return;
+  let added = 0;
+  for (const tr of body.children) {
+    const old = before.get(tr.dataset.k);
+    if (old) {
+      before.delete(tr.dataset.k);
+      tr.getAnimations().forEach((a) => a.id === "flip" && a.cancel());
+      const dy = old.top - tr.getBoundingClientRect().top;
+      if (Math.abs(dy) > 0.5) tr.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], { id: "flip", duration: 200, easing: EASE });
+    } else {
+      tr.animate([{ opacity: 0, transform: "translateX(-12px)" }, { opacity: 1, transform: "none" }],
+        { id: "in", duration: 220, easing: "ease-out", delay: Math.min(added++, 8) * 35, fill: "backwards" });
+    }
+  }
+  for (const { tr, rect } of before.values()) { // removed: the old row fades out on top of where it was
+    const t = document.createElement("table"); t.className = "parts ghost";
+    Object.assign(t.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px` });
+    tr.getAnimations().forEach((a) => a.cancel());
+    t.appendChild(document.createElement("tbody")).appendChild(tr);
+    document.body.appendChild(t);
+    t.animate([{ opacity: 1 }, { opacity: 0, transform: "translateX(-12px)" }], { duration: 160, easing: "ease-in", fill: "forwards" }).onfinish = () => t.remove();
+  }
+}
 function refreshUI() {
-  const body = $("partsBody"); body.innerHTML = "";
+  const body = $("partsBody");
+  const rows = new Map(), before = motionOK() && body.children.length ? new Map() : null;
+  for (const tr of body.children) {
+    rows.set(tr.dataset.k, tr);
+    if (before) { const rect = tr.getBoundingClientRect(); before.set(tr.dataset.k, { tr, rect, top: rect.top }); }
+  }
+  if (!S.G) body.innerHTML = "";
   document.body.classList.toggle("empty", !S.G);
   if (!S.G) return;
   const solo = isSolo(S.active);
@@ -1336,7 +1391,8 @@ function refreshUI() {
   for (const i of [...mergeSel]) if (i <= 0 || i >= S.parts.length || i === S.active) mergeSel.delete(i);
   S.parts.forEach((p, i) => {
     if (i === 0 && !cnt[0]) return; // Unassigned is listed only while some faces are unassigned
-    const tr = document.createElement("tr");
+    const key = String(rowKey(p)), tr = rows.get(key) || document.createElement("tr");
+    rows.delete(key);
     tr.className = i === S.active ? "active" : mergeSel.has(i) ? "msel" : "";
     tr.title = i ? "Click: select · Ctrl/Shift+click: select more · Right-click: actions" : "Click: select · Right-click: actions";
     tr.innerHTML = `<td><span class="sw" style="background:${p.color}"></span></td>
@@ -1355,9 +1411,11 @@ function refreshUI() {
     };
     tr.querySelector(".eye").onclick = () => { p.visible = !p.visible; updateVisibility(); drawSeeds(); refreshUI(); };
     if (i) tr.querySelector(".nm").ondblclick = (ev) => { ev.stopPropagation(); startRename(i); };
-    tr.dataset.part = i;
-    body.appendChild(tr);
+    tr.dataset.part = i; tr.dataset.k = key;
+    body.appendChild(tr); // appending a reused row moves it into its new place
   });
+  for (const tr of rows.values()) tr.remove(); // rows of parts that are gone
+  animateRows(body, before);
   if (lastActive !== S.active) { lastActive = S.active; updateColors(); }
   $("mergeBtn").hidden = !mergeSel.size;
   $("mergeBtn").title = `Merge ${mergeSel.size} part(s) into ${S.parts[S.active].name}`;
