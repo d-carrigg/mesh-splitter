@@ -89,7 +89,7 @@
   #toolbar button svg.i { width:22px; height:22px; stroke-width:1.5; }
   #toolbar button:hover { background:#4D4D54; border-color:transparent; }
   #toolbar button.on { background:transparent !important; border-color:transparent !important; color:var(--acch); }
-  #acts { top:8px; right:12px; display:flex; gap:6px; align-items:center; background:none; box-shadow:none; z-index:3; }
+  #acts { top:8px; right:12px; display:flex; gap:6px; align-items:center; background:none; box-shadow:none; z-index:5; } /* above tool panels (.gp, z 4) so the export menu opens over them */
   #acts > button { background:var(--tb); border-color:var(--tb); }
   .split { display:inline-flex; }
   .split > .pri:first-child { border-radius:4px 0 0 4px; padding:4px 14px; min-height:30px; font-size:13px; }
@@ -134,13 +134,13 @@
   .cardHead button:hover { color:var(--fg); }
   #info { right:0; bottom:0; border-radius:0; border-left:3px solid #05A394; padding:7px 14px 7px 10px; line-height:1.55; font-variant-numeric:tabular-nums; z-index:2; pointer-events:none; }
   #status { position:absolute; left:12px; bottom:8px; color:#D0D0D3; font-size:12px; pointer-events:none; text-shadow:0 1px 2px #0008; }
-  #busy { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:#0008; font-size:15px; z-index:5; }
+  #busy { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:#0008; font-size:15px; z-index:6; }
   #drop { position:absolute; inset:20px; pointer-events:none; border:2px dashed #7a7a82; border-radius:8px; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; color:#D0D0D3; font-size:16px; }
   #drop button, #drop #dropRecent { pointer-events:auto; }
   #drop > button { font-size:14px; padding:8px 14px; }
   body.empty #side, body.empty #toolbar, body.empty #acts, body.empty #rightCol, body.empty .gp, body.empty #info { display:none !important; }
   body.empty #view { grid-column:1 / -1; }
-  #placeHint { pointer-events:none; padding:3px 8px; font-size:12px; z-index:6; transform:translate(14px, 14px); white-space:nowrap; }
+  #placeHint { pointer-events:none; padding:3px 8px; font-size:12px; z-index:7; transform:translate(14px, 14px); white-space:nowrap; }
   #view.placing canvas { cursor:crosshair; }
   #flowPop { z-index:4; padding:8px 10px; width:max-content; }
   #flowPop .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
