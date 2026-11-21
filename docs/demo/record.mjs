@@ -1,6 +1,7 @@
 // Record the README / OrcaCloud demo GIF (and the feature docs' GIFs and screenshots) by driving the browser app headless.
 //
 //   node docs/demo/record.mjs [config.json ...] [--out docs/demo.gif] [--assets DIR] [--keep-frames]
+//   node docs/demo/record.mjs docs/demo/icon.config.json   (the animated OrcaCloud icon: plugin/icon.gif + icon.webp)
 //
 // Several configs run one after another (e.g. docs/features/demo/*.json). A config with "out": null records
 // no GIF and only writes its "shot" / "compare" PNGs (into "shots", default docs/features/img).
@@ -235,6 +236,16 @@ const steps = {
   async set(s) { await page.locator(s.target).fill(String(s.value)); await idle(); await hold(s.after ?? 0.3); }, // e.g. a color input
   async key(s) { await page.keyboard.press(s.key); await idle(); await hold(s.after ?? 0.3); },
   async eval(s) { await page.evaluate(s.js); await idle(); }, // escape hatch: run JS in the page
+  // Animate over s.s seconds: js is a function source "(t) => ..." run in the page once per frame with t going
+  // 0..1 (eased unless "linear": true); the step renders and captures a frame after each call.
+  async tween(s) {
+    const k = Math.max(1, Math.round((s.s ?? 1) * fps));
+    for (let i = 1; i <= k; i++) {
+      const t = s.linear ? i / k : ease(i / k);
+      await page.evaluate(([js, t]) => { (0, eval)(js)(t); app.render(); }, [s.js, t]);
+      await snap();
+    }
+  },
   // Save a PNG of the page (or a region) to shotsDir/<name>.png. clip: a CSS selector, [x, y, w, h], or
   // {around: target, w, h} (a box centered on a target point, kept inside the page).
   async shot(s) {
@@ -297,5 +308,14 @@ const ff = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String
   "-filter_complex", `[0:v]${scale},split[a][b];[a]palettegen=max_colors=${colors}:stats_mode=diff[p];[b][p]paletteuse=dither=${dither}:diff_mode=rectangle`,
   "-loop", String(g.loop ?? 0), out], { stdio: "inherit" });
 if (ff.status !== 0) process.exit(ff.status || 1);
+// "webp": {out, width, quality} also writes an animated WebP from the same frames (lossy, much smaller than the GIF).
+if (cfg.webp) {
+  const w = cfg.webp, wout = path.resolve(root, w.out);
+  const fw = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(fps), "-i", path.join(framesDir, "f%05d.png"),
+    "-vf", `fps=${fps},${crop}scale=${w.width ?? width}:-1:flags=lanczos`, "-c:v", "libwebp_anim", "-lossless", "0",
+    "-quality", String(w.quality ?? 70), "-compression_level", "6", "-loop", String(g.loop ?? 0), wout], { stdio: "inherit" });
+  if (fw.status !== 0) process.exit(fw.status || 1);
+  console.log(`${wout}: ${(statSync(wout).size / 1024).toFixed(0)} KB`);
+}
 if (!flag("--keep-frames")) rmSync(framesDir, { recursive: true, force: true });
 console.log(`${out}: ${n} frames, ${(n / fps).toFixed(1)} s, ${(statSync(out).size / 1048576).toFixed(2)} MB`);
