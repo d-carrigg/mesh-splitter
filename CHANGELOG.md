@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.15](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.14...v0.3.15) (2026-11-21)
+
+
+### Bug Fixes
+
+* describe the plugin's network use and encoded page for the OrcaCloud review ([#75](https://github.com/d-carrigg/mesh-splitter/issues/75)) ([035f02d](https://github.com/d-carrigg/mesh-splitter/commit/035f02ddbd562b831a5035c16f9bd5a146e33dd7))
+
 ## [0.3.14](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.13...v0.3.14) (2026-11-21)
 
 
