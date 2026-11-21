@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.3.10](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.9...v0.3.10) (2026-11-21)
+
+
+### Features
+
+* AI part naming in the OrcaSlicer plugin, with OpenAI, OpenRouter, Claude or a local server ([#49](https://github.com/d-carrigg/mesh-splitter/issues/49)) ([2b3b306](https://github.com/d-carrigg/mesh-splitter/commit/2b3b3065d9b5bf8c9d8878b09cbc4b7830df7a0c))
+* animate panels, menus and part rows as they appear and disappear ([#40](https://github.com/d-carrigg/mesh-splitter/issues/40)) ([f9991a7](https://github.com/d-carrigg/mesh-splitter/commit/f9991a74bb1957d918c02b15068b27e1fbc7a04b))
+* Claude Code plugin, so Claude can split meshes ([#48](https://github.com/d-carrigg/mesh-splitter/issues/48)) ([80b6154](https://github.com/d-carrigg/mesh-splitter/commit/80b6154778423d43ac37549b05257a9d58e4a246))
+* fill the holes a moved part leaves, or anchor it so new material keeps it joined ([#39](https://github.com/d-carrigg/mesh-splitter/issues/39)) ([1714850](https://github.com/d-carrigg/mesh-splitter/commit/1714850586d80196a73bc9e26d97d32d6b9fdef3))
+
+
+### Bug Fixes
+
+* coarse and inside-out meshes, recess exports, exact auto split counts, rotate on the body joint; add example models ([#42](https://github.com/d-carrigg/mesh-splitter/issues/42)) ([8806042](https://github.com/d-carrigg/mesh-splitter/commit/8806042242111c118aa19728a84f3746812ab4c2))
+
+
+### Documentation
+
+* AI part naming GIF (set up a local model, Name parts, Apply names) ([#50](https://github.com/d-carrigg/mesh-splitter/issues/50)) ([e57acfe](https://github.com/d-carrigg/mesh-splitter/commit/e57acfe9b5a5d0073f705b0ce70e82c287b268c3))
+* animated plugin icon (GIF + WebP) ([#38](https://github.com/d-carrigg/mesh-splitter/issues/38)) ([02c6321](https://github.com/d-carrigg/mesh-splitter/commit/02c6321766dd2c68aca5abd809f5705f43c3e009))
+* dedicated AI part naming page with privacy callout ([#44](https://github.com/d-carrigg/mesh-splitter/issues/44)) ([022bd85](https://github.com/d-carrigg/mesh-splitter/commit/022bd85a853eee9370afe17d5e83b8b2bc904a06))
+* hero image at top of How it works ([#46](https://github.com/d-carrigg/mesh-splitter/issues/46)) ([4741014](https://github.com/d-carrigg/mesh-splitter/commit/4741014439f398c4706963ab376938c9783bd092))
+* link How it works from plugin description ([#45](https://github.com/d-carrigg/mesh-splitter/issues/45)) ([2e17dce](https://github.com/d-carrigg/mesh-splitter/commit/2e17dce94245c2b322d64ab808aef3136cbc4de0))
+* show Fill and Anchor in the front-arm pose ([#47](https://github.com/d-carrigg/mesh-splitter/issues/47)) ([ebaceef](https://github.com/d-carrigg/mesh-splitter/commit/ebaceef60e78bbe064d6b408fe2d243a829885fd))
+* update intro text ([#43](https://github.com/d-carrigg/mesh-splitter/issues/43)) ([2126735](https://github.com/d-carrigg/mesh-splitter/commit/21267350f92eeec7bbd7ca44cd397b281e392e11))
+
 ## [0.3.9](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.8...v0.3.9) (2026-11-20)
 
 
