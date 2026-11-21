@@ -21,8 +21,9 @@ file (dist/mesh_splitter_any.py) from Plugins > Install local plugin, then tick 
 
 Internet access: only AI part naming connects, and only when the user clicks Connect or Name parts. It sends the
 part images and stats to the provider the user picked (OpenRouter, OpenAI, Anthropic, or a base URL they enter,
-such as a local LM Studio server), after OrcaSlicer asks the user's permission for that host
-(ask_network_permission). Nothing else in the plugin uses the network.
+such as LM Studio on their own computer). The plugin declares the three built-in provider hosts with
+orca.request_permissions (register_capabilities below), so OrcaSlicer asks the user at install; a base URL the user
+enters is asked for when first used (ask_network_permission). Nothing else in the plugin uses the network.
 
 OrcaSlicer 2.5's plugin API reads the model but cannot add or replace objects, so the split comes back as
 a 3MF (one object, one part per split part, filament slot per part) that you import with Ctrl+I.
