@@ -1,0 +1,93 @@
+/* Header polish: neutral bar, crisp logo, brand accent taken from the logo. */
+
+[data-md-color-primary="custom"] {
+  --md-primary-fg-color: #ffffff;
+  --md-primary-fg-color--light: #f4f5f7;
+  --md-primary-fg-color--dark: #e6e8ec;
+  --md-primary-bg-color: #1f2329;
+  --md-primary-bg-color--light: #5b6270;
+}
+
+[data-md-color-scheme="slate"][data-md-color-primary="custom"] {
+  --md-primary-fg-color: #1a1d23;
+  --md-primary-fg-color--light: #23272f;
+  --md-primary-fg-color--dark: #14161b;
+  --md-primary-bg-color: #e8eaee;
+  --md-primary-bg-color--light: #9aa1ad;
+  --md-default-bg-color: #1a1d23;
+}
+
+[data-md-color-accent="custom"] {
+  --md-accent-fg-color: #d6402e;
+  --md-accent-fg-color--transparent: rgba(214, 64, 46, 0.1);
+  --md-typeset-a-color: #c0392b;
+}
+
+[data-md-color-scheme="slate"][data-md-color-accent="custom"] {
+  --md-accent-fg-color: #ff6b57;
+  --md-accent-fg-color--transparent: rgba(255, 107, 87, 0.12);
+  --md-typeset-a-color: #ff8a78;
+}
+
+/* Bar: flat with a hairline divider instead of a drop shadow. */
+.md-header,
+.md-header--shadow {
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+}
+[data-md-color-scheme="slate"] .md-header,
+[data-md-color-scheme="slate"] .md-header--shadow {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+@media screen and (min-width: 76.25em) {
+  .md-header__inner {
+    padding-top: 0.2rem;
+    padding-bottom: 0.2rem;
+  }
+}
+
+/* Bigger logo, tighter gap to the title. */
+.md-header__button.md-logo {
+  margin: 0 0.1rem 0 0.4rem;
+  padding: 0.2rem;
+}
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+  height: 2rem;
+  width: auto;
+}
+.md-header__title {
+  margin-left: 0.2rem !important;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Search: soft pill that reads on both a white and a dark bar. */
+@media screen and (min-width: 60em) {
+  .md-search__form {
+    border-radius: 0.5rem;
+    background-color: rgba(31, 35, 41, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(31, 35, 41, 0.08);
+  }
+  .md-search__form:hover {
+    background-color: rgba(31, 35, 41, 0.1);
+  }
+  [data-md-color-scheme="slate"] .md-search__form {
+    background-color: rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+  [data-md-color-scheme="slate"] .md-search__form:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  .md-search__input::placeholder {
+    color: var(--md-primary-bg-color--light);
+  }
+  .md-search__input + .md-search__icon {
+    color: var(--md-primary-bg-color--light);
+  }
+}
+
+/* Repo widget: quieter facts line. */
+.md-source__facts {
+  opacity: 0.7;
+}
