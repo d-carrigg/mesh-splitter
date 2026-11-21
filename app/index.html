@@ -382,10 +382,10 @@
 <script type="importmap">
 {
   "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/",
-    "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.6/build/index.module.js",
-    "fflate": "https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js"
+    "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/",
+    "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.9.18/build/index.module.js",
+    "fflate": "https://cdn.jsdelivr.net/npm/fflate@0.8.3/esm/browser.js"
   }
 }
 </script>
@@ -2403,7 +2403,7 @@ $("xfReset").onclick = () => {
 const gizmo = new TransformControls(camera, renderer.domElement);
 gizmo.setSize(0.85);
 const gzProxy = new THREE.Object3D();
-scene.add(gzProxy); scene.add(gizmo);
+scene.add(gzProxy); scene.add(gizmo.getHelper()); // three r169+: TransformControls is no longer an Object3D
 let gzMode = "translate", gzOn = true, gzSnap = null, gzSync = false;
 try { const m = localStorage.getItem("meshsplit:gizmo"); if (m === "off") gzOn = false; else if (m) gzMode = m; } catch {}
 gizmo.addEventListener("change", render);
