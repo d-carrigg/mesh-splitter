@@ -1,0 +1,18 @@
+{
+ "object": "curling stone character sweeping with a broom",
+ "summary": "Clean split: the stone, its handle, arms, hands, feet and broom are each one part.",
+ "parts": [
+  {"id": 1, "name": "stone body", "confidence": 0.95},
+  {"id": 2, "name": "broom head", "confidence": 0.95},
+  {"id": 3, "name": "right arm", "confidence": 0.9},
+  {"id": 4, "name": "stone handle", "confidence": 0.95},
+  {"id": 5, "name": "left hand", "confidence": 0.85},
+  {"id": 6, "name": "stone base", "confidence": 0.8},
+  {"id": 7, "name": "left arm", "confidence": 0.9},
+  {"id": 8, "name": "left foot", "confidence": 0.9},
+  {"id": 9, "name": "right foot", "confidence": 0.9},
+  {"id": 10, "name": "broom handle", "confidence": 0.9},
+  {"id": 11, "name": "left eye", "confidence": 0.85}
+ ],
+ "issues": []
+}
