@@ -23,7 +23,7 @@ env:
 
 jobs:
   build:
-    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'release-please--') || github.head_ref == 'claude/project-thread-vr5l0l'  # TEMP test
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'release-please--')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -106,25 +106,3 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ github.ref_name }}" dist/* --clobber --repo "${{ github.repository }}"
-
-  # TEMP: test the upload path on a throwaway draft release, then delete it
-  upload-test:
-    if: github.event_name == 'pull_request'
-    needs: test
-    runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ github.token }}
-      R: ${{ github.repository }}
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: binaries
-          path: dist
-      - run: |
-          gh release create cli-binaries-test --draft --title "CLI binaries test (temporary)" --notes "temp" --target "${{ github.event.pull_request.head.sha }}" --repo "$R"
-          gh release upload cli-binaries-test dist/* --clobber --repo "$R"
-          mkdir got && gh release download cli-binaries-test --dir got --repo "$R"
-          ls -l got && cmp got/mesh-splitter-linux-x64 dist/mesh-splitter-linux-x64 && test "$(ls got | wc -l)" -eq 5
-          chmod +x got/mesh-splitter-linux-x64 && got/mesh-splitter-linux-x64 --version
-      - if: always()
-        run: gh release delete cli-binaries-test --yes --cleanup-tag --repo "$R" || true
