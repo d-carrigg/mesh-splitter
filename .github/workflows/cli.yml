@@ -40,6 +40,8 @@ jobs:
           uv run mesh-splitter split build/snowman.stl --session build/seeds.split.json -o build/session.3mf
           uv run mesh-splitter split build/snowman.stl --auto -o build/auto.3mf
           uv run mesh-splitter split build/snowman.stl --auto 4 -o build/auto4.3mf
+          uv run mesh-splitter split examples/robot/robot.stl --auto 12 --filaments 4 -o build/robot_f4.3mf
+          unzip -p build/robot_f4.3mf Metadata/model_settings.config | grep -o 'key="extruder" value="[0-9]*"' | sort -u | grep -qv 'value="[1-4]"' && { echo 'slot above 4'; exit 1; } || true
           test "$(ls build/stl/*.stl | wc -l)" = 2
           uv run mesh-splitter split build/shells.3mf --shells -o build/from3mf.3mf
       - name: Check the 3MFs

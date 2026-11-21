@@ -12,8 +12,8 @@ if (major < 20) { console.error(`mesh-splitter needs Node.js 20 or newer (found 
 
 if (!["fflate", "@xmldom/xmldom"].every((m) => fs.existsSync(path.join(root, "node_modules", m, "package.json")))) {
   console.error("First run: installing command-line packages (npm ci)...");
-  const r = spawnSync("npm", ["ci", "--omit=dev", "--no-audit", "--no-fund", "--loglevel=error"],
-    { cwd: root, stdio: ["ignore", "inherit", "inherit"], shell: process.platform === "win32" });
+  const r = spawnSync("npm", ["ci", "--omit=dev", "--no-audit", "--no-fund", "--loglevel=error", "--update-notifier=false"],
+    { cwd: root, stdio: ["ignore", "ignore", "inherit"], shell: process.platform === "win32" });
   if (r.status !== 0) { console.error(`npm ci failed in ${root}${r.error ? `: ${r.error.message}` : ""}`); process.exit(r.status || 1); }
 }
 

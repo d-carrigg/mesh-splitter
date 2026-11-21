@@ -30,6 +30,8 @@ Combine and rename after any method: `--merge "NAME=A,B"` joins parts A and B (b
 
 Settings: `--crease DEG` (default 2; lower makes more, smaller parts) and `--denoise N` (default 4; higher ignores small dents).
 
+Filament slots: auto and shells splits number parts from slot 2, so a split with many parts can need more slots than the printer has. If the user says how many filaments they have (for example 4 for one AMS), add `--filaments N`. A `Warning:` line means parts share a slot: merge parts or use `--filaments`. The part list's face count after the split is higher than the input's, because cutting along the part boundaries adds faces.
+
 ## Outputs (any mix; with none, writes `<name>_parts.3mf` next to the mesh)
 
 | Option | Writes |
@@ -37,7 +39,7 @@ Settings: `--crease DEG` (default 2; lower makes more, smaller parts) and `--den
 | `-o FILE` | Multi-part 3MF: one object, one part per split part with its name and filament slot. The best file for OrcaSlicer or Bambu Studio. |
 | `--painted FILE` | Painted 3MF: one mesh, each face painted with its part's filament. |
 | `--stl DIR` | One closed STL per part (cut openings capped). |
-| `--merged FILE` | All parts in one STL. |
+| `--merged FILE` | All parts in one STL (cut caps stay inside where parts touch). |
 | `--save-session FILE` | `.split.json` the user can open in the app (**Load session**) to keep editing by hand. |
 | `--report FILE` | JSON: the mesh's bounds and each part's name, filament, face count, bounds (`min`, `max`, `size`) and `center`. |
 
