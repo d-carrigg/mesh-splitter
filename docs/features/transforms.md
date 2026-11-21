@@ -5,6 +5,7 @@ Change a part's position, angle and size, and keep it joined to its neighbor.
 - [Move, rotate, scale and undo](#move-rotate-scale-and-undo)
 - [Rotate on joint](#rotate-on-joint)
 - [Heal joint](#heal-joint)
+- [Fill and anchor](#fill-and-anchor)
 - [Stretch](#stretch)
 - [Collision warning](#collision-warning)
 
@@ -74,6 +75,32 @@ After you move or rotate a part, its cut edge may no longer line up with its nei
 - It works with any move or rotate. [Rotate on joint](#rotate-on-joint) plus heal joint is the usual pair for turning a part in place.
 - Replaced parts can't be healed; the option hides for them.
 - Undo turns it off like any other edit.
+
+## Fill and anchor
+
+When a part moves away from the part it joined, the cut opens and both sides show a hole. Each part chooses what happens there, under **At the cut** in the Transform panel.
+
+- **Fill** (default): the hole is patched. The bigger side (the body) gets a patch that follows its own curve, so the body stays smooth where a hand used to rest. The smaller side gets a flat face.
+- **Anchor**: the part stays joined where it attaches. New material sweeps from the neighbor's rim to the part's moved cut, along the same turn, so an arm raised at the shoulder stays on the body instead of lifting off.
+
+![An arm turned 55°: holes in the body, then patched with Fill](img/gap-fill.png)
+
+![Fill lets the arm lift off the body; Anchor keeps it joined with new material](img/gap-anchor.png)
+
+### How to use it
+
+1. Select the part (Ctrl+click to select more).
+2. Open the Transform panel (move, rotate or scale in the toolbar).
+3. Under **At the cut**, pick **Fill** or **Anchor**. It applies to every selected part.
+
+![At the cut: Fill or Anchor](img/gap-ui.png)
+
+### Tips
+
+- Patches and new material show in the view as soon as a part moves, and Send to Orca, the multi-part 3MF and all STL exports use them. Every part stays a closed solid.
+- Parts that move together (Move with, Hold, Reach) don't open a gap, so nothing is added between them.
+- Anchor works best with rotate on joint or a turn about the shoulder. [Heal joint](#heal-joint) is the other way to close a small gap: it bends the part back onto its neighbor instead of adding material.
+- Replaced parts always use Fill.
 
 ## Stretch
 

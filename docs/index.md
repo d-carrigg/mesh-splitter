@@ -1,6 +1,8 @@
 # Mesh Splitter
 
-Split one solid mesh into separate, color-coded parts for multi-color or multi-piece printing, right inside OrcaSlicer. You can also scale, rotate, transform, or replace subsections of a mesh. For the example photo, I made the eyes 1 part, then replaced them with a flipped version to change where the figure looked. It also runs in **any browser**.
+Split one solid mesh into separate, color-coded parts for multi-color or multi-piece printing, right inside OrcaSlicer. Scale, rotate, or completely replace sections of the mesh for easy customization of single or multi-material prints. If you have ever been asked to print a part and customize "just this one thing," you may like this plugin.
+
+For the example photo, I made the eyes 1 part, then replaced them with a flipped version to change where the figure looked. It also runs in **any browser**.
 
 ![Splitting a curling-stone figure, picking the eyes as a part, and replacing them with a flipped version](demo.gif)
 
@@ -8,7 +10,7 @@ Split one solid mesh into separate, color-coded parts for multi-color or multi-p
 
 - **[Splitting](features/splitting.md):** auto split, split by shells, seeds and Add part
 - **[Editing parts](features/editing-parts.md):** fill, brush, merge, Replace with…, show only, rename, AI part naming
-- **[Move, rotate, scale and heal](features/transforms.md):** handles, snapping, undo, rotate on joint, heal joint
+- **[Move, rotate, scale and heal](features/transforms.md):** handles, snapping, undo, rotate on joint, heal joint, fill and anchor
 - **[Exporting](features/exporting.md):** Send to Orca, painted 3MF, part STLs, merged STL
 - **[Command line](features/command-line.md):** split and export from a script with `uv run mesh-splitter split`
 - **[How it works](how-it-works.md):** the splitting algorithm, the shared core, and the math behind joint transforms

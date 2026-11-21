@@ -1,0 +1,101 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "curler.stl",
+ "out": "plugin/icon.gif",
+ "webp": {
+  "out": "plugin/icon.webp",
+  "width": 256,
+  "quality": 70
+ },
+ "viewport": {
+  "width": 1100,
+  "height": 792
+ },
+ "fps": 15,
+ "gif": {
+  "width": 256,
+  "colors": 64,
+  "dither": "bayer:bayer_scale=3",
+  "loop": 0,
+  "crop": [
+   340,
+   32,
+   760,
+   760
+  ]
+ },
+ "camera": {
+  "az": 25,
+  "el": 18,
+  "dist": 0.74,
+  "lift": -0.13
+ },
+ "css": "#__cursor, #view > :not(canvas), #status { display: none !important }",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "eval",
+   "js": "const { S } = app, cen = S.G.cen, near = (P, lab) => { let best = -1, bd = Infinity; for (let f = 0; f < S.nF; f++) { if (lab != null && S.labels[f] !== lab) continue; const d = (cen[3*f]-P[0])**2 + (cen[3*f+1]-P[1])**2 + (cen[3*f+2]-P[2])**2; if (d < bd) { bd = d; best = f; } } return best; }; document.getElementById('fillAng').value = 15; S.active = 11; app.fillFrom(near([42, -1.5, 71])); app.fillFrom(near([46, -1.5, 71], 1)); S.active = 0; app.afterEdit('')"
+  },
+  {
+   "do": "eval",
+   "js": "const { S } = app, V = app.camera.position.constructor, M4 = app.camera.matrix.constructor; S.parts.forEach((p) => (p.seeds = [])); app.afterEdit(''); const b = S.G.bbox, C = new V((b[0]+b[3])/2, (b[1]+b[4])/2, (b[2]+b[5])/2); const about = (J, n, a) => new M4().makeTranslation(J.x, J.y, J.z).multiply(new M4().makeRotationAxis(n, a)).multiply(new M4().makeTranslation(-J.x, -J.y, -J.z)); const hj = app.jointFrame(4), aj = app.jointFrame(3), bj = app.jointFrame(7); window.__icon = { explode(t) { for (let i = 1; i < S.parts.length; i++) { const x = app.ensureXf(i); x.t = x.c.map((v, k) => +((v - C.getComponent(k)) * (k < 2 ? 0.45 : 0.18) * t).toFixed(4)); } app.applyXf(); }, spin(t) { if (t < 1) S.parts[4].heal = { r: 8 }; else delete S.parts[4].heal; app.setXfMatrix(4, about(hj.J, hj.n, 2 * Math.PI * t)); app.xfEdited(4); app.applyXf(); }, swing(t) { const n = bj.J.clone().sub(aj.J).normalize(); app.setXfMatrix(3, about(aj.J, n, 35 * Math.PI / 180 * t)); app.xfEdited(3); app.applyXf(); }, };"
+  },
+  {
+   "do": "key",
+   "key": "q",
+   "after": 0
+  },
+  {
+   "do": "eval",
+   "js": "app.setFollow([5, 10, 2, 7], 3); app.S.active = 0; app.refreshUI()"
+  },
+  {
+   "do": "hold",
+   "s": 0.3
+  },
+  {
+   "do": "tween",
+   "s": 0.7,
+   "js": "(t) => __icon.explode(t)"
+  },
+  {
+   "do": "hold",
+   "s": 0.4
+  },
+  {
+   "do": "tween",
+   "s": 0.6,
+   "js": "(t) => __icon.explode(1 - t)"
+  },
+  {
+   "do": "tween",
+   "s": 1.1,
+   "js": "(t) => __icon.spin(t)"
+  },
+  {
+   "do": "hold",
+   "s": 0.2
+  },
+  {
+   "do": "tween",
+   "s": 0.7,
+   "js": "(t) => __icon.swing(t)"
+  },
+  {
+   "do": "hold",
+   "s": 0.3
+  },
+  {
+   "do": "tween",
+   "s": 0.7,
+   "js": "(t) => __icon.swing(1 - t)"
+  },
+  {
+   "do": "hold",
+   "s": 0.1
+  }
+ ]
+}

@@ -1,6 +1,8 @@
 # Mesh Splitter
 
-Split one solid mesh into separate, color-coded parts for multi-color or multi-piece printing, right inside OrcaSlicer. You can also scale, rotate, transform, or replace subsections of a mesh. For the example photo, I made the eyes 1 part, then replaced them with a flipped version to change where the figure looked. It also runs in **any browser**.
+Split one solid mesh into separate, color-coded parts for multi-color or multi-piece printing, right inside OrcaSlicer. Scale, rotate, or completely replace sections of the mesh for easy customization of single or multi-material prints. If you have ever been asked to print a part and customize "just this one thing," you may like this plugin.
+
+For the example photo, I made the eyes 1 part, then replaced them with a flipped version to change where the figure looked. It also runs in **any browser**.
 
 ![Splitting a curling-stone figure, picking the eyes as a part, and replacing them with a flipped version](docs/demo.gif)
 
@@ -13,6 +15,7 @@ Every feature is documented with pictures on the [docs site](https://d-carrigg.g
 - **[Move, rotate, scale](https://d-carrigg.github.io/mesh-splitter/features/transforms/#move-rotate-scale-and-undo):** drag handles in the view (W / E / R, Shift to snap), with undo.
 - **[Rotate on joint](https://d-carrigg.github.io/mesh-splitter/features/transforms/#rotate-on-joint):** spin a part about its cut's axis (J), so a part on an angled surface stays seated on it.
 - **[Heal joint](https://d-carrigg.github.io/mesh-splitter/features/transforms/#heal-joint):** after moving or rotating a part, stretch or squeeze it near its cut so the cut's edge lands back on its neighbor (no gap).
+- **[Fill and anchor](https://d-carrigg.github.io/mesh-splitter/features/transforms/#fill-and-anchor):** when a part moves off another, patch the hole it leaves (Fill), or keep it joined with new material (Anchor).
 - **[Replace with…](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#replace-with):** right-click a part and swap in another STL. It snaps onto the joint and keeps the part's name and filament. A replacement made from the same model, such as edited eyes, stays in place.
 - **[Send to Orca](https://d-carrigg.github.io/mesh-splitter/features/exporting/#send-to-orca):** one multi-part 3MF, every part on its filament. Painted 3MF, merged STL and per-part STLs are also available.
 - **[Command line](https://d-carrigg.github.io/mesh-splitter/features/command-line/):** `uv run mesh-splitter split model.stl --auto 6 -o model.3mf` splits and exports without opening the app, with the same results.

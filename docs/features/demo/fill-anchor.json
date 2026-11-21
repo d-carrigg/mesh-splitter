@@ -1,0 +1,97 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "curler.stl",
+ "out": null,
+ "viewport": {
+  "width": 1200,
+  "height": 800
+ },
+ "deviceScaleFactor": 1.5,
+ "camera": {
+  "az": -120,
+  "el": 25,
+  "dist": 0.7,
+  "lift": 0.1
+ },
+ "css": "#__cursor { display: none !important } #status { visibility: hidden }",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "eval",
+   "js": "document.getElementById('rightCol').style.visibility = 'hidden'; app.setFollow([5, 10, 2, 3], 7); const x = app.ensureXf(7); x.c = app.jointFrame(7).J.toArray(); x.r = [0, -55, 0]; app.xfEdited(7); app.S.active = 0; app.afterEdit('')"
+  },
+  {
+   "do": "eval",
+   "js": "app.fillMesh().visible = false; app.render()"
+  },
+  {
+   "do": "shot",
+   "name": "_gap-none",
+   "clip": [
+    440,
+    300,
+    600,
+    480
+   ]
+  },
+  {
+   "do": "eval",
+   "js": "app.fillMesh().visible = true; app.render()"
+  },
+  {
+   "do": "shot",
+   "name": "_gap-fill",
+   "clip": [
+    440,
+    300,
+    600,
+    480
+   ]
+  },
+  {
+   "do": "eval",
+   "js": "app.setAnchor([7], true); app.S.active = 0; app.refreshUI()"
+  },
+  {
+   "do": "shot",
+   "name": "_gap-anchor",
+   "clip": [
+    440,
+    300,
+    600,
+    480
+   ]
+  },
+  {
+   "do": "compare",
+   "left": "_gap-none",
+   "right": "_gap-fill",
+   "labels": [
+    "Arm turned 55\u00b0: holes in the body",
+    "Fill (default)"
+   ],
+   "name": "gap-fill"
+  },
+  {
+   "do": "compare",
+   "left": "_gap-fill",
+   "right": "_gap-anchor",
+   "labels": [
+    "Fill: the arm lifts off the body",
+    "Anchor: the arm stays joined"
+   ],
+   "name": "gap-anchor"
+  },
+  {
+   "do": "eval",
+   "js": "document.getElementById('rightCol').style.visibility = ''; app.S.active = 7; app.refreshUI(); app.setGizmo('rotate')"
+  },
+  {
+   "do": "shot",
+   "name": "gap-ui",
+   "clip": "#xfCard"
+  }
+ ]
+}

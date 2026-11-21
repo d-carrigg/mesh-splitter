@@ -78,7 +78,7 @@
   #partCard .pr > .lbl { flex:1; }
   #partCard input[type=text] { border-color:var(--line); background:var(--bg); width:190px; }
   #repName { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #repOpts.hide, #healRow.hide { display:none; }
+  #repOpts.hide, #healRow.hide, #anchorRow.hide { display:none; }
 
   /* canvas */
   #view { position:relative; min-width:0; min-height:0; overflow:hidden; background:var(--canvas); }
@@ -156,6 +156,21 @@
   #aiOut .iss:hover { background:#3a3a3f; }
   #aiOut .iss.high { border-color:#ff5d5d; } #aiOut .iss.medium { border-color:#f5a623; } #aiOut .iss.low { border-color:#6fa8ff; }
   #aiOut .fix { color:var(--mute); font-size:11px; }
+  /* Motion: panels, menus, rows and notices ease in and out quickly (~150 ms), and not at all when the
+     system asks for reduced motion. Entering uses keyframes, which run whenever an element stops being
+     display:none. Leaving uses a display transition (allow-discrete), so a webview without it just hides. */
+  @keyframes msDrop { from { opacity:0; transform:translateY(-6px); } }
+  @keyframes msFade { from { opacity:0; } }
+  @keyframes msToast { from { opacity:0; transform:translate(-50%, 8px); } }
+  @media (prefers-reduced-motion: no-preference) {
+    .gp, .menu, #aiCard, #flowPop, #hitRow { animation:msDrop .18s ease-out; }
+    #partCard, #info, #mergeBtn, #followRow, #splitPanel [data-m].show, #repOpts { animation:msFade .18s ease-out; }
+    #toast { animation:msToast .18s ease-out; }
+    .gp, .menu, #aiCard, #flowPop, #toast { transition:opacity .12s ease-in, transform .12s ease-in, display .12s allow-discrete; }
+    .gp[hidden], .menu[hidden], #aiCard[hidden], #flowPop[hidden] { opacity:0; transform:translateY(-6px); }
+    #toast[hidden] { opacity:0; transform:translate(-50%, 8px); }
+  }
+  table.parts.ghost { position:fixed; pointer-events:none; z-index:1; }
 </style>
 </head>
 <body class="empty">
@@ -292,6 +307,8 @@
       <div class="row" style="margin:0"><span class="lbl" style="flex:1">Stretch</span><label class="lbl" title="Auto: the smallest stretch that keeps what this part holds or carries at least the gap away from other parts"><input id="stretchAuto" type="checkbox"> Auto</label><input id="stretchPct" type="number" min="20" max="500" step="5"><span class="small">%</span></div>
       <div class="row" id="stretchGapRow" style="margin:0"><span class="lbl" style="flex:1">Gap</span><input id="stretchGap" type="number" min="0" step="0.5"><span class="small">mm</span></div>
     </div>
+    <div id="anchorRow" class="row" style="margin:0;justify-content:space-between" title="What happens at the cut when this part moves away from the part it joins. Applies to all selected parts."><span class="lbl">At the cut</span>
+      <span class="seg"><button id="gapFill" title="Fill (default): patch the hole the part leaves in its neighbor, following the surface around it, and close the part's own cut">Fill</button><button id="gapAnchor" title="Anchor: keep the part joined where it attaches. New material sweeps from the neighbor to the moved cut, so a turned arm stays on the body">Anchor</button></span></div>
     <div id="healRow" style="display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--sep);padding-top:9px" title="Heal joint: after a move or rotate, stretch or squeeze this part near its cut so the cut's edge lands back on the neighbor's edge. Only faces within the blend distance of the cut change shape.">
       <div class="row" style="margin:0"><label class="lbl" style="flex:1"><input id="healOn" type="checkbox"> Heal joint</label><span class="lbl">Blend</span><input id="healR" type="number" min="0.5" step="0.5"><span class="small">mm</span></div>
       <span class="small">Stretches the part near its cut so it stays flush with its neighbor.</span>
@@ -546,7 +563,7 @@ const newPart = (o = {}) => core.newPart(S, o);
 const dropEmptyParts = () => core.dropEmptyParts(S);
 const partCounts = () => core.partCounts(S);
 
-function snapshot() { return { labels: S.labels.slice(), parts: JSON.parse(JSON.stringify(S.parts)), active: S.active, mesh: [S.pos, S.tri, S.G] }; }
+function snapshot() { return { labels: S.labels.slice(), parts: JSON.parse(JSON.stringify(S.parts)), keys: S.parts.map(rowKey), active: S.active, mesh: [S.pos, S.tri, S.G] }; }
 function pushUndo(snap = snapshot()) {
   S.hist.past.push(snap); S.hist.future = [];
   if (S.hist.past.length > 40) S.hist.past.shift();
@@ -555,6 +572,7 @@ function travel(from, to, msg) {
   const u = from.pop(); if (!u) return;
   to.push(snapshot());
   S.labels = u.labels; S.parts = u.parts; S.active = u.active;
+  u.keys?.forEach((k, i) => rowKeys.set(u.parts[i], k)); // undo/redo keeps each part's row, so only real changes animate
   if (u.mesh && u.mesh[1] !== S.tri) setMesh(...u.mesh); // undo/redo across a boundary smoothing
   afterEdit(msg);
 }
@@ -680,7 +698,7 @@ let xfKey = "";
 function applyXf() {
   if (!mesh) return;
   const Ms = S.parts.map(xfMatrix), any = Ms.some(Boolean);
-  const key = any ? JSON.stringify(S.parts.map((p) => [p.xf || 0, p.heal || 0])) + "|" + fullHash() : "";
+  const key = any ? JSON.stringify(S.parts.map((p) => [p.xf || 0, p.heal || 0, p.anchor || 0, p.visible !== false])) + "|" + fullHash() : "";
   if (key === xfKey) return;
   xfKey = key;
   const geo = mesh.geometry, P = geo.getAttribute("position").array, N = geo.getAttribute("normal").array, { P0, N0 } = mesh.userData;
@@ -699,6 +717,7 @@ function applyXf() {
   geo.getAttribute("position").needsUpdate = true; geo.getAttribute("normal").needsUpdate = true;
   geo.computeBoundingBox(); geo.computeBoundingSphere();
   geo.disposeBoundsTree?.(); geo.computeBoundsTree();
+  updateFillMesh();
   render();
   scheduleHits();
 }
@@ -1110,6 +1129,248 @@ function healSoup(i, orig, out) {
   return out;
 }
 
+// ---------------------------------------------------------------- fill / anchor
+// When a part moves away from a neighbor, the cut between them opens and each side shows a hole. Fill (the default)
+// closes each side with a patch that follows the surrounding surface, so the body stays smooth where a hand used to
+// rest. Anchor (part.anchor) keeps the part joined instead: new material sweeps from the neighbor's rim to the part's
+// moved cut, along the same turn, so an arm turned at the shoulder stays attached to the body.
+let twinCache = { key: null, map: null }, loopCache = new Map();
+function twinLabels(hash) { // directed edge a->b (key a*nV+b) -> label of the face that has it
+  const key = `${S.nF}|${hash}`;
+  if (twinCache.key === key) return twinCache.map;
+  const map = new Map(), nV = S.nV;
+  for (let f = 0; f < S.nF; f++) for (let e = 0; e < 3; e++) map.set(S.tri[3*f+e] * nV + S.tri[3*f+(e+1)%3], S.labels[f]);
+  twinCache = { key, map }; return map;
+}
+// One pass of world positions: each part's matrix and heal field, computed once.
+function fillCtx() {
+  const M = new Map(), H = new Map(), hash = fullHash();
+  const mat = (l) => { if (!M.has(l)) M.set(l, l > 0 && S.parts[l] ? xfMatrix(S.parts[l]) : null); return M.get(l); };
+  const heal = (l) => { if (!H.has(l)) H.set(l, mat(l) ? healField(l) : null); return H.get(l); };
+  const ctx = {};
+  const wpos = (l, v, out = new THREE.Vector3()) => {
+    if (l === ctx.fixL && ctx.fix.has(v)) { const o = ctx.fix.get(v); return out.set(ctx.fixV[o], ctx.fixV[o+1], ctx.fixV[o+2]); }
+    out.set(S.pos[3*v], S.pos[3*v+1], S.pos[3*v+2]); const m = mat(l); if (!m) return out;
+    out.applyMatrix4(m); const h = heal(l); if (h && h.w[v] > 0) out.addScaledVector(h.d[h.near[v]], h.w[v]);
+    return out;
+  };
+  return Object.assign(ctx, { mat, heal, wpos, hash, tol: 1e-4 * (S.G?.diag || 100) });
+}
+const anchored = (l) => l > 0 && !!S.parts[l]?.anchor && !hasRep(S.parts[l]);
+function partLoops(l, ctx) { // boundary loops of part l (geometry only, cached)
+  const key = `${l}|${S.nF}|${ctx.hash}`;
+  if (!loopCache.has(key)) { if (loopCache.size > 40) loopCache.clear(); loopCache.set(key, partMesh(l)?.loopList || []); }
+  return loopCache.get(key);
+}
+// What closes each boundary loop of a mesh: "fan" (no gap: a flat cap that the neighbor's cap meets), "patch" (Fill),
+// "bridge" (this side is anchored) or "under" (the neighbor is anchored and bridges over it).
+function loopPlans(loops, ctx) {
+  const tw = twinLabels(ctx.hash), nV = S.nV, out = [], a3 = new THREE.Vector3(), b3 = new THREE.Vector3();
+  const major = (m) => { let best = -1, bn = 0; for (const [k, n] of m) if (n > bn) { bn = n; best = k; } return best; };
+  for (const lp of loops) {
+    const oc = new Map(), nc = new Map();
+    for (const [a, b] of lp) {
+      const o = tw.get(a * nV + b), n = tw.get(b * nV + a);
+      oc.set(o, (oc.get(o) || 0) + 1); if (n !== undefined) nc.set(n, (nc.get(n) || 0) + 1);
+    }
+    const own = major(oc), nb = nc.size ? major(nc) : -1;
+    let kind = "fan";
+    if (nb >= 0 && S.parts[nb]) {
+      let gap = hasRep(S.parts[nb]);
+      if (!gap) { let g = 0; for (const [a] of lp) if (ctx.wpos(own, a, a3).distanceTo(ctx.wpos(nb, a, b3)) > ctx.tol) g++; gap = g > lp.length / 2; }
+      if (gap) {
+        const rep = hasRep(S.parts[nb]);
+        if (!rep && anchored(own) && (!anchored(nb) || own < nb)) kind = "bridge";
+        else if (!rep && anchored(nb)) kind = "under";
+        else kind = "patch";
+      }
+    }
+    out.push({ lp, own, nb, kind });
+  }
+  return out;
+}
+// Smooth patch over a loop, in original coordinates: rings shrinking from the loop to its center, lifted onto a
+// quadratic fitted to the surface of part fitL around the hole (the body's curve continues across it). fitL < 0: a
+// plane fitted to the loop (the flat cut face of the smaller part).
+const patchCache = new Map();
+function patchRings(lp, fitL, hash) {
+  const key = `${fitL}|${lp[0][0]}|${lp[0][1]}|${lp.length}|${S.nF}|${hash}`;
+  if (patchCache.has(key)) return patchCache.get(key);
+  if (patchCache.size > 60) patchCache.clear();
+  const L = lp.map((e) => e[0]), n = L.length, V = (v) => new THREE.Vector3(S.pos[3*v], S.pos[3*v+1], S.pos[3*v+2]);
+  const pts = L.map(V), C = new THREE.Vector3(); pts.forEach((p) => C.add(p)); C.divideScalar(n);
+  let rbar = 0, per = 0; for (let k = 0; k < n; k++) { rbar += pts[k].distanceTo(C); per += pts[k].distanceTo(pts[(k+1) % n]); }
+  rbar /= n; const edge = per / n, R = 1.8 * rbar + 2 * edge;
+  // surface normal around the hole: the fit part's faces at the loop (Newell normal of the loop as a fallback)
+  const inLoop = new Set(L), G = S.G, nrm = new THREE.Vector3(), cand = [];
+  for (let f = 0; f < S.nF; f++) {
+    if (S.labels[f] !== fitL) continue;
+    const a = S.tri[3*f], b = S.tri[3*f+1], c = S.tri[3*f+2];
+    if (inLoop.has(a) || inLoop.has(b) || inLoop.has(c)) nrm.x += G.nrm[3*f] * G.area[f], nrm.y += G.nrm[3*f+1] * G.area[f], nrm.z += G.nrm[3*f+2] * G.area[f];
+    const dx = S.pos[3*a] - C.x, dy = S.pos[3*a+1] - C.y, dz = S.pos[3*a+2] - C.z;
+    if (dx*dx + dy*dy + dz*dz < R*R) cand.push(f);
+  }
+  if (nrm.lengthSq() < 1e-12) for (let k = 0; k < n; k++) { const a = pts[k], b = pts[(k+1) % n]; nrm.add(new THREE.Vector3().subVectors(a, C).cross(new THREE.Vector3().subVectors(b, C))); }
+  nrm.normalize(); if (nrm.lengthSq() < 0.5) nrm.set(0, 0, 1);
+  const u = new THREE.Vector3(1, 0, 0); if (Math.abs(u.dot(nrm)) > 0.9) u.set(0, 1, 0);
+  u.addScaledVector(nrm, -u.dot(nrm)).normalize(); const w = new THREE.Vector3().crossVectors(nrm, u);
+  const loc = (p) => { const d = p.clone().sub(C); return [d.dot(u), d.dot(w), d.dot(nrm)]; };
+  // least squares h = c0 + c1 x + c2 y (+ c3 x² + c4 xy + c5 y²) over the fit part's vertices facing the same way
+  const D = fitL > 0 ? 6 : 3, A = Array.from({ length: D }, () => new Float64Array(D + 1)); let ns = 0, hmin = Infinity, hmax = -Infinity;
+  const addPt = (p) => {
+    const [x, y, h] = loc(p), r = [1, x, y, x*x, x*y, y*y];
+    for (let i = 0; i < D; i++) { for (let j = 0; j < D; j++) A[i][j] += r[i] * r[j]; A[i][D] += r[i] * h; }
+    ns++; hmin = Math.min(hmin, h); hmax = Math.max(hmax, h);
+  };
+  if (fitL > 0) {
+    const seen = new Set();
+    for (const f of cand) {
+      if (G.nrm[3*f] * nrm.x + G.nrm[3*f+1] * nrm.y + G.nrm[3*f+2] * nrm.z < 0.2) continue;
+      for (let c = 0; c < 3; c++) { const v = S.tri[3*f+c]; if (!seen.has(v)) { seen.add(v); addPt(V(v)); } }
+    }
+  } else pts.forEach(addPt);
+  let co = null;
+  if (ns >= 2 * D) { // Gaussian elimination with a little ridge so a flat sample set stays solvable
+    for (let i = 0; i < D; i++) A[i][i] += 1e-6 * (A[0][0] || 1) * (i > 2 ? rbar ** 4 : i ? rbar ** 2 : 1);
+    try {
+      for (let i = 0; i < D; i++) {
+        let p = i; for (let r = i + 1; r < D; r++) if (Math.abs(A[r][i]) > Math.abs(A[p][i])) p = r;
+        [A[i], A[p]] = [A[p], A[i]]; if (Math.abs(A[i][i]) < 1e-14) throw 0;
+        for (let r = 0; r < D; r++) if (r !== i) { const k = A[r][i] / A[i][i]; for (let c = i; c <= D; c++) A[r][c] -= k * A[i][c]; }
+      }
+      co = A.map((row, i) => row[D] / row[i]); while (co.length < 6) co.push(0);
+    } catch { co = null; }
+  }
+  const lo = Math.min(hmin, 0) - rbar * 0.5, hi = Math.max(hmax, 0) + rbar * 0.5;
+  const fit = (x, y) => co ? Math.max(lo, Math.min(hi, co[0] + co[1]*x + co[2]*y + co[3]*x*x + co[4]*x*y + co[5]*y*y)) : 0;
+  const P2 = pts.map(loc), K = Math.max(2, Math.min(6, Math.round(rbar / Math.max(3 * edge, 1e-6))));
+  const rings = [], s = [], idx = [];
+  for (let k = 1; k < K; k++) { // inner rings get fewer points, keeping their edges about as long as the loop's
+    const t = 1 - k / K, m = Math.max(6, Math.round(n * t)), ring = new Float32Array(3 * m), ix = new Int32Array(m);
+    for (let j = 0; j < m; j++) {
+      const q = ix[j] = Math.round(j * n / m) % n, [x0, y0, h0] = P2[q], x = t * x0, y = t * y0, h = fit(x, y) + t * (h0 - fit(x0, y0));
+      ring[3*j] = C.x + x*u.x + y*w.x + h*nrm.x; ring[3*j+1] = C.y + x*u.y + y*w.y + h*nrm.y; ring[3*j+2] = C.z + x*u.z + y*w.z + h*nrm.z;
+    }
+    rings.push(ring); s.push(t); idx.push(ix);
+  }
+  const hc = fit(0, 0), c = [C.x + hc*nrm.x, C.y + hc*nrm.y, C.z + hc*nrm.z];
+  const out = { rings, t: s, idx, c }; patchCache.set(key, out); return out;
+}
+// Triangles between rings (ring 0 = the loop as the part sees it, a->b along its boundary; each inner ring starts at
+// the same place and may have fewer points) and a center point, wound so they close the part's boundary.
+// flip: the part is mirrored.
+function ringTris(rings, c, flip, out) {
+  const tri = (A, i, B, j, Cc, k) => {
+    const p = [A, i, B, j, Cc, k];
+    if (flip) { [p[2], p[3], p[4], p[5]] = [p[4], p[5], p[2], p[3]]; }
+    for (let q = 0; q < 6; q += 2) { const R = p[q], x = p[q+1]; if (x < 0) out.push(R[0], R[1], R[2]); else out.push(R[3*x], R[3*x+1], R[3*x+2]); }
+  };
+  for (let r = 0; r + 1 < rings.length; r++) { // zip the two rings by their position along the loop
+    const O = rings[r], I = rings[r+1], no = O.length / 3, ni = I.length / 3;
+    for (let i = 0, j = 0; i < no || j < ni;) {
+      if (j >= ni || (i < no && (i + 1) / no <= (j + 1) / ni)) { tri(O, (i + 1) % no, O, i, I, j % ni); i++; }
+      else { tri(O, i % no, I, j, I, (j + 1) % ni); j++; }
+    }
+  }
+  const I = rings[rings.length - 1], n = I.length / 3;
+  for (let a = 0; a < n; a++) { const b = (a + 1) % n; tri(I, b, I, a, c, -1); }
+}
+// World-space triangles closing one planned loop of part `own`.
+function planTris(pl, ctx, out = []) {
+  const { lp, own, nb, kind } = pl, n = lp.length, M = ctx.mat(own), flip = !!M && M.determinant() < 0, t3 = new THREE.Vector3();
+  const ring0 = new Float32Array(3 * n);
+  lp.forEach(([a], j) => ctx.wpos(own, a, t3).toArray(ring0, 3 * j));
+  const cen = (R) => { const c = [0, 0, 0]; for (let j = 0; j < n; j++) for (let k = 0; k < 3; k++) c[k] += R[3*j+k] / n; return c; };
+  if (kind === "fan" || kind === "under") { ringTris([ring0], cen(ring0), flip, out); return out; }
+  if (kind === "patch") {
+    const cntF = (l) => (l > 0 ? partCountsCached(ctx)[l] : 0);
+    const fitL = cntF(own) >= cntF(nb) ? own : -1; // the bigger side continues its surface; the smaller gets a flat face
+    const P = patchRings(lp, fitL, ctx.hash), rings = [ring0];
+    // interior points ride with the part; the loop's own offset (heal) fades out toward the center
+    const off = lp.map(([a]) => { const o = new THREE.Vector3(S.pos[3*a], S.pos[3*a+1], S.pos[3*a+2]); if (M) o.applyMatrix4(M); return ctx.wpos(own, a, new THREE.Vector3()).sub(o); });
+    P.rings.forEach((R, k) => {
+      const W = new Float32Array(R.length), t = P.t[k], ix = P.idx[k];
+      for (let j = 0; j < ix.length; j++) { t3.fromArray(R, 3*j); if (M) t3.applyMatrix4(M); t3.addScaledVector(off[ix[j]], t); t3.toArray(W, 3*j); }
+      rings.push(W);
+    });
+    const c = new THREE.Vector3(...P.c); if (M) c.applyMatrix4(M);
+    ringTris(rings, c.toArray(), flip, out); return out;
+  }
+  // bridge: sweep the cut from the neighbor's rim (t = 0) to this part's moved cut (t = 1) along the relative turn
+  const Mn = ctx.mat(nb), Rel = (M ? M.clone() : new THREE.Matrix4()).multiply(Mn ? Mn.clone().invert() : new THREE.Matrix4());
+  const p0 = lp.map(([a]) => ctx.wpos(nb, a)), p1 = lp.map(([a]) => ctx.wpos(own, a));
+  const C0 = new THREE.Vector3(); p0.forEach((p) => C0.add(p)); C0.divideScalar(n);
+  const C1 = C0.clone().applyMatrix4(Rel), q = new THREE.Quaternion(); Rel.decompose(new THREE.Vector3(), q, new THREE.Vector3());
+  const Lm = new THREE.Matrix3().setFromMatrix4(Rel), Km = new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(q)).transpose().multiply(Lm);
+  const res = p1.map((p, j) => p.clone().sub(p0[j].clone().applyMatrix4(Rel))); // heal / stretch beyond the rigid turn
+  let per = 0, md = 0; for (let j = 0; j < n; j++) { per += p0[j].distanceTo(p0[(j+1) % n]); md = Math.max(md, p0[j].distanceTo(p1[j])); }
+  const ang = 2 * Math.acos(Math.min(1, Math.abs(q.w))), steps = Math.max(1, Math.min(24, Math.max(Math.ceil(ang / 0.14), Math.ceil(md / Math.max(3 * per / n, 1e-6)))));
+  const rings = [ring0], I = new THREE.Quaternion(), qt = new THREE.Quaternion(), d = new THREE.Vector3(), kd = new THREE.Vector3();
+  for (let k = 1; k <= steps; k++) {
+    const t = 1 - k / steps, R = new Float32Array(3 * n); qt.slerpQuaternions(I, q, t);
+    for (let j = 0; j < n; j++) {
+      d.subVectors(p0[j], C0); kd.copy(d).applyMatrix3(Km);
+      t3.copy(d).lerp(kd, t).applyQuaternion(qt).add(C0.clone().lerp(C1, t)).addScaledVector(res[j], t).toArray(R, 3*j);
+    }
+    rings.push(R);
+  }
+  ringTris(rings, C0.toArray(), flip, out); return out;
+}
+function partCountsCached(ctx) { return (ctx.cnt ||= partCounts()); }
+// Closing triangles for every loop of part i (or of the unchanged rest, in mergedSoup), world space.
+function capTris(plans, ctx) { const out = []; for (const pl of plans) planTris(pl, ctx, out); return Float32Array.from(out); }
+
+// Display: the patches and sleeves of open gaps, drawn as their own mesh in the parts' colors.
+let fillMesh = null;
+function updateFillMesh() {
+  if (fillMesh) { scene.remove(fillMesh); fillMesh.geometry.dispose(); fillMesh = null; }
+  if (!mesh || !S.G) return;
+  const ch = changedParts(); if (!ch.size) return;
+  const ctx = fillCtx(), nb = neighborPairs(), involved = new Set();
+  for (const k of nb) { const [a, b] = k.split("|").map(Number); if (ch.has(a) || ch.has(b)) { involved.add(a); involved.add(b); } }
+  const pos = [], own = [];
+  for (const l of involved) {
+    const p = S.parts[l]; if (!p || p.visible === false || hasRep(p)) continue;
+    for (const pl of loopPlans(partLoops(l, ctx), ctx)) {
+      if (pl.kind !== "patch" && pl.kind !== "bridge") continue;
+      const n0 = pos.length; planTris(pl, ctx, pos); for (let k = n0; k < pos.length; k += 9) own.push(l);
+    }
+  }
+  if (!pos.length) return;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(Float32Array.from(pos), 3));
+  geo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(pos.length), 3));
+  geo.setAttribute("normal", new THREE.BufferAttribute(smoothNormals(geo.getAttribute("position").array), 3));
+  fillMesh = new THREE.Mesh(geo, material); fillMesh.userData.own = own; fillMesh.raycast = () => {};
+  scene.add(fillMesh); colorFillMesh();
+}
+function colorFillMesh(plain = false) {
+  if (!fillMesh) return;
+  const col = fillMesh.geometry.getAttribute("color").array, own = fillMesh.userData.own, cs = new Map();
+  own.forEach((l, t) => { if (!cs.has(l)) cs.set(l, shownColor(l, plain).convertSRGBToLinear()); const c = cs.get(l); for (let k = 0; k < 9; k += 3) { col[9*t+k] = c.r; col[9*t+k+1] = c.g; col[9*t+k+2] = c.b; } });
+  fillMesh.geometry.getAttribute("color").needsUpdate = true;
+}
+const posKey = (P, o) => `${Math.round(P[o]*1e3)},${Math.round(P[o+1]*1e3)},${Math.round(P[o+2]*1e3)}`;
+function smoothNormals(P) { // vertex normals averaged over triangles that share a position
+  const N = new Float32Array(P.length), acc = new Map(), key = (o) => posKey(P, o);
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let o = 0; o < P.length; o += 9) {
+    a.fromArray(P, o); b.fromArray(P, o+3); c.fromArray(P, o+6);
+    const f = b.clone().sub(a).cross(c.clone().sub(a));
+    for (let k = 0; k < 9; k += 3) { const kk = key(o+k); const v = acc.get(kk); if (v) v.add(f); else acc.set(kk, f.clone()); }
+  }
+  for (let o = 0; o < P.length; o += 3) { const v = acc.get(key(o)).clone().normalize(); N[o] = v.x; N[o+1] = v.y; N[o+2] = v.z; }
+  return N;
+}
+function setAnchor(js, on) {
+  js = js.filter((j) => j > 0 && S.parts[j] && !hasRep(S.parts[j]));
+  if (!js.length) return;
+  pushUndo();
+  for (const j of js) { if (on) S.parts[j].anchor = true; else delete S.parts[j].anchor; }
+  const names = js.map((j) => S.parts[j].name).join(", ");
+  afterEdit(on ? `Anchor: ${names} stay${js.length > 1 ? "" : "s"} joined to the body; the gap fills with new material` : `Fill: the holes ${names} leave${js.length > 1 ? "" : "s"} are patched`);
+}
+
 function filColor(n) { return orcaFil?.[n - 1] || S.parts.find((q) => q.filament === n)?.color || "#666"; }
 let orcaFil = null; // OrcaSlicer's filament colors by slot (plugin), used by the filament view
 let byFilament = false; try { byFilament = localStorage.getItem("meshsplit:byFil") === "1"; } catch {}
@@ -1124,6 +1385,7 @@ function shownColor(i, plain) {
 }
 function updateColors(plain = false) {
   if (!mesh) return;
+  colorFillMesh(plain);
   const col = mesh.geometry.getAttribute("color").array;
   const cs = S.parts.map((_, i) => shownColor(i, plain).convertSRGBToLinear());
   for (const m of repMeshes.values()) if (S.parts[m.userData.part]) m.material.color.copy(shownColor(m.userData.part, plain));
@@ -1326,8 +1588,47 @@ function syncSliders() {
 let lastActive = -1;
 const mergeSel = new Set(); // parts Shift+clicked in the list, merged into the selected part
 function selectPart(i) { if (flow && flow.part !== i) closeFlow(); S.active = i; mergeSel.clear(); refreshUI(); }
+// Parts list motion. Each part keeps a row key across re-renders and undo (kept beside the part, not in it, so
+// sessions don't change). After a re-render, new rows fade in, removed rows fade out where they were, and the
+// other rows glide from their old place to the new one (FLIP), instead of the list jumping.
+const rowKeys = new WeakMap();
+let rowSeq = 0;
+function rowKey(p) { let k = rowKeys.get(p); if (!k) rowKeys.set(p, (k = ++rowSeq)); return k; }
+const motionOK = () => !matchMedia("(prefers-reduced-motion: reduce)").matches;
+const EASE = "cubic-bezier(.2, .8, .3, 1)";
+// Rows are reused by key (not rebuilt), so a row's animation survives the many re-renders an edit triggers.
+function animateRows(body, before) {
+  if (!before || !motionOK() || !body.isConnected) return;
+  let added = 0;
+  for (const tr of body.children) {
+    const old = before.get(tr.dataset.k);
+    if (old) {
+      before.delete(tr.dataset.k);
+      tr.getAnimations().forEach((a) => a.id === "flip" && a.cancel());
+      const dy = old.top - tr.getBoundingClientRect().top;
+      if (Math.abs(dy) > 0.5) tr.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], { id: "flip", duration: 200, easing: EASE });
+    } else {
+      tr.animate([{ opacity: 0, transform: "translateX(-12px)" }, { opacity: 1, transform: "none" }],
+        { id: "in", duration: 220, easing: "ease-out", delay: Math.min(added++, 8) * 35, fill: "backwards" });
+    }
+  }
+  for (const { tr, rect } of before.values()) { // removed: the old row fades out on top of where it was
+    const t = document.createElement("table"); t.className = "parts ghost";
+    Object.assign(t.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px` });
+    tr.getAnimations().forEach((a) => a.cancel());
+    t.appendChild(document.createElement("tbody")).appendChild(tr);
+    document.body.appendChild(t);
+    t.animate([{ opacity: 1 }, { opacity: 0, transform: "translateX(-12px)" }], { duration: 160, easing: "ease-in", fill: "forwards" }).onfinish = () => t.remove();
+  }
+}
 function refreshUI() {
-  const body = $("partsBody"); body.innerHTML = "";
+  const body = $("partsBody");
+  const rows = new Map(), before = motionOK() && body.children.length ? new Map() : null;
+  for (const tr of body.children) {
+    rows.set(tr.dataset.k, tr);
+    if (before) { const rect = tr.getBoundingClientRect(); before.set(tr.dataset.k, { tr, rect, top: rect.top }); }
+  }
+  if (!S.G) body.innerHTML = "";
   document.body.classList.toggle("empty", !S.G);
   if (!S.G) return;
   const solo = isSolo(S.active);
@@ -1336,7 +1637,8 @@ function refreshUI() {
   for (const i of [...mergeSel]) if (i <= 0 || i >= S.parts.length || i === S.active) mergeSel.delete(i);
   S.parts.forEach((p, i) => {
     if (i === 0 && !cnt[0]) return; // Unassigned is listed only while some faces are unassigned
-    const tr = document.createElement("tr");
+    const key = String(rowKey(p)), tr = rows.get(key) || document.createElement("tr");
+    rows.delete(key);
     tr.className = i === S.active ? "active" : mergeSel.has(i) ? "msel" : "";
     tr.title = i ? "Click: select · Ctrl/Shift+click: select more · Right-click: actions" : "Click: select · Right-click: actions";
     tr.innerHTML = `<td><span class="sw" style="background:${p.color}"></span></td>
@@ -1355,9 +1657,11 @@ function refreshUI() {
     };
     tr.querySelector(".eye").onclick = () => { p.visible = !p.visible; updateVisibility(); drawSeeds(); refreshUI(); };
     if (i) tr.querySelector(".nm").ondblclick = (ev) => { ev.stopPropagation(); startRename(i); };
-    tr.dataset.part = i;
-    body.appendChild(tr);
+    tr.dataset.part = i; tr.dataset.k = key;
+    body.appendChild(tr); // appending a reused row moves it into its new place
   });
+  for (const tr of rows.values()) tr.remove(); // rows of parts that are gone
+  animateRows(body, before);
   if (lastActive !== S.active) { lastActive = S.active; updateColors(); }
   $("mergeBtn").hidden = !mergeSel.size;
   $("mergeBtn").title = `Merge ${mergeSel.size} part(s) into ${S.parts[S.active].name}`;
@@ -1900,6 +2204,8 @@ function refreshXfPanel() {
   $("xfReset").disabled = !ok || isIdXf(p?.xf);
   $("gzCenter").classList.toggle("on", !gzJointOn);
   $("healRow").classList.toggle("hide", !ok || !!p?.rep);
+  $("anchorRow").classList.toggle("hide", !ok || !!p?.rep);
+  $("gapAnchor").classList.toggle("on", ok && !!p?.anchor); $("gapFill").classList.toggle("on", ok && !p?.anchor);
   $("stretchRow").classList.toggle("hide", !ok || !!p?.rep);
   const au = ok && !!p.xf?.st?.auto;
   if (ok && document.activeElement !== $("stretchPct")) $("stretchPct").value = +((p.xf?.st?.k ?? 1) * 100).toFixed(au ? 0 : 1);
@@ -1961,6 +2267,8 @@ $("healR").onchange = () => {
   const r = +$("healR").value; if (!(r > 0)) { refreshUI(); return; }
   pushUndo(); p.heal = { r }; afterEdit(`Heal blend on ${p.name}: ${r} mm`);
 };
+$("gapFill").onclick = () => { if (S.G && S.active > 0) setAnchor(selected(), false); };
+$("gapAnchor").onclick = () => { if (S.G && S.active > 0) setAnchor(selected(), true); };
 $("stretchAuto").onchange = () => { if (S.G && S.active > 0) setAutoStretch(selected(), $("stretchAuto").checked); };
 $("stretchGap").onchange = () => {
   const g = +$("stretchGap").value; if (!S.G || S.active <= 0 || !(g >= 0)) { refreshUI(); return; }
@@ -2166,7 +2474,9 @@ function shoot(view, w, h, mode) {
     const saved = keep.slice(); keep.set(ids); col.needsUpdate = true; mesh.material = idMat;
     const rmats = [];
     for (const m of repMeshes.values()) { const l = m.userData.part + 1; rmats.push([m, m.material]); m.material = new THREE.MeshBasicMaterial({ color: new THREE.Color((l & 255) / 255, (l >> 8) / 255, 0), toneMapped: false, side: THREE.DoubleSide }); }
+    if (fillMesh) fillMesh.visible = false;
     shotR.render(scene, shotCam);
+    if (fillMesh) fillMesh.visible = true;
     for (const [m, mat] of rmats) { m.material.dispose(); m.material = mat; }
     keep.set(saved); col.needsUpdate = true; mesh.material = material;
   } else {
@@ -2439,7 +2749,13 @@ function partSoup(i) {
   const p = S.parts[i];
   if (hasRep(p)) { const M = repMatrix(i); return M ? xformSoup(REPS.get(p.rep.id).pos, M) : null; }
   const m = partMesh(i); if (!m) return null;
-  const M = xfMatrix(p); return M ? healSoup(i, m.verts, xformSoup(m.verts, M)) : Float32Array.from(m.verts);
+  const M = xfMatrix(p), faces = Float32Array.from(m.verts.slice(0, m.nFaceVerts)), ctx = fillCtx();
+  const body = M ? healSoup(i, faces, xformSoup(faces, M)) : Float32Array.from(faces);
+  // caps start exactly on the part's own (float32) boundary positions, so the closed solid has no slivers
+  ctx.fixL = i; ctx.fix = new Map(); ctx.fixV = body; let o = 0;
+  for (let f = 0; f < S.nF; f++) if (S.labels[f] === i) { for (let c = 0; c < 3; c++, o += 3) ctx.fix.set(S.tri[3*f+c], o); }
+  const caps = capTris(loopPlans(m.loopList, ctx), ctx), out = new Float32Array(body.length + caps.length);
+  out.set(body); out.set(caps, body.length); return out;
 }
 // Whole model as one triangle soup + filament per triangle. Unchanged parts keep their faces with the holes left by
 // moved/replaced parts capped; each moved/replaced part is its own closed shell overlapping the rest (slicers union them).
@@ -2447,13 +2763,14 @@ function mergedSoup() {
   const ch = changedParts(), parts = [], fil = [];
   const rest = meshOf((l) => !ch.has(l));
   if (rest) {
-    parts.push(rest.verts);
+    parts.push(rest.verts.slice(0, rest.nFaceVerts));
     rest.triLab.forEach((l) => fil.push(S.parts[l].filament));
-    const ctr = [...ch].map((i) => { const b = partBox(i); return [i, (b[0]+b[3])/2, (b[1]+b[4])/2, (b[2]+b[5])/2]; });
-    for (let o = rest.nFaceVerts; o < rest.verts.length; o += 9) { // cap: filament of the nearest moved/replaced part
-      const x = rest.verts[o+6], y = rest.verts[o+7], z = rest.verts[o+8];
-      let best = 0, bd = Infinity; for (const [i, cx, cy, cz] of ctr) { const d = (x-cx)**2 + (y-cy)**2 + (z-cz)**2; if (d < bd) { bd = d; best = i; } }
-      fil.push(S.parts[best].filament);
+    // holes left by moved/replaced parts: a Fill patch is the part's own surface (its filament); a cap hidden under
+    // the moved part or its sleeve takes that part's filament
+    const ctx = fillCtx();
+    for (const pl of loopPlans(rest.loopList, ctx)) {
+      const t = planTris(pl, ctx), f = S.parts[pl.kind === "patch" || pl.nb < 0 ? pl.own : pl.nb]?.filament ?? 1;
+      parts.push(Float32Array.from(t)); for (let o = 0; o < t.length; o += 9) fil.push(f);
     }
   }
   for (const i of ch) { const v = partSoup(i); if (!v) continue; parts.push(v); for (let o = 0; o < v.length; o += 9) fil.push(S.parts[i].filament); }
@@ -2640,7 +2957,7 @@ if (ORCA.on) {
   });
   orcaSend({ cmd: "objects", auto: true });
 }
-window.app = { S, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, setAnchor, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
 </script>
 </body>
 </html>
