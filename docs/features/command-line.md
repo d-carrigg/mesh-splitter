@@ -64,6 +64,7 @@ With no output option, it writes `<name>_parts.3mf` next to the mesh. Use any mi
 | `--stl DIR` | One closed STL per part, with the cut openings capped. |
 | `--merged FILE` | All parts in one STL. |
 | `--save-session FILE` | A `.split.json` you can load in the app (**Load session**) to keep editing. |
+| `--report FILE` | JSON summary: the mesh's bounds, and each part's name, filament slot, face count, bounds and center. |
 
 See [Exporting](exporting.md) for how each format loads in the slicer.
 
