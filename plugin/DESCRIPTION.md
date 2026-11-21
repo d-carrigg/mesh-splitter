@@ -4,7 +4,7 @@ Split one solid mesh into separate, color-coded parts for multi-color or multi-p
 
 **Docs:** [Splitting](https://d-carrigg.github.io/mesh-splitter/features/splitting/) · [Editing parts](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/) · [Move, rotate, scale and heal](https://d-carrigg.github.io/mesh-splitter/features/transforms/) · [Exporting](https://d-carrigg.github.io/mesh-splitter/features/exporting/) · [How it works](https://d-carrigg.github.io/mesh-splitter/how-it-works/)
 
-For the example photo, I made the eyes 1 part, then replaced them with a flipped version to change where the figure looked.
+For the example photo, I made the eyes 1 part, then replaced them with a flipped version to change where the figure looked. See more in the [Examples](https://d-carrigg.github.io/mesh-splitter/examples/).
 
 ## Features
 
