@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.19](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.18...v0.3.19) (2026-11-22)
+
+
+### Features
+
+* delete a part's geometry and close the holes it leaves ([#93](https://github.com/d-carrigg/mesh-splitter/issues/93)) ([4c05285](https://github.com/d-carrigg/mesh-splitter/commit/4c052859b0e4d12f67833432cb97b78049c5fb60))
+* move along the plate or joint, and trim overlap ([#91](https://github.com/d-carrigg/mesh-splitter/issues/91)) ([5f9d469](https://github.com/d-carrigg/mesh-splitter/commit/5f9d469b58c03f125b309d90f3f2abcc25f60a03))
+
+
+### Bug Fixes
+
+* Fill and Anchor act only at the joint a part turns about ([#92](https://github.com/d-carrigg/mesh-splitter/issues/92)) ([106270b](https://github.com/d-carrigg/mesh-splitter/commit/106270bb132d11e192e6adb0c0c245ab48ba0d70))
+
 ## [0.3.18](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.17...v0.3.18) (2026-11-22)
 
 
