@@ -3223,8 +3223,9 @@ function orcaPlateChanged(m) {
 // plate is open here: offer to load the new one, or load it without asking once the user opts in. The split of the
 // old model stays in the autosave, so opening that model again picks it up.
 const NEWPROJ_KEY = "meshsplit:autoLoadNewProject";
-function newProjAuto() { try { return localStorage.getItem(NEWPROJ_KEY) === "1"; } catch { return false; } }
-function setNewProjAuto(on) { try { localStorage.setItem(NEWPROJ_KEY, on ? "1" : "0"); } catch {} $("newProjAuto").checked = on; }
+// "ask" (default), "load" (load the new model without asking) or "keep" (keep the current model, never ask)
+function newProjMode() { try { const v = localStorage.getItem(NEWPROJ_KEY); return v === "load" || v === "keep" ? v : "ask"; } catch { return "ask"; } }
+function setNewProjMode(v) { try { localStorage.setItem(NEWPROJ_KEY, v); } catch {} $("newProjMode").value = v; }
 function orcaNewProject(prev, objs) {
   const src = S.G && S.source?.orca, ids = new Set(objs.map((o) => o.id));
   if (ORCA.projEvent || (src && !ids.has(src.id) && !prev.some((o) => ids.has(o.id)))) ORCA.newProj = true;
@@ -3235,7 +3236,9 @@ function orcaNewProject(prev, objs) {
   if (!src || ids.has(src.id)) return; // nothing from the plate open here, or it's still on the plate
   const own = ORCA.sentAt && Date.now() - ORCA.sentAt < 600000; ORCA.sentAt = 0;
   if (own) return; // the project our own Send to Orca opened
-  if (newProjAuto() && objs.length === 1) {
+  const mode = newProjMode();
+  if (mode === "keep") return;
+  if (mode === "load" && objs.length === 1) {
     const old = S.name; $("newProj").hidden = true; orcaLoad(objs[0]);
     toast(`Loaded ${objs[0].name} from the new OrcaSlicer project. Your split of ${old} is saved: open it again to continue it.`, true);
     return;
@@ -3245,15 +3248,15 @@ function orcaNewProject(prev, objs) {
   for (const o of objs) {
     const b = document.createElement("button"); b.className = "pri"; b.title = o.name;
     b.textContent = `Load ${o.name}`;
-    b.onclick = () => { if ($("newProjRemember").checked) setNewProjAuto(true); $("newProj").hidden = true; orcaLoad(o); };
+    b.onclick = () => { if ($("newProjRemember").checked) setNewProjMode("load"); $("newProj").hidden = true; orcaLoad(o); };
     list.appendChild(b);
   }
   $("newProjRemember").checked = false;
-  $("newProjRemember").parentElement.hidden = newProjAuto(); // already on: several models, so the user picks one
+  $("newProjRemember").parentElement.hidden = mode === "load"; // already set to load: several models, so the user picks one
   $("newProj").hidden = false;
 }
-$("newProjKeep").onclick = () => ($("newProj").hidden = true);
-$("newProjAuto").onchange = () => setNewProjAuto($("newProjAuto").checked);
+$("newProjKeep").onclick = () => { if ($("newProjRemember").checked) setNewProjMode("keep"); $("newProj").hidden = true; };
+$("newProjMode").onchange = () => setNewProjMode($("newProjMode").value);
 function orcaMesh(m) { // chunks of the requested transfer, in any order
   if (!m.req || m.req !== ORCA.want) return; // a stale or superseded transfer
   if (!ORCA.rx || ORCA.rx.req !== m.req) ORCA.rx = { req: m.req, name: m.name, nV: m.nV, nF: m.nF, parts: new Array(m.of), got: 0 };
@@ -3309,7 +3312,7 @@ if (ORCA.on) {
     } else if (/^llm_/.test(m.cmd || "")) llmReply(m);
     else if (m.cmd === "error") { busy(false); ORCA.rx = null; ORCA.want = null; clearTimeout(rxTimer); status(m.message); alert(m.message); }
   });
-  $("newProjAuto").checked = newProjAuto();
+  $("newProjMode").value = newProjMode();
   // Back on the tab or window: refresh the plate list, in case OrcaSlicer didn't report a project change.
   document.addEventListener("visibilitychange", () => { if (!document.hidden) orcaSend({ cmd: "objects" }); });
   window.addEventListener("focus", () => orcaSend({ cmd: "objects" }));

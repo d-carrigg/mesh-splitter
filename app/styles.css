@@ -18,7 +18,7 @@ body.inOrca #top { display:none; }
 #newProj[hidden] { display:none; }
 #newProjList { display:flex; flex-direction:column; gap:4px; max-height:240px; overflow:auto; }
 #newProjList button { text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-label.chk { display:flex; align-items:center; gap:6px; padding:4px 8px; white-space:nowrap; cursor:pointer; font-weight:400; }
+label.chk { display:flex; align-items:center; gap:10px; padding:4px 8px; white-space:nowrap; cursor:pointer; font-weight:400; }
 .mh { color:var(--mute); font-size:11px; text-transform:uppercase; letter-spacing:.06em; padding:6px 8px 2px; }
 /* Print as: One part hides filament slots (the colors only tell parts apart) */
 body.oneFil .filOnly, body.oneFil .parts td.fcol { display:none !important; }

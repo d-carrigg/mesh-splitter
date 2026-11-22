@@ -16,13 +16,14 @@
       <div id="fileMenu" class="menu" hidden>
         <div class="orcaOnly mh" hidden>From the plate</div>
         <div id="orcaMenu" class="orcaOnly sub" hidden></div>
-        <label class="orcaOnly chk" hidden title="When OrcaSlicer opens or starts another project, load its model here without asking"><input id="newProjAuto" type="checkbox"> Load new projects automatically</label>
         <button id="openBtn" data-icon="open" title="Open STL / 3MF">Open file…<span class="meta">Ctrl+O</span></button>
         <div id="recentHd" class="mh">Recent</div>
         <div id="recentMenu" class="sub"></div>
         <div class="msep"></div>
         <button id="saveSess" class="needMesh" data-icon="save" title="Save the split (labels, part names, transforms) as .json">Save session</button>
         <button id="loadSess" class="needMesh" data-icon="load" title="Load a saved .json session for this mesh">Load session…</button>
+        <div class="orcaOnly msep" hidden></div>
+        <label class="orcaOnly chk" hidden title="What to do when OrcaSlicer opens or starts another project while a model from the old one is open here">New Orca project<span style="flex:1"></span><select id="newProjMode"><option value="ask">Ask</option><option value="load">Load its model</option><option value="keep">Keep current</option></select></label>
       </div></span>
   </div>
   <div class="sc"><div id="fileName">Open a model</div><div id="fileInfo"></div>
@@ -68,7 +69,7 @@
     <b>OrcaSlicer has a new project</b>
     <span id="newProjText" class="small"></span>
     <div id="newProjList"></div>
-    <label class="small"><input id="newProjRemember" type="checkbox"> Do this automatically next time</label>
+    <label class="small"><input id="newProjRemember" type="checkbox"> Don't ask again</label>
     <div class="row" style="margin:0"><span style="flex:1"></span><button id="newProjKeep">Keep current model</button></div>
   </div>
   <div id="drop">
