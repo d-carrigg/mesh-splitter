@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.18](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.17...v0.3.18) (2026-11-22)
+
+
+### Features
+
+* welcome screen in the browser app and the OrcaSlicer plugin ([#87](https://github.com/d-carrigg/mesh-splitter/issues/87)) ([77129ff](https://github.com/d-carrigg/mesh-splitter/commit/77129ff016f37eb28b76e9b2c0f9919ced7eda51))
+
+
+### Bug Fixes
+
+* **plugin:** create the --page-out folder so the plugin build works again ([#90](https://github.com/d-carrigg/mesh-splitter/issues/90)) ([742266e](https://github.com/d-carrigg/mesh-splitter/commit/742266e7b2f6b072f61be2436853a6ef65201bd1))
+
 ## [0.3.17](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.16...v0.3.17) (2026-11-21)
 
 

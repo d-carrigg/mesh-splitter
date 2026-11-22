@@ -1,6 +1,6 @@
 {
   "name": "mesh-splitter",
-  "version": "0.3.17",
+  "version": "0.3.18",
   "description": "Split a single-shell mesh (STL or 3MF) into separate parts for multi-color or multi-piece 3D printing, and export a multi-part 3MF, a painted 3MF or one STL per part.",
   "author": {
     "name": "d-carrigg",
