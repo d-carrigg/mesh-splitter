@@ -83,7 +83,7 @@ The parsing, the splitting pipeline and the file writers live in one JavaScript 
 ```mermaid
 flowchart TB
   core["app/core.js<br/>STL/3MF reading · face graph · grow · auto split · shells<br/>snap · smooth cut · 3MF/STL writers · sessions"]
-  app["Browser app<br/>app/index.html<br/>(uv run mesh-splitter)"]
+  app["Browser app<br/>app/index.html + main.js<br/>(uv run mesh-splitter)"]
   plugin["OrcaSlicer plugin<br/>plugin/build.py bundles app + core<br/>into mesh_splitter_any.whl"]
   cli["Command line<br/>cli/split.mjs<br/>(uv run mesh-splitter split)"]
   core --> app
@@ -91,7 +91,7 @@ flowchart TB
   core --> cli
 ```
 
-- **Browser app:** `app/index.html` imports `core.js` and adds the 3D view, the tools, transforms and the UI.
+- **Browser app:** `app/index.html` (page), `app/styles.css` and `app/main.js`, which imports `core.js` and adds the 3D view, the tools, transforms and the UI.
 - **OrcaSlicer plugin:** `plugin/build.py` bundles the page, `core.js`, three.js and fflate into one page, compressed into the plugin's Python file. Inside OrcaSlicer the page talks to the plugin over `window.orca` messages: the plugin sends the plate's mesh in, and the page sends the finished 3MF out to be saved.
 - **Command line:** `cli/split.mjs` runs on Node.js and calls the same functions. A saved session from the app can be loaded there, and the reverse. See [Command line](features/command-line.md).
 

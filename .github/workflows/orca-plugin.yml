@@ -1,6 +1,6 @@
 name: OrcaSlicer plugin
 
-# Builds the Mesh Splitter plugin for OrcaSlicer (plugin/) from app/index.html and uploads dist/mesh_splitter_any.whl (version: pyproject.toml [project].version). On main it also refreshes the "orca-plugin" release so the
+# Builds the Mesh Splitter plugin for OrcaSlicer (plugin/) from app/ (index.html, styles.css, main.js) and uploads dist/mesh_splitter_any.whl (version: pyproject.toml [project].version). On main it also refreshes the "orca-plugin" release so the
 # latest build has a stable download link.
 # Tests (unit, end-to-end, real OrcaSlicer) run only on the release PR from Release Please
 # (branch release-please--*) or when run by hand, so feature PRs and merges don't spend CI minutes on them.
