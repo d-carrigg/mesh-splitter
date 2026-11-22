@@ -12,7 +12,7 @@ A hands-on pass over every feature, run on request ("check the whole app") rathe
   - `curler.stl` (curling figure, from the project files): for comparing with the docs images.
 - Browser app: `uv run mesh-splitter` (opens `http://127.0.0.1:8766`). Use a fresh browser profile, or clear the site's storage: the app remembers each file's last split (reopening it says "Restored your last session"), and the recent files and AI settings.
 - Mock AI model: `uv run python server/mock_llm_server.py --port 1234 --models mock-vision-1` (an OpenAI-compatible server, like LM Studio, that names each part "mock part N").
-- OrcaSlicer 2.5.1 with the plugin installed from `plugin/dist/mesh_splitter_any.whl` (Plugins > Install local plugin).
+- OrcaSlicer 2.5.1 with the plugin installed from `plugin/dist/mesh_splitter_any.whl` (`uv run python build.py --official`) (Plugins > Install local plugin).
 - Docs images to compare with: `docs/features/img/`, `docs/how-it-works/img/`, `docs/examples/img/`. To redraw them for a side-by-side check without touching the repo, copy each `docs/features/demo/*.json` with `"shots"` pointed at a temp folder and run `node docs/demo/record.mjs <copies>`.
 
 ## 1. Open

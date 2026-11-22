@@ -1,9 +1,12 @@
 name: OrcaSlicer plugin
 
-# Builds the Mesh Splitter plugin for OrcaSlicer (plugin/) from app/ (index.html, styles.css, main.js) and uploads dist/mesh_splitter_any.whl (version: pyproject.toml [project].version). On main it also refreshes the "orca-plugin" release so the
+# Builds the Mesh Splitter plugin for OrcaSlicer (plugin/) from app/ (index.html, styles.css, main.js) and uploads dist/<package>.whl (version: pyproject.toml [project].version). On main it also refreshes the "orca-plugin" release so the
 # latest build has a stable download link.
 # Tests (unit, end-to-end, real OrcaSlicer) run only on the release PR from Release Please
 # (branch release-please--*) or when run by hand, so feature PRs and merges don't spend CI minutes on them.
+# The official name and key (Mesh Splitter, mesh_splitter_any.whl) need the repo Actions variable
+# MESH_SPLITTER_OFFICIAL_BUILD=true; without it (forks, clones) the build is "Mesh Splitter (unofficial copy)",
+# mesh_splitter_copy_any.whl.
 on:
   push:
     branches: [main]
@@ -25,6 +28,7 @@ jobs:
     env:
       ORCA_VERSION: 2.5.1   # the OrcaSlicer release the plugin targets
       RUN_TESTS: ${{ startsWith(github.head_ref, 'release-please--') || github.event_name == 'workflow_dispatch' }}
+      MESH_SPLITTER_OFFICIAL_BUILD: ${{ vars.MESH_SPLITTER_OFFICIAL_BUILD }}   # read by build.py
     defaults:
       run:
         working-directory: plugin
@@ -40,7 +44,12 @@ jobs:
         run: uv sync
       - run: npm ci
       - name: Build
-        run: uv run python build.py --page-out build/page.html   # version from pyproject.toml
+        run: |
+          if [ "$GITHUB_REPOSITORY" = d-carrigg/mesh-splitter ] && [ "$MESH_SPLITTER_OFFICIAL_BUILD" != true ]; then
+            echo "::error::Set the Actions variable MESH_SPLITTER_OFFICIAL_BUILD=true, or this repo builds the unofficial copy"; exit 1
+          fi
+          uv run python build.py --page-out build/page.html   # version from pyproject.toml
+          echo "WHL=$(ls dist/*.whl)" >> "$GITHUB_ENV"   # dist/mesh_splitter_any.whl, or the _copy_ name
       - name: Unit tests
         if: env.RUN_TESTS == 'true'
         run: |
@@ -74,7 +83,7 @@ jobs:
           chmod +x orca.AppImage && ./orca.AppImage --appimage-extract >/dev/null   # no FUSE on runners
           cd "$GITHUB_WORKSPACE/plugin"
           LANG=en_US.UTF-8 xvfb-run -a -s "-screen 0 1600x1000x24" \
-            uv run python real_orca_test.py ~/orca/squashfs-root/AppRun dist/mesh_splitter_any.whl \
+            uv run python real_orca_test.py ~/orca/squashfs-root/AppRun "$WHL" \
             build/snowman.stl build/out/snowman_parts.3mf --out build/real-orca
       - name: Upload real OrcaSlicer logs
         if: always() && env.RUN_TESTS == 'true'
@@ -86,14 +95,14 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: mesh_splitter-${{ github.run_number }}
-          path: plugin/dist/mesh_splitter_any.whl
+          path: plugin/dist/*.whl
       - name: Publish to the orca-plugin release
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          notes="Development build from main. Download mesh_splitter_any.whl, then OrcaSlicer > Plugins > Install local plugin. Versioned releases are on the Releases page and the OrcaCloud Plugin Hub."
+          notes="Development build from main. Download the .whl, then OrcaSlicer > Plugins > Install local plugin. Versioned releases are on the Releases page and the OrcaCloud Plugin Hub."
           gh release view orca-plugin >/dev/null 2>&1 || gh release create orca-plugin --title "Mesh Splitter dev build" --notes "$notes" --prerelease
           # Keep vX.Y.Z as "Latest"; this rolling build is a pre-release.
           gh release edit orca-plugin --title "Mesh Splitter dev build" --notes "$notes" --prerelease --latest=false
-          gh release upload orca-plugin dist/mesh_splitter_any.whl --clobber
+          gh release upload orca-plugin "$WHL" --clobber
