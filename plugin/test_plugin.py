@@ -280,7 +280,7 @@ class BuildTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             out = Path(d) / "mesh_splitter_any.whl"
             import subprocess, zipfile
-            subprocess.run([sys.executable, str(HERE / "build.py"), "--version", "9.9.9", "--official", "--out", str(out)],
+            subprocess.run([sys.executable, str(HERE / "build.py"), "--version", "9.9.9", "--name", "meshsplitter", "--out", str(out)],
                            check=True, capture_output=True)
             z = zipfile.ZipFile(out)
             info = "mesh_splitter_any-9.9.9.dist-info/"
@@ -313,7 +313,7 @@ class BuildTests(unittest.TestCase):
     def test_build_without_official_flag_is_an_unofficial_copy(self):
         import subprocess, zipfile
         with tempfile.TemporaryDirectory() as d:
-            env = {k: v for k, v in os.environ.items() if k != "MESH_SPLITTER_OFFICIAL_BUILD"}
+            env = {k: v for k, v in os.environ.items() if k != "MESH_SPLITTER_NAME"}
             subprocess.run([sys.executable, str(HERE / "build.py"), "--version", "9.9.9", "--out", str(Path(d) / "x.whl")],
                            check=True, capture_output=True, env=env)
             z = zipfile.ZipFile(Path(d) / "x.whl")

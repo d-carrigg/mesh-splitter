@@ -1,10 +1,10 @@
 """Build the OrcaSlicer plugin: bundle app/ (index.html, styles.css, main.js) into one self-contained page and package it in a wheel.
 
     cd plugin && npm ci && python build.py              ->  dist/mesh_splitter_copy_any.whl  (unofficial copy)
-    cd plugin && npm ci && python build.py --official   ->  dist/mesh_splitter_any.whl       (official name)
+    cd plugin && npm ci && python build.py --name meshsplitter   ->  dist/mesh_splitter_any.whl  (official name)
 
-Builds are named as an unofficial copy unless --official is given or MESH_SPLITTER_OFFICIAL_BUILD=true is set (the
-official repo sets it as an Actions variable). So a fork or clone that builds and publishes gets its own plugin
+Builds are named as an unofficial copy unless --name meshsplitter is given or MESH_SPLITTER_NAME=meshsplitter is set
+(the official repo sets it as an Actions variable). So a fork or clone that builds and publishes gets its own plugin
 name and key and its page does not say "Official build"; only the official repo's CI keeps "Mesh Splitter" and
 mesh_splitter_any, so existing installs keep updating.
 
@@ -104,7 +104,7 @@ def project_version():
     return m.group(1)
 
 
-OFFICIAL_ENV = "MESH_SPLITTER_OFFICIAL_BUILD"
+NAME_ENV, OFFICIAL_ID = "MESH_SPLITTER_NAME", "meshsplitter"
 OFFICIAL_NAME, OFFICIAL_PACKAGE = "Mesh Splitter", "mesh_splitter_any"
 COPY_NAME, COPY_PACKAGE = "Mesh Splitter (unofficial copy)", "mesh_splitter_copy_any"  # OrcaCloud wants the _any suffix
 OFFICIAL_LINE_RE = re.compile(r'<p id="official"[^>]*>.*?</p>', re.S)
@@ -171,11 +171,12 @@ def write_wheel(out, src, page, version, package):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--version", default=project_version(), help="defaults to [project].version in pyproject.toml")
-    ap.add_argument("--official", action="store_true", default=os.environ.get(OFFICIAL_ENV, "").lower() == "true",
-                    help=f"official name and key (also when {OFFICIAL_ENV}=true); otherwise an unofficial copy")
+    ap.add_argument("--name", default=os.environ.get(NAME_ENV, ""),
+                    help=f"{OFFICIAL_ID} for the official name and key (default: ${NAME_ENV}); anything else builds an unofficial copy")
     ap.add_argument("--out", help="defaults to dist/<package>.whl")
     ap.add_argument("--page-out", help="also write the bundled page here (for testing in a browser)")
     a = ap.parse_args()
+    a.official = a.name == OFFICIAL_ID
     package = OFFICIAL_PACKAGE if a.official else COPY_PACKAGE
     page = build_page()
     size = len(page.encode("utf-8"))

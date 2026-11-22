@@ -5,7 +5,7 @@ name: OrcaSlicer plugin
 # Tests (unit, end-to-end, real OrcaSlicer) run only on the release PR from Release Please
 # (branch release-please--*) or when run by hand, so feature PRs and merges don't spend CI minutes on them.
 # The official name and key (Mesh Splitter, mesh_splitter_any.whl) need the repo Actions variable
-# MESH_SPLITTER_OFFICIAL_BUILD=true; without it (forks, clones) the build is "Mesh Splitter (unofficial copy)",
+# MESH_SPLITTER_NAME=meshsplitter; without it (forks, clones) the build is "Mesh Splitter (unofficial copy)",
 # mesh_splitter_copy_any.whl.
 on:
   push:
@@ -28,7 +28,7 @@ jobs:
     env:
       ORCA_VERSION: 2.5.1   # the OrcaSlicer release the plugin targets
       RUN_TESTS: ${{ startsWith(github.head_ref, 'release-please--') || github.event_name == 'workflow_dispatch' }}
-      MESH_SPLITTER_OFFICIAL_BUILD: ${{ vars.MESH_SPLITTER_OFFICIAL_BUILD }}   # read by build.py
+      MESH_SPLITTER_NAME: ${{ vars.MESH_SPLITTER_NAME }}   # read by build.py
     defaults:
       run:
         working-directory: plugin
@@ -45,8 +45,8 @@ jobs:
       - run: npm ci
       - name: Build
         run: |
-          if [ "$GITHUB_REPOSITORY" = d-carrigg/mesh-splitter ] && [ "$MESH_SPLITTER_OFFICIAL_BUILD" != true ]; then
-            echo "::error::Set the Actions variable MESH_SPLITTER_OFFICIAL_BUILD=true, or this repo builds the unofficial copy"; exit 1
+          if [ "$GITHUB_REPOSITORY" = d-carrigg/mesh-splitter ] && [ "$MESH_SPLITTER_NAME" != meshsplitter ]; then
+            echo "::error::Set the Actions variable MESH_SPLITTER_NAME=meshsplitter, or this repo builds the unofficial copy"; exit 1
           fi
           uv run python build.py --page-out build/page.html   # version from pyproject.toml
           echo "WHL=$(ls dist/*.whl)" >> "$GITHUB_ENV"   # dist/mesh_splitter_any.whl, or the _copy_ name

@@ -4,7 +4,7 @@ name: Publish to OrcaCloud
 # version, attaches the file to the release, and publishes it to the OrcaCloud Plugin Hub with the release
 # notes as the changelog (converted to plain text by release_notes.py). Auth is GitHub OIDC (no secrets): the plugin on OrcaCloud
 # must have this repository connected under Edit plugin > GitHub publishing.
-# The official name and key need the repo Actions variable MESH_SPLITTER_OFFICIAL_BUILD=true (see build.py);
+# The official name and key need the repo Actions variable MESH_SPLITTER_NAME=meshsplitter (see build.py);
 # without it the plugin is built and published as "Mesh Splitter (unofficial copy)".
 # Steps from https://cloud.orcaslicer.com/wiki/#publish-from-github
 on:
@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TAG: ${{ github.ref_name }}
-      MESH_SPLITTER_OFFICIAL_BUILD: ${{ vars.MESH_SPLITTER_OFFICIAL_BUILD }}   # read by build.py
+      MESH_SPLITTER_NAME: ${{ vars.MESH_SPLITTER_NAME }}   # read by build.py
     defaults:
       run:
         working-directory: plugin
@@ -47,8 +47,8 @@ jobs:
         run: |
           want="$(grep -m1 '^version' ../pyproject.toml | cut -d'"' -f2)"
           [ "${TAG#v}" = "$want" ] || { echo "::error::tag $TAG != pyproject version $want"; exit 1; }
-          if [ "$GITHUB_REPOSITORY" = d-carrigg/mesh-splitter ] && [ "$MESH_SPLITTER_OFFICIAL_BUILD" != true ]; then
-            echo "::error::Set the Actions variable MESH_SPLITTER_OFFICIAL_BUILD=true, or this repo builds the unofficial copy"; exit 1
+          if [ "$GITHUB_REPOSITORY" = d-carrigg/mesh-splitter ] && [ "$MESH_SPLITTER_NAME" != meshsplitter ]; then
+            echo "::error::Set the Actions variable MESH_SPLITTER_NAME=meshsplitter, or this repo builds the unofficial copy"; exit 1
           fi
           uv run python build.py
           echo "WHL=$(ls dist/*.whl)" >> "$GITHUB_ENV"   # dist/mesh_splitter_any.whl, or the _copy_ name
