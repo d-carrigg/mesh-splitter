@@ -287,7 +287,8 @@ def write_new(folder, name, data):
 def object_index(model, src):
     """Where the object the split came from is in the plate's object list now (it may have moved since). OrcaSlicer
     gives every object a new id when it opens a project, as it does after each Send to Orca, so when the id is gone
-    the object is found by name: at the index the page last knew, else the only object with that name."""
+    the object is found by name: at the index the page last knew, else the only object with that name.
+    (None, None) when it isn't on the plate any more."""
     objs = model.objects()
     for i, o in enumerate(objs):
         if src.get("id") is not None and int(o.id()) == int(src["id"]):
@@ -299,7 +300,7 @@ def object_index(model, src):
         hits = [j for j, o in enumerate(objs) if o.name == name]
         if len(hits) == 1:
             return hits[0], name
-    raise ValueError(f"'{name or 'The original object'}' is no longer on the plate; open it from the plate again")
+    return None, None  # deleted in OrcaSlicer (or renamed): the split goes where it is (project3mf in_place)
 
 
 def send_to_orca(data, msg):
@@ -334,7 +335,7 @@ def send_to_orca(data, msg):
             os.remove(tmp)
     colors = {int(k): v for k, v in (msg.get("colors") or {}).items() if str(k).isdigit()}
     edited, info = project3mf.apply(project, data, mode, index, name=name, object_name=src_name, colors=colors,
-                                    single=bool(msg.get("single")))
+                                    single=bool(msg.get("single")), in_place=bool(src) and index is None)
     path = write_new(folder, f"{safe_name(stem)} - Mesh Splitter.3mf", edited)
     # Where the model will be once OrcaSlicer opens the project (new ids then): the page's next send finds it there
     info["source"] = info.pop("source_at", None)

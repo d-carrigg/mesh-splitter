@@ -639,12 +639,54 @@ class SendToOrcaTests(unittest.TestCase):
         self.assertEqual(m["cmd"], "saved")
         self.assertEqual([o[0] for o in read_3mf(Path(self.handed[0][0]).read_bytes())[0]], ["cube", "bolt", "bolt"])
 
-    def test_replace_needs_the_object_on_the_plate(self):
-        gone = fake_orca.FakeObject("gone", [])
-        m = self.send("replace_object", gone)
-        self.assertEqual(m["cmd"], "save_error")
-        self.assertIn("no longer on the plate", m["message"])
-        self.assertEqual(self.handed, [])
+    def deleted_original(self):
+        """The user deleted the object the split came from in OrcaSlicer (Delete key) before sending."""
+        import orca
+        bolt = self.objs.pop(1)
+        orca.host.model()._objs[:] = self.objs
+        orca._state["project"] = orca_project([("cube", 0, (50, 50))])
+        return bolt
+
+    def test_every_send_works_after_the_original_was_deleted(self):
+        # the split goes where it was on the plate; nothing else is removed except what the mode clears
+        want = {"add": ["cube", "bolt"], "replace_object": ["cube", "bolt"], "replace_plate": ["bolt"]}
+        for mode, names in want.items():
+            with self.subTest(mode=mode):
+                self.setUp()
+                bolt = self.deleted_original()
+                m = self.send(mode, bolt)
+                self.assertEqual(m["cmd"], "saved", m)
+                objs = read_3mf(Path(self.handed[-1][0]).read_bytes())[0]
+                self.assertEqual([o[0] for o in objs], names)
+                self.assertEqual(objs[-1][2], [(105.0, 105.0)])  # where it was split
+                self.assertEqual(m["source"], {"index": len(names) - 1, "name": "bolt"})  # the next send finds it
+        self.setUp()
+        m = self.send("fill_plate", self.deleted_original())
+        self.assertEqual(m["cmd"], "saved", m)
+        objs = read_3mf(Path(self.handed[-1][0]).read_bytes())[0]
+        self.assertEqual({o[0] for o in objs}, {"bolt"})  # the plate is cleared and filled
+        self.assertGreater(len(objs), 1)
+
+    def test_send_after_deleting_the_split_that_was_sent(self):
+        # Replace plate, then delete what was sent in OrcaSlicer, then Replace plate again: the page's source now
+        # names the sent split, which is gone
+        import orca
+        m = self.send("replace_plate", self.objs[1])
+        orca.host.model()._objs[:] = []
+        orca._state["project"] = orca_project([])
+        data = base64.b64encode(Project3mfTests.SPLIT).decode()
+        self.b.handle({"cmd": "save", "id": 2, "name": "bolt_parts.3mf", "part": 0, "of": 1, "data": data,
+                       "mode": "replace_plate", "source": {"id": None, **m["source"]}})
+        self.assertEqual(self.sent[-1]["cmd"], "saved", self.sent[-1])
+        self.assertEqual([o[0] for o in read_3mf(Path(self.handed[-1][0]).read_bytes())[0]], ["bolt"])
+
+    def test_plate_under_a_point(self):
+        import project3mf
+        proj = project3mf.Project(orca_project([("cube", 0, (50, 50)), ("bolt", 1, (50, 50))], plates=2))
+        x0, y0 = proj.plate_origin(1)
+        self.assertEqual(proj.plate_at((x0 + 100, y0 + 100)), 1)
+        self.assertEqual(proj.plate_at((100, 100)), 0)
+        self.assertEqual(proj.plate_at((-5000, -5000)), 0)  # off every plate: the first
 
     def test_without_handoff_the_project_is_saved(self):
         self.p.handoff.supported = lambda: False
