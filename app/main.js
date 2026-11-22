@@ -1353,12 +1353,17 @@ function nearestFace(i, w) {
 
 function filColor(n) { return orcaFil?.[n - 1] || S.parts.find((q) => q.filament === n)?.color || "#666"; }
 let orcaFil = null; // OrcaSlicer's filament colors by slot (plugin), used by the filament view
+// One part prints on the source object's filament (OrcaSlicer), else a plain light gray.
+const oneColor = () => orcaFil?.[(S.source?.orca?.filaments?.[0] || 1) - 1] || "#d9d9d9";
 let byFilament = false; try { byFilament = localStorage.getItem("meshsplit:byFil") === "1"; } catch {}
 // Display color of part i: its own color, or (filament view) the color of the first part on the same slot.
 function shownColor(i, plain) {
   const p = S.parts[i];
   let c = p.color;
-  if (byFilament && !plain) { const q = S.parts.find((q) => q.filament === p.filament); if (q) c = q.color; if (orcaFil?.[p.filament - 1]) c = orcaFil[p.filament - 1]; }
+  if (byFilament && !plain) {
+    if (S.printAs === "one") c = oneColor(); // One part prints on one filament, so it shows as one color
+    else { const q = S.parts.find((q) => q.filament === p.filament); if (q) c = q.color; if (orcaFil?.[p.filament - 1]) c = orcaFil[p.filament - 1]; }
+  }
   const col = new THREE.Color(c);
   if (!plain && i === S.active && i > 0) col.lerp(new THREE.Color(0xffffff), 0.45); // selected part reads lighter
   return col;
@@ -2253,7 +2258,7 @@ function showXfDims() {
   if (!S.G || !mesh || i <= 0) { info.hidden = true; return; }
   const b = partWorldBox(i), p = S.parts[i];
   const dims = isFinite(b[0]) ? `${(b[3]-b[0]).toFixed(1)} × ${(b[4]-b[1]).toFixed(1)} × ${(b[5]-b[2]).toFixed(1)} mm` : "no faces";
-  info.innerHTML = `Part name: ${esc(p.name)}<br>Size: ${dims}<br>Triangles: ${partCounts()[i].toLocaleString()} · Filament ${p.filament}`;
+  info.innerHTML = `Part name: ${esc(p.name)}<br>Size: ${dims}<br>Triangles: ${partCounts()[i].toLocaleString()}${S.printAs === "one" ? "" : ` · Filament ${p.filament}`}`;
   info.hidden = false;
 }
 $("xfPanel").addEventListener("focusin", () => { if (S.G) xfSnap = snapshot(); });
@@ -2961,7 +2966,9 @@ function setPrintAs(mode, save = true) {
   S.printAs = mode;
   document.body.classList.toggle("oneFil", mode === "one");
   for (const b of $("printAs").children) b.classList.toggle("on", b.dataset.mode === mode);
-  if (mode === "one" && byFilament) setColorMode(false);
+  if (S.G) refreshUI();
+  $("colorMode").title = `Filament colors (C): ${{ one: "the whole model in its one filament's color", paint: "each part in the color it's painted with", parts: "each part in its filament slot's color" }[mode]}`;
+  updateColors();
   if (!ORCA.on) $("expMain").lastChild.textContent = { one: "Export 3MF", paint: "Export painted 3MF", parts: "Export parts 3MF" }[mode];
   if (save) try { localStorage.setItem(`meshsplit:printAs:${S.name}`, mode); } catch {}
 }
@@ -3251,4 +3258,4 @@ if (ORCA.on) {
   });
   orcaSend({ cmd: "objects", auto: true });
 }
-window.app = { S, deleteGeometry, closeHoles, meshHoles, setAnchor, setGap, setTrim, trimResult, trimMeshes, setSlide, updateTrim, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, buildOne3MF, buildPainted3MF, setPrintAs, deleteGeometry, closeHoles, meshHoles, setAnchor, setGap, setTrim, trimResult, trimMeshes, setSlide, updateTrim, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };

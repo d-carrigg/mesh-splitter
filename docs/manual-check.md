@@ -49,7 +49,7 @@ A hands-on pass over every feature, run on request ("check the whole app") rathe
 |---|---|---|
 | 3.1 | Click a part in the view, then a row in the list. | Both select it: row highlighted, outline in the view, **Part** section shows Name, color, Filament slot. |
 | 3.2 | Rename: type in **Name**, Enter. Then double-click a row name, type, Enter; and right-click a row > **Rename**, Esc. | First two rename (list and Part section update); Esc cancels. |
-| 3.3 | Change the color swatch and the Filament slot. | Part color changes in view and list; the slot number on the row changes. **Filament colors** (C) shows parts on the same slot in one color; C again goes back. |
+| 3.3 | Set **Print as** to **Parts**. Change the color swatch and the Filament slot. | Part color changes in view and list; the slot number on the row changes. **Filament colors** (C) shows parts on the same slot in one color; C again goes back. |
 | 3.4 | Eye on a row; eye at the top of the list. | Row eye hides/shows that part; top eye shows all. |
 | 3.5 | **Solo** in the Part section, then **Solo** again (or right-click > **Show only this** / **Show all again**). | Only that part shows; then all come back as before. |
 | 3.6 | Select a part, Shift+click two more (view or list). **Merge** appears; click it. | The three become one with the first part's name, color and slot. |
@@ -57,6 +57,14 @@ A hands-on pass over every feature, run on request ("check the whole app") rathe
 | 3.8 | Select a part, press Del (or **Delete**). | Its faces join the neighboring part; part count drops by one. |
 | 3.9 | Right-click a part > **Replace with…**, pick `top_hat.stl` (on the head). | The part is swapped for the hat, lined up on the old joint, keeping name and slot. Part section shows Flip, Roll 90°, Pick joint, in place, fit, embed. Each changes the placement. The trash next to **Replace…** brings the old part back. 📷 |
 | 3.10 | Right-click a part row > **Zoom to part**. | View frames that part. |
+
+## 3b. Print as
+
+| # | Do | Expect |
+|---|---|---|
+| 3b.1 | Open `robot.stl` fresh. Look under the name. | **Print as** shows **One part / Painted / Parts**, on **One part**. Parts rows show no filament slots; the Part section has no Filament slot. Main button reads **Export 3MF**. 📷 |
+| 3b.2 | Press C (**Filament colors**) in each mode. | **One part:** the whole model in one color. **Painted** and **Parts:** each part in its filament slot's color. The button's tooltip says which. C again goes back to part colors. 📷 |
+| 3b.3 | Switch to **Parts**, reload the page and reopen `robot.stl`. | It comes back as **Parts** (remembered per model). A 3MF with several parts opens as **Parts**; a painted 3MF opens as **Painted**. |
 
 ## 4. Transform
 
@@ -103,7 +111,7 @@ A hands-on pass over every feature, run on request ("check the whole app") rathe
 
 | # | Do | Expect |
 |---|---|---|
-| 8.1 | **Export 3MF** (main button, or Ctrl+E). | Downloads `robot_parts.3mf`. Open it in OrcaSlicer: one object, one part per split part, names and filament slots kept, moved parts where you put them. |
+| 8.1 | For each **Print as**, click the main export button (or Ctrl+E). | **One part:** `Export 3MF` downloads `robot.3mf`, one object with one part. **Painted:** `Export painted 3MF` downloads one part painted per slot. **Parts:** `Export parts 3MF` downloads `robot_parts.3mf`: one object, one part per split part, names and filament slots kept, moved parts where you put them. Check each in OrcaSlicer. |
 | 8.2 | Export arrow > menu. | Menu draws on top of the Transform panel: Multi-part 3MF, Painted 3MF, Part STLs (.zip), Merged STL. 📷 |
 | 8.3 | Each format. | Painted 3MF: one mesh painted per slot. STLs zip: one closed STL per part. Merged STL: whole model as one STL with moved parts in place. |
 | 8.4 | **Open > Save session**, reload the page, open `robot.stl`, **Load session…**. | Split, names, slots and transforms come back. Also: `bear.stl` + `bear.split.json` loads the bear's finished split. |
@@ -123,8 +131,12 @@ A hands-on pass over every feature, run on request ("check the whole app") rathe
 |---|---|---|
 | 10.1 | Start OrcaSlicer with the plugin installed. | It loads with no error; the **Mesh Splitter** tab is there. |
 | 10.2 | Put one object on the plate, open the tab. | The page shows the plugin UI (no browser top bar); the single object opens by itself and is auto split. With several objects, they are listed under **From the plate** in the Open menu. 📷 compare with `orca-plate-menu.png` |
-| 10.3 | Main button reads **Send to Orca**. Click it. | Saves `<name>_parts.3mf` to Downloads; status shows the path. Ctrl+I in OrcaSlicer imports it as one object with a part per split part. 📷 compare with `orca-send.png` |
-| 10.4 | AI names in the plugin against the mock server. | OrcaSlicer asks to allow the address; after Yes, names come back. |
+| 10.3 | Print as **One part**. Turn a part on its joint with **Heal joint** on. Arrow next to **Send to Orca** > **Replace** *(name)*. | OrcaSlicer asks how to open the file: pick **Open as project**. The object is replaced in place: one object, one part, on the original's filament, with the turned part. No added filaments. 📷 |
+| 10.4 | Print as **Painted**, **Replace** again. | One object, one part, painted with the parts' colors. OrcaSlicer has the extra filaments it needs. 📷 |
+| 10.5 | Print as **Parts**, **Send to Orca** (Add to plate). | The original stays; the model is placed next to it with one part per split part, each on its own filament. 📷 |
+| 10.6 | **Replace plate**, then **Fill plate**. | Replace plate clears the plate and puts the model where the original was. Fill plate fills the plate with named copies, 6 mm apart, none on excluded areas. 📷 |
+| 10.7 | Arrow > **Multi-part 3MF to Downloads**. | Saves `<name>_parts.3mf`; Ctrl+I imports it as one object with a part per split part. |
+| 10.8 | AI names in the plugin against the mock server. | OrcaSlicer asks to allow the address; after Yes, names come back. |
 
 ## 11. Command line
 

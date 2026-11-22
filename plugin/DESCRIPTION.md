@@ -1,6 +1,6 @@
 ![Splitting a curling-stone figure, picking the eyes as a part, and replacing them with a flipped version](https://raw.githubusercontent.com/d-carrigg/mesh-splitter/main/docs/demo.gif)
 
-Split one solid mesh into separate, color-coded parts for multi-color or multi-piece printing, right inside OrcaSlicer. Scale, rotate, or completely replace sections of the mesh for easy customization of single or multi-material prints. If you have ever been asked to print a part and customize "just this one thing," you may like this plugin.
+Split one solid mesh into separate, color-coded parts to edit it, color it, or print it in several filaments, right inside OrcaSlicer. Scale, rotate, or completely replace sections of the mesh for easy customization of single or multi-material prints. If you have ever been asked to print a part and customize "just this one thing," you may like this plugin.
 
 **Docs:** [Splitting](https://d-carrigg.github.io/mesh-splitter/features/splitting/) · [Editing parts](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/) · [Move, rotate, scale and heal](https://d-carrigg.github.io/mesh-splitter/features/transforms/) · [Exporting](https://d-carrigg.github.io/mesh-splitter/features/exporting/) · [How it works](https://d-carrigg.github.io/mesh-splitter/how-it-works/)
 

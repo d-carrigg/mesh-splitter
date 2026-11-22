@@ -1,6 +1,6 @@
 # Mesh Splitter
 
-Split one solid mesh into separate, color-coded parts for multi-color or multi-piece printing, right inside OrcaSlicer. Scale, rotate, or completely replace sections of the mesh for easy customization of single or multi-material prints. If you have ever been asked to print a part and customize "just this one thing," you may like this plugin.
+Split one solid mesh into separate, color-coded parts to edit it, color it, or print it in several filaments, right inside OrcaSlicer. Scale, rotate, or completely replace sections of the mesh for easy customization of single or multi-material prints. If you have ever been asked to print a part and customize "just this one thing," you may like this plugin.
 
 For the example photo, I made the eyes 1 part, then replaced them with a flipped version to change where the figure looked. It also runs in **any browser**.
 
@@ -11,7 +11,7 @@ For the example photo, I made the eyes 1 part, then replaced them with a flipped
 Every feature is documented with pictures on the [docs site](https://d-carrigg.github.io/mesh-splitter/).
 
 - **Split in a few clicks:** [auto split](https://d-carrigg.github.io/mesh-splitter/features/splitting/#auto-split), [split by shells](https://d-carrigg.github.io/mesh-splitter/features/splitting/#split-by-shells), or [click a seed per part](https://d-carrigg.github.io/mesh-splitter/features/splitting/#seeds-and-add-part). Cuts follow the model's creases.
-- **One color per part:** each part gets its own filament slot. [Rename](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#rename), hide, or [show only one part](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#show-only-this-part). Fix parts by hand with [fill, brush and merge](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#fill).
+- **One color per part:** each part gets its own color, and its own filament slot when you print in several filaments. [Rename](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#rename), hide, or [show only one part](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#show-only-this-part). Fix parts by hand with [fill, brush and merge](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#fill).
 - **[Move, rotate, scale](https://d-carrigg.github.io/mesh-splitter/features/transforms/#move-rotate-scale-and-undo):** drag handles in the view (W / E / R, Shift to snap), with undo.
 - **[Rotate on joint](https://d-carrigg.github.io/mesh-splitter/features/transforms/#rotate-on-joint):** spin a part about its cut's axis (J), so a part on an angled surface stays seated on it.
 - **[Heal joint](https://d-carrigg.github.io/mesh-splitter/features/transforms/#heal-joint):** after moving or rotating a part, stretch or squeeze it near its cut so the cut's edge lands back on its neighbor (no gap).
@@ -73,7 +73,7 @@ Then ask, for example, "split figure.stl into head, body and base and give me a 
 | W / E / R / Q | Move / rotate / scale handles, then hide them |
 | J | Rotate on joint: one ring about the part's cut axis, pivoting at the cut's center |
 | Shift (while dragging) | Snap to 1 mm, 15° or 5% |
-| C | Toggle part colors / filament colors |
+| C | Toggle part colors / filament colors (follows Print as) |
 | Home | Frame the model |
 | Del | Delete the part (its faces join the neighbor) |
 | Shift+Del | Delete the part's geometry from the model and close the holes it leaves |
