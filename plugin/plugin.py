@@ -16,7 +16,8 @@ this file. Install the wheel from Plugins > Install local plugin, then tick Acti
 
   page --orca.postMessage({cmd: 'objects'})--------------> plugin: list plate objects
   page --orca.postMessage({cmd: 'mesh', index})----------> plugin: world-space mesh, base64 chunks
-  page --orca.postMessage({cmd: 'save', id, name, ...})--> plugin: write the file to Downloads, or with a `mode`
+  page --orca.postMessage({cmd: 'save', id, name, ...})--> plugin: ask where to save it (Windows' Save As dialog;
+                                                           Downloads elsewhere) and write it, or with a `mode`
                                                            hand the split to OrcaSlicer (send_to_orca below)
   page --orca.postMessage({cmd: 'llm_*', ...})-----------> plugin: AI part naming settings / one request, only when
                                                            the user clicks (llm_providers below)
@@ -51,6 +52,7 @@ except Exception:  # numpy is declared above; uv installs it when the plugin loa
 
 import handoff  # noqa: E402
 import project3mf  # noqa: E402
+import savedialog  # noqa: E402
 from llm_providers import abort as llm_abort, call as llm_call, check as llm_check, resolve as llm_resolve, status as llm_status, update as llm_update  # noqa: E402  __LLM_PROVIDERS__
 
 CHUNK = 512 * 1024
@@ -132,8 +134,28 @@ def permission_text(e):
     return f"Mesh Splitter: {e}"
 
 
+def last_save_dir():
+    """The folder the user last saved an export to (remembered in the plugin's storage), or None."""
+    try:
+        with open(os.path.join(storage_dir(), "last_save_dir.txt"), encoding="utf-8") as f:
+            d = f.read().strip()
+        return d if os.path.isdir(d) else None
+    except OSError:
+        return None
+
+
+def remember_save_dir(folder):
+    try:
+        os.makedirs(storage_dir(), exist_ok=True)
+        with open(os.path.join(storage_dir(), "last_save_dir.txt"), "w", encoding="utf-8") as f:
+            f.write(folder)
+    except OSError:
+        pass
+
+
 def downloads_dir():
-    return os.path.join(os.path.expanduser("~"), "Downloads")
+    """The user's Downloads folder (where Windows says it is, since it can be moved), else ~/Downloads."""
+    return savedialog.downloads_folder() or os.path.join(os.path.expanduser("~"), "Downloads")
 
 
 def output_dir():
@@ -263,12 +285,21 @@ def write_new(folder, name, data):
 
 
 def object_index(model, src):
-    """Where the object the split came from is in the plate's object list now (it may have moved since)."""
+    """Where the object the split came from is in the plate's object list now (it may have moved since). OrcaSlicer
+    gives every object a new id when it opens a project, as it does after each Send to Orca, so when the id is gone
+    the object is found by name: at the index the page last knew, else the only object with that name."""
     objs = model.objects()
     for i, o in enumerate(objs):
         if src.get("id") is not None and int(o.id()) == int(src["id"]):
             return i, o.name
-    raise ValueError(f"'{src.get('name') or 'The original object'}' is no longer on the plate; open it from the plate again")
+    name, i = src.get("name"), src.get("index")
+    if name:
+        if isinstance(i, int) and 0 <= i < len(objs) and objs[i].name == name:
+            return i, name
+        hits = [j for j, o in enumerate(objs) if o.name == name]
+        if len(hits) == 1:
+            return hits[0], name
+    raise ValueError(f"'{name or 'The original object'}' is no longer on the plate; open it from the plate again")
 
 
 def send_to_orca(data, msg):
@@ -291,7 +322,9 @@ def send_to_orca(data, msg):
     index, src_name = object_index(orca.host.model(), src) if src else (None, None)
     plater = orca.host.plater()
     stem = os.path.splitext(os.path.basename(plater.project_path() or ""))[0] or "Untitled"
-    tmp = unique_path(folder, ".mesh-splitter-project.3mf")
+    stem = re.sub(r"( - Mesh Splitter)+( \(\d+\))?$", "", stem) or "Untitled"  # sent before: don't grow the name
+    # The copy goes in the plugin's own folder, where OrcaSlicer lets the plugin read and delete without asking.
+    tmp = unique_path(storage_dir(), ".mesh-splitter-project.3mf")
     try:
         plater.export_3mf_copy(tmp)
         with open(tmp, "rb") as f:
@@ -303,6 +336,8 @@ def send_to_orca(data, msg):
     edited, info = project3mf.apply(project, data, mode, index, name=name, object_name=src_name, colors=colors,
                                     single=bool(msg.get("single")))
     path = write_new(folder, f"{safe_name(stem)} - Mesh Splitter.3mf", edited)
+    # Where the model will be once OrcaSlicer opens the project (new ids then): the page's next send finds it there
+    info["source"] = info.pop("source_at", None)
     if not handoff.supported():
         note = (f"Saved {os.path.basename(path)} to {folder}. Sending to OrcaSlicer isn't available on this system: "
                 "open it with File > Open Project.")
@@ -438,10 +473,18 @@ class Bridge:
         if msg.get("mode"):
             self.send({"cmd": "saved", "id": sid, **send_to_orca(data, msg)})
             return
-        path = unique_path(output_dir(), safe_name(msg.get("name")))
+        name = safe_name(msg.get("name"))
+        if savedialog.supported():
+            path = savedialog.ask(name, last_save_dir() or output_dir(), handoff.main_window())
+            if not path:
+                self.send({"cmd": "saved", "id": sid, "cancelled": True})
+                return
+        else:  # no system dialog here: Downloads, never overwriting an earlier export
+            path = unique_path(output_dir(), name)
         with open(path, "wb") as f:
             f.write(data)
-        self.send({"cmd": "saved", "id": sid, "path": path})
+        remember_save_dir(os.path.dirname(path))
+        self.send({"cmd": "saved", "id": sid, "path": path, "folder": os.path.dirname(path)})
         if path.lower().endswith(".3mf"):
             notify(f"Mesh Splitter saved {os.path.basename(path)} to {os.path.dirname(path)}. Press Ctrl+I to import it.")
 

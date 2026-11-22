@@ -2,8 +2,8 @@
 
     cd plugin && npm ci && python build.py      ->  dist/mesh_splitter_any.whl
 
-The wheel holds the package mesh_splitter_any/ (__init__.py = plugin.py with llm_providers inlined, handoff.py and
-project3mf.py for Send to Orca, page.html = the bundled page) and its .dist-info. Everything is plain text, so a reviewer can read it as shipped. OrcaSlicer
+The wheel holds the package mesh_splitter_any/ (__init__.py = plugin.py with llm_providers inlined, handoff.py,
+project3mf.py and savedialog.py for Send to Orca and file exports, page.html = the bundled page) and its .dist-info. Everything is plain text, so a reviewer can read it as shipped. OrcaSlicer
 installs .whl plugins (Plugins > Install local plugin) and imports the package named in top_level.txt.
 The file name has no version so the local plugin key, and with it the plugin's saved settings, stay the same
 across updates.
@@ -99,7 +99,7 @@ def project_version():
 
 
 PACKAGE = "mesh_splitter_any"
-SUBMODULES = ["handoff", "project3mf"]  # plugin/<name>.py, shipped next to __init__.py
+SUBMODULES = ["handoff", "project3mf", "savedialog"]  # plugin/<name>.py, shipped next to __init__.py
 SUBMODULE_RE = re.compile(rf"^import ({'|'.join(SUBMODULES)})  # noqa: E402$", re.M)
 HEADER_RE = re.compile(r"\A# /// script\n(.*?)^# ///\n", re.S | re.M)
 

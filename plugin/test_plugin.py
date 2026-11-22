@@ -150,6 +150,28 @@ class BridgeTests(unittest.TestCase):
         import orca
         self.assertIn("x_parts (2).3mf", orca._state["notifications"][-1])
 
+    def test_save_asks_where_with_the_system_dialog(self):
+        asked = []
+        chosen = os.path.join(self.tmp.name, "picked", "mine.stl")
+        os.makedirs(os.path.dirname(chosen))
+        self.p._storage[:] = [self.tmp.name]
+        for mod, attr, val in ((self.p.savedialog, "supported", lambda: True), (self.p.handoff, "main_window", lambda: None),
+                               (self.p.savedialog, "ask", lambda name, folder, owner: asked.append((name, folder)) or chosen)):
+            patcher = mock.patch.object(mod, attr, val)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.b.handle({"cmd": "save", "id": 5, "name": "x_merged.stl", "part": 0, "of": 1, "data": "AAAA"})
+        self.assertEqual(asked, [("x_merged.stl", self.tmp.name)])
+        self.assertEqual(self.sent[-1], {"cmd": "saved", "id": 5, "path": chosen, "folder": os.path.dirname(chosen)})
+        self.assertTrue(os.path.exists(chosen))
+        self.p.savedialog.ask = lambda name, folder, owner: asked.append((name, folder)) and None  # undone by the patcher
+        self.b.handle({"cmd": "save", "id": 6, "name": "x_merged.stl", "part": 0, "of": 1, "data": "AAAA"})
+        self.assertEqual(asked[-1][1], os.path.dirname(chosen))  # starts where the last save went
+        self.assertEqual(self.sent[-1], {"cmd": "saved", "id": 6, "cancelled": True})
+
+    def test_save_dialog_filter(self):
+        self.assertEqual(self.p.savedialog.filter_string("a.stl"), "STL file (*.stl)\0*.stl\0All files (*.*)\0*.*\0")
+
     def test_save_error_reported(self):
         self.p.output_dir = lambda: os.path.join(self.tmp.name, "missing")
         self.b.handle({"cmd": "save", "id": 1, "name": "a.3mf", "part": 0, "of": 1, "data": "AAAA"})
@@ -286,7 +308,7 @@ class BuildTests(unittest.TestCase):
             info = "mesh_splitter_any-9.9.9.dist-info/"
             self.assertEqual(sorted(z.namelist()), sorted([
                 "mesh_splitter_any/__init__.py", "mesh_splitter_any/page.html",
-                "mesh_splitter_any/handoff.py", "mesh_splitter_any/project3mf.py",
+                "mesh_splitter_any/handoff.py", "mesh_splitter_any/project3mf.py", "mesh_splitter_any/savedialog.py",
                 info + "METADATA", info + "WHEEL", info + "top_level.txt", info + "RECORD", info + "LICENSE"]))
             meta = z.read(info + "METADATA").decode()
             for line in ("Name: Mesh Splitter", "Version: 9.9.9", "Author: d-carrigg", "License: MIT", "Requires-Dist: numpy"):
@@ -423,7 +445,8 @@ class Project3mfTests(unittest.TestCase):
         self.assertNotIn('value="4"', cfg)
         self.assertLess(cfg.rindex("<object"), cfg.index("<plate"))  # OrcaSlicer reads objects before plates
         self.assertEqual(cfg.count('key="object_id"'), 2)  # both on plate 1
-        self.assertEqual(info, {"removed": 1, "copies": 1, "plate": 1, "parts": 2, "filaments_added": 4})
+        self.assertEqual(info, {"removed": 1, "copies": 1, "plate": 1, "parts": 2, "filaments_added": 4,
+                                "source_at": {"index": 1, "name": "bolt split"}})  # where OrcaSlicer will list it
 
     def test_single_part_goes_on_the_originals_filament(self):
         one = split_3mf([("bolt", 3, (100, 100, 0))])  # the page's one-part export (slot from the page is ignored)
@@ -534,6 +557,9 @@ class SendToOrcaTests(unittest.TestCase):
         self.objs = [fake_orca.FakeObject("cube", []), fake_orca.FakeObject("bolt", [])]
         self.p = load_plugin(self.objs)
         self.p.output_dir = lambda: self.tmp.name
+        self.store = tempfile.TemporaryDirectory()
+        self.addCleanup(self.store.cleanup)
+        self.p._storage[:] = [self.store.name]  # the project copy is made in the plugin's own folder
         import orca
         orca._state["project"] = orca_project([("cube", 0, (50, 50)), ("bolt", 0, (150, 50))])
         orca._state["project_path"] = "/home/d/prints/desk toy.3mf"
@@ -557,6 +583,27 @@ class SendToOrcaTests(unittest.TestCase):
         self.assertEqual((m["cmd"], m["ask"], m["path"]), ("saved", "Open as project", path))
         self.assertIn("Open as project", m["note"])
         self.assertEqual(os.listdir(self.tmp.name).count(".mesh-splitter-project.3mf"), 0)  # the copy is cleaned up
+        self.assertEqual(os.listdir(self.store.name), [])
+
+    def test_next_send_finds_the_model_after_orca_reopens_the_project(self):
+        import orca
+        m = self.send("replace_plate", self.objs[1])
+        self.assertEqual(m["source"], {"index": 0, "name": "bolt"})  # plate cleared, the split is the only object
+        # OrcaSlicer opens the sent project: every object gets a new id
+        orca.host.model()._objs[:] = [fake_orca.FakeObject("bolt", [])]
+        orca._state["project"] = Path(self.handed[0][0]).read_bytes()
+        orca._state["project_path"] = self.handed[0][0]
+        data = base64.b64encode(Project3mfTests.SPLIT).decode()
+        self.b.handle({"cmd": "save", "id": 2, "name": "bolt_parts.3mf", "part": 0, "of": 1, "data": data,
+                       "mode": "replace_plate", "source": {"id": None, **m["source"]}})
+        m2 = self.sent[-1]
+        self.assertEqual(m2["cmd"], "saved", m2)
+        self.assertEqual(os.path.basename(m2["path"]), "desk toy - Mesh Splitter (2).3mf")  # the name doesn't grow
+        # also when the page still has the stale id
+        self.b.handle({"cmd": "save", "id": 3, "name": "bolt_parts.3mf", "part": 0, "of": 1, "data": data,
+                       "mode": "add", "source": {"id": 424242, "index": 0, "name": "bolt"}})
+        self.assertEqual(self.sent[-1]["cmd"], "saved", self.sent[-1])
+        self.assertEqual(self.sent[-1]["source"], {"index": 0, "name": "bolt"})  # after an add: still the original
 
     def test_add_without_a_source(self):
         m = self.send("add")

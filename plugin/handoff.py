@@ -46,7 +46,9 @@ def send(paths):
     raise RuntimeError("Sending to the plate is not available on this system")
 
 
-def _send_windows(paths):
+def main_window():
+    """OrcaSlicer's main window in this process (Windows): class wxWindowNR with the Instance_Hash_Minor property,
+    or None."""
     import ctypes
     from ctypes import wintypes
     user32, kernel32 = ctypes.windll.user32, ctypes.windll.kernel32
@@ -68,7 +70,15 @@ def _send_windows(paths):
             return False
         return True
     user32.EnumWindows(enum_proc(visit), 0)
-    if not found:
+    return found[0] if found else None
+
+
+def _send_windows(paths):
+    import ctypes
+    from ctypes import wintypes
+    user32 = ctypes.windll.user32
+    hwnd = main_window()
+    if not hwnd:
         raise RuntimeError("OrcaSlicer's main window was not found")
 
     class COPYDATASTRUCT(ctypes.Structure):
@@ -78,7 +88,7 @@ def _send_windows(paths):
     user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, ctypes.c_void_p]
     # PostMessage can't carry WM_COPYDATA; SendMessage from the UI thread to its own window runs the handler
     # right away, and OrcaSlicer only queues the load there (wxPostEvent), so this returns at once.
-    user32.SendMessageW(found[0], 0x004A, 0, ctypes.byref(data))
+    user32.SendMessageW(hwnd, 0x004A, 0, ctypes.byref(data))
 
 
 def _send_dbus(paths):

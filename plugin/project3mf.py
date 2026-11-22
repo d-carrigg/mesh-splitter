@@ -442,6 +442,14 @@ def apply(project_data, split_data, mode, index=None, name=None, object_name=Non
         proj.remove_object(oid)
     used = [p[1] for p in parts] + [paint_state(t[3]) for p in parts for t in p[3] if len(t) > 3]
     added = proj.ensure_filaments(max(used), colors or {})
+    first = len(proj.object_ids())
     proj.add_object(parts, name or object_name or "Split", positions, plate)
+    # Where the model the page works on is once OrcaSlicer opens this project: the original after an add from the
+    # plate, otherwise the split (its first copy). OrcaSlicer lists objects in build order.
+    ids = proj.object_ids()
+    if mode == "add" and index is not None:
+        at = {"index": ids.index(src), "name": object_name}
+    else:
+        at = {"index": first, "name": name or object_name or "Split"}
     return proj.save(), {"removed": len(gone), "copies": len(positions), "plate": plate + 1, "parts": len(parts),
-                         "filaments_added": added}
+                         "filaments_added": added, "source_at": at}

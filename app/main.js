@@ -2930,12 +2930,14 @@ $("aiBtn").onclick = runNaming;
 $("aiChk").onclick = () => { if (S.G) { showAi(true, false); runChecks(); } }; // local checks need no AI model
 
 // ---------------------------------------------------------------- export
-function download(name, data, type = "application/octet-stream") {
-  if (ORCA.on) return ORCA.save(name, data);
+// note: a warning to show once the file is saved
+function download(name, data, type = "application/octet-stream", note = "") {
+  if (ORCA.on) return ORCA.save(name, data, null, note);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([data], { type }));
   a.download = name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  if (note) alert(note);
 }
 function exportPainted3MF() {
   if (!S.G) return;
@@ -3066,11 +3068,12 @@ function buildParts3MF() {
 function exportParts3MF() {
   if (!S.G) return;
   const { out, parts } = buildParts3MF();
-  download(`${S.name}_parts.3mf`, out, "model/3mf");
-  const fils = [...new Set(parts.map((p) => p.filament))].sort((a, b) => a - b);
-  status(`Multi-part 3MF written: ${parts.length} part(s), filament slot(s) ${fils.join(", ")}.`);
-  if (orcaFil?.length && fils[fils.length - 1] > orcaFil.length)
-    alert(`Parts use filament slot ${fils[fils.length - 1]}, but OrcaSlicer has ${orcaFil.length} filaments. Add filaments in Orca or change the parts' F numbers.`);
+  const fils = [...new Set(parts.map((p) => p.filament))].sort((a, b) => a - b), top = fils[fils.length - 1];
+  // Importing a file doesn't add filaments to the project (Send to Orca does): say so with the saved message
+  const note = orcaFil?.length && top > orcaFil.length ? `Its parts use filament slots up to ${top}, and this project has ${orcaFil.length} filaments. ` +
+    "Importing the file doesn't add filaments: add them in OrcaSlicer, change the parts' F numbers, or use Send to Orca, which adds them." : "";
+  download(`${S.name}_parts.3mf`, out, "model/3mf", note);
+  if (!ORCA.on) status(`Multi-part 3MF written: ${parts.length} part(s), filament slot(s) ${fils.join(", ")}.`);
 }
 
 function exportSTLs() {
@@ -3153,7 +3156,7 @@ function orcaSend(msg) { window.orca.postMessage(msg); }
 function u8ToB64(b) { let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }
 // send: { mode, source, colors } asks the plugin to put the 3MF into the open project and hand that to OrcaSlicer
 // (see ORCA.send) instead of only saving it.
-ORCA.save = (name, data, send = null) => {
+ORCA.save = (name, data, send = null, note = "") => {
   const b = typeof data === "string" ? new TextEncoder().encode(data) : data instanceof Uint8Array ? data : new Uint8Array(data);
   const t = u8ToB64(b), id = `${ORCA.nonce}-${++ORCA.seq}`, n = Math.max(1, Math.ceil(t.length / CHUNK));
   return new Promise((res, rej) => {
@@ -3161,8 +3164,13 @@ ORCA.save = (name, data, send = null) => {
     for (let i = 0; i < n; i++) orcaSend({ cmd: "save", id, name, part: i, of: n, data: t.slice(i * CHUNK, (i + 1) * CHUNK), ...(send || {}) });
     status(send ? "Sending to OrcaSlicer…" : `Saving ${name}…`);
   }).then((m) => {
-    if (m.note) { status(m.note); toast(m.note, !m.warn); }
-    else status(`Saved ${m.path} · import it in OrcaSlicer with Ctrl+I`);
+    if (m.cancelled) { status("Save canceled"); return null; }
+    // after Send to Orca, OrcaSlicer opens the project with new object ids: the plugin says where the model is now
+    if (send && m.source && S.source?.orca) { S.source.orca = { ...S.source.orca, ...m.source, id: null }; ORCA.cur = { ...S.source.orca }; }
+    if (m.note) { status(m.note); toast(m.note, !m.warn); return m.path; }
+    const base = String(m.path).split(/[\\/]/).pop(), where = m.folder || String(m.path).slice(0, -base.length - 1);
+    const msg = `Saved ${base} to ${where}.` + (/\.3mf$/i.test(base) ? " Import it in OrcaSlicer with Ctrl+I." : "");
+    status(msg); toast(note ? `${msg} ${note}` : msg, !note);
     return m.path;
   }).catch((e) => { status(`Save failed: ${e.message}`); alert(`Save failed: ${e.message}`); });
 };
