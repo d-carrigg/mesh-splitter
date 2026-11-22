@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.3.20](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.19...v0.3.20) (2026-11-22)
+
+
+### Features
+
+* build as "Mesh Splitter (unofficial copy)" unless the repo sets MESH_SPLITTER_NAME=meshsplitter ([#101](https://github.com/d-carrigg/mesh-splitter/issues/101)) ([5997dce](https://github.com/d-carrigg/mesh-splitter/commit/5997dce4fad13a25f22228240c2bcf9019071c29))
+* mark the official build (watermarked icon, in-app credit, official-release line, MIT license in the plugin) ([#99](https://github.com/d-carrigg/mesh-splitter/issues/99)) ([bbcc6ed](https://github.com/d-carrigg/mesh-splitter/commit/bbcc6edb626f2d5c4cd40a450694db252b45157d))
+* offer to load the new model when OrcaSlicer opens another project ([#100](https://github.com/d-carrigg/mesh-splitter/issues/100)) ([9d5643e](https://github.com/d-carrigg/mesh-splitter/commit/9d5643eec1438c04cb3112653a297f21b73552c0))
+* Print as (one part, painted, parts) and Send to Orca: add, replace object/plate, fill plate ([#95](https://github.com/d-carrigg/mesh-splitter/issues/95)) ([4e51db3](https://github.com/d-carrigg/mesh-splitter/commit/4e51db302041fa1f9b22baa725df580b05666fed))
+* sign the plugin icon with DCARRIGG built into the print plate ([#103](https://github.com/d-carrigg/mesh-splitter/issues/103)) ([127fe70](https://github.com/d-carrigg/mesh-splitter/commit/127fe70f1fba9c61d20c2acf073f0d44f3ff7a7b))
+
+
+### Bug Fixes
+
+* escape part colors in HTML and quiet CDN check alert ([#98](https://github.com/d-carrigg/mesh-splitter/issues/98)) ([ba4077e](https://github.com/d-carrigg/mesh-splitter/commit/ba4077e0d95a2a4c494d81a61f71c7c811b93e7e))
+* grant Send to Orca's dbus-send permission in the real OrcaSlicer release check ([#97](https://github.com/d-carrigg/mesh-splitter/issues/97)) ([fa88e15](https://github.com/d-carrigg/mesh-splitter/commit/fa88e158c76ef62ffffc409ded03cdcc872ac3ae))
+* Orca plugin exports: Save As dialog on Windows, one Send to Orca button that works after reloads and deletes ([#102](https://github.com/d-carrigg/mesh-splitter/issues/102)) ([3717eb2](https://github.com/d-carrigg/mesh-splitter/commit/3717eb26ef08023d42885eb080958c49743cffe2))
+
 ## [0.3.19](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.18...v0.3.19) (2026-11-22)
 
 
