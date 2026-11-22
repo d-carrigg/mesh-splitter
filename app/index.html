@@ -23,7 +23,8 @@
         <button id="loadSess" class="needMesh" data-icon="load" title="Load a saved .json session for this mesh">Load session…</button>
       </div></span>
   </div>
-  <div class="sc"><div id="fileName">Open a model</div><div id="fileInfo"></div></div>
+  <div class="sc"><div id="fileName">Open a model</div><div id="fileInfo"></div>
+    <div class="row needMesh" style="margin:0"><span class="lbl" style="flex:1">Print as</span><span class="seg" id="printAs"><button data-mode="one" title="One part on one filament: edit the model and print it. Part colors only tell the parts apart">One part</button><button data-mode="paint" title="One part, painted: each part's faces are painted with its filament (OrcaSlicer color painting)">Painted</button><button data-mode="parts" title="Separate parts: each part is its own part on its own filament (multi-material)">Parts</button></span></div></div>
   <div class="sh"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>Parts<span class="spacer"></span>
     <button id="mergeBtn" data-icon="merge" title="Merge the selected parts" hidden>Merge</button>
     <button id="showAll" data-icon="eye" title="Show all parts"></button>
@@ -41,7 +42,7 @@
     </div>
     <div class="sc">
       <div class="pr"><span class="lbl">Name</span><input id="pcColor" type="color" title="Display color"><input id="pcName" type="text"></div>
-      <div class="pr"><span class="lbl">Filament slot</span><input id="pcFil" type="number" min="1" max="32" title="Filament slot"></div>
+      <div class="pr filOnly"><span class="lbl">Filament slot</span><input id="pcFil" type="number" min="1" max="32" title="Filament slot"></div>
       <div class="row small" id="hitRow" style="color:#f0a030" title="This part now passes through another part it didn't touch before. Move, rotate or stretch one of them."></div>
       <div class="row small" id="followRow" title="Parts that move with this one keep their place relative to it (right-click a part > Move with…)"></div>
       <div class="pr"><span class="lbl">Replace with file</span><button id="repDel" data-icon="trash" title="Remove the replacement (old part comes back)"></button><button id="repBtn" data-icon="replace" title="Swap this part for another STL/3MF, lined up on the old part's joint">Replace…</button></div>
@@ -64,7 +65,7 @@
   <div id="drop">
     <div id="welcome">
       <h1>Welcome to Mesh Splitter</h1>
-      <p>Split one mesh into color-coded parts for multi-color or multi-piece printing.</p>
+      <p>Split one mesh into color-coded parts to edit it, color it, or print it in several filaments.</p>
     </div>
     <span>Drop an STL or 3MF here</span><div id="dropOrca"></div><button id="dropOpen" data-icon="open">Open…</button><div id="dropRecent"></div>
     <div id="welcomeFoot">
@@ -99,6 +100,12 @@
     <button id="redoBtn" disabled data-icon="redo" title="Redo (Ctrl+Y)"></button>
     <span class="menuWrap needMesh split"><button id="expMain" class="pri" data-icon="download" title="One object, each part a separate part with its filament slot set (opens as parts in OrcaSlicer / Bambu Studio)">Export 3MF</button><button id="expBtn" class="pri caret" title="More export formats"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="m6 9 6 6 6-6"/></svg></button>
       <div id="expMenu" class="menu" hidden>
+        <div class="orcaOnly mh" hidden>Send to OrcaSlicer</div>
+        <button id="sendAdd" class="orcaOnly" hidden data-icon="plus" title="Add the split to the plate as a new object, next to the original. OrcaSlicer asks how to open it: pick Open as project">Add to plate</button>
+        <button id="sendReplace" class="orcaOnly needSrc" hidden data-icon="replace" title="The split takes the original object's place on its plate. OrcaSlicer asks how to open it: pick Open as project">Replace object</button>
+        <button id="sendPlate" class="orcaOnly needSrc" hidden data-icon="replace" title="Clear the original's plate and put the split where the original was. OrcaSlicer asks how to open it: pick Open as project">Replace plate</button>
+        <button id="sendFill" class="orcaOnly needSrc" hidden data-icon="shells" title="Clear the original's plate and fill it with as many copies of the split as fit. OrcaSlicer asks how to open it: pick Open as project">Fill plate</button>
+        <div class="orcaOnly msep" hidden></div>
         <button id="expParts" data-icon="package" title="One object, each part a separate part with its filament slot set (opens as parts in OrcaSlicer / Bambu Studio)">Multi-part 3MF</button>
         <button id="exp3mf" data-icon="palette" title="Same mesh, each triangle painted with its part's filament slot (Bambu/Orca color painting)">Painted 3MF</button>
         <button id="expStl" data-icon="package" title="One closed STL per part, cut faces capped (.zip)">Part STLs (.zip)</button>

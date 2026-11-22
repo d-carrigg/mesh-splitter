@@ -2,7 +2,7 @@
 //   node e2e.mjs MESH.stl OUT_DIR [--shot shot.png]
 // Opens build/page.html (python build.py --page-out build/page.html), injects window.orca the way
 // OrcaSlicer's WebHosting.cpp does, pipes page <-> fake_host.py, waits for the plate object to load and
-// auto split, presses "Send to Orca", and prints the saved path.
+// auto split, sends it to Orca (Replace), saves the multi-part 3MF, and prints the saved path.
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
@@ -41,10 +41,11 @@ await page.addInitScript(() => {
     document.head.appendChild(st);
   });
 });
-let saved = null;
+let saved = null, handoff = null;
 createInterface({ input: host.stdout }).on("line", async (line) => {
   const msg = JSON.parse(line);
-  if (msg.cmd === "saved") saved = msg.path;
+  if (msg.cmd === "__handoff") { handoff = msg.files; return; }
+  if (msg.cmd === "saved") saved = msg;
   if (msg.cmd === "save_error" || msg.cmd === "error") errors.push(msg.message);
   await page.evaluate((m) => window.__orcaDispatch({ data: m }), msg).catch((e) => errors.push(e.message));
 });
@@ -232,11 +233,39 @@ else {
   console.log("ai naming:", names.join(", "));
 }
 mock.kill();
-await page.click("#expMain");
-const t0 = Date.now();
-while (!saved && !errors.length && Date.now() - t0 < 60000) await new Promise((r) => setTimeout(r, 100));
+// Send to Orca > Replace needs the model opened from the plate: the menu shows the object's name.
+if (await page.isVisible("#aiClose")) await page.click("#aiClose");
+await page.click("#expBtn");
+const menu = await page.evaluate(() => ({ replace: document.getElementById("sendReplace").textContent.trim(),
+  disabled: ["sendReplace", "sendPlate", "sendFill"].map((id) => document.getElementById(id).disabled) }));
+console.log("send menu:", JSON.stringify(menu));
+if (menu.replace !== `Replace ${info.name}` || menu.disabled.some(Boolean)) errors.push("send menu: " + JSON.stringify(menu));
+if (shot) { await page.waitForTimeout(400); await page.screenshot({ path: shot.replace(/\.png$/, "_send.png") }); }
+// Print as starts at One part for a plain one-part object: the edited model goes back as one part on the
+// original's filament, and the filament slots are hidden.
+const pa = await page.evaluate(() => ({ mode: app.S.printAs, filHidden: getComputedStyle(document.querySelector("#partsBody .fcol")).display === "none" }));
+console.log("print as:", JSON.stringify(pa));
+if (pa.mode !== "one" || !pa.filHidden) errors.push("Print as should start at One part with filament slots hidden: " + JSON.stringify(pa));
+await page.click("#sendReplace"); // Send to Orca > Replace <object>: the split goes into the project in its place
+const wait = async (ok) => { const t0 = Date.now(); while (!ok() && !errors.length && Date.now() - t0 < 60000) await new Promise((r) => setTimeout(r, 100)); };
+await wait(() => saved && handoff);
+const sent = saved; saved = null;
 console.log("status:", await page.textContent("#status"));
+if (!errors.length && !(sent?.ask === "Open as project" && handoff?.length === 1 && handoff[0] === sent.path && sent.removed === 1 && sent.parts === 1 && sent.filaments_added === 0))
+  errors.push("Send to Orca did not hand the project to OrcaSlicer: " + JSON.stringify({ sent, handoff }));
+// Painted: one part, painted with the parts' filaments; the slots it uses are added to the project
+handoff = null;
+await page.click('#printAs button[data-mode="paint"]');
+await page.click("#expBtn"); await page.click("#sendReplace");
+await wait(() => saved && handoff);
+const painted = saved; saved = null;
+console.log("painted:", JSON.stringify({ parts: painted?.parts, added: painted?.filaments_added }));
+if (!errors.length && !(painted?.parts === 1 && painted.filaments_added > 0)) errors.push("Painted send: " + JSON.stringify(painted));
+// The page's own multi-part 3MF still saves to Downloads (CI checks it with verify_3mf.py)
+await page.click("#expBtn"); await page.click("#expParts");
+await wait(() => saved);
 await browser.close();
 host.stdin.end();
 if (errors.length || !saved) { console.error("FAILED:", errors.join(" | ") || "nothing saved"); process.exit(1); }
-console.log("saved:", saved);
+console.log("sent:", sent.path);
+console.log("saved:", saved.path);

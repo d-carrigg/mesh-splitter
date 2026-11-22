@@ -102,8 +102,8 @@ class BridgeTests(unittest.TestCase):
         m = self.sent[-1]
         self.assertTrue(m["auto"])
         objs = [{k: v for k, v in o.items() if k != "id"} for o in m["objects"]]
-        self.assertEqual(objs, [{"index": 0, "name": "cube", "parts": 1, "faces": 4, "ignored": 0},
-                                {"index": 1, "name": "Object 2", "parts": 0, "faces": 0, "ignored": 0}])
+        self.assertEqual(objs, [{"index": 0, "name": "cube", "parts": 1, "faces": 4, "ignored": 0, "painted": False, "filaments": []},
+                                {"index": 1, "name": "Object 2", "parts": 0, "faces": 0, "ignored": 0, "painted": False, "filaments": []}])
         self.assertNotEqual(m["objects"][0]["id"], m["objects"][1]["id"])
         self.assertEqual(m["filament_colors"], ["#FF0000", "#00AE42"])
 
@@ -246,8 +246,11 @@ class RegistrationTests(unittest.TestCase):
         return orca._state["permissions"]
 
     def test_no_network_declared_until_ai_naming_is_set_up(self):
+        import handoff
         self.assertEqual(self.register({}), [{
-            "fs_readwrite": [os.path.join("C:", "Users", "d", "Downloads", "*")], "network": [], "threading": False}])
+            "fs_readwrite": [os.path.join("C:", "Users", "d", "Downloads", "*")], "process": handoff.PROCESSES,
+            "network": [], "threading": False}])
+        self.assertEqual(handoff.PROCESSES, ["dbus-send"] if sys.platform.startswith("linux") else [])
 
     def test_declares_only_the_saved_provider_host(self):
         perms = self.register({"provider": "openrouter", "providers": {"openrouter": {"api_key": "k"}}})
@@ -283,6 +286,7 @@ class BuildTests(unittest.TestCase):
             info = "mesh_splitter_any-9.9.9.dist-info/"
             self.assertEqual(sorted(z.namelist()), sorted([
                 "mesh_splitter_any/__init__.py", "mesh_splitter_any/page.html",
+                "mesh_splitter_any/handoff.py", "mesh_splitter_any/project3mf.py",
                 info + "METADATA", info + "WHEEL", info + "top_level.txt", info + "RECORD"]))
             meta = z.read(info + "METADATA").decode()
             for line in ("Name: Mesh Splitter", "Version: 9.9.9", "Author: d-carrigg", "Requires-Dist: numpy"):
@@ -290,12 +294,297 @@ class BuildTests(unittest.TestCase):
             self.assertIn("Tag: py3-none-any", z.read(info + "WHEEL").decode())
             z.extractall(d)
             fake_orca.install([])
-            spec = importlib.util.spec_from_file_location("built", Path(d) / "mesh_splitter_any" / "__init__.py")
-            mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+            sys.path.insert(0, d)  # OrcaSlicer imports the package by name (top_level.txt)
+            try:
+                for name in [n for n in sys.modules if n == "mesh_splitter_any" or n.startswith("mesh_splitter_any.")]:
+                    del sys.modules[name]
+                mod = importlib.import_module("mesh_splitter_any")
+            finally:
+                sys.path.remove(d)
+            self.assertTrue(mod.project3mf.__file__.startswith(d))
             html = mod.page_html()
             self.assertNotIn("cdn.jsdelivr.net", html)
             self.assertNotIn('type="importmap"', html)
             self.assertLess(len(html.encode()), 1_800_000)
+
+
+# ---------------------------------------------------------------- Send to Orca (handoff.py, project3mf.py)
+
+CUBE_V = [(0, 0, 0), (10, 0, 0), (10, 10, 0), (0, 10, 0), (0, 0, 10), (10, 0, 10), (10, 10, 10), (0, 10, 10)]
+CUBE_F = [(0, 2, 1), (0, 3, 2), (4, 5, 6), (4, 6, 7), (0, 1, 5), (0, 5, 4), (1, 2, 6), (1, 6, 5), (2, 3, 7), (2, 7, 6),
+          (3, 0, 4), (3, 4, 7)]
+
+
+def zip_bytes(files):
+    import io, zipfile
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as z:
+        for n, t in files.items():
+            z.writestr(n, t)
+    return out.getvalue()
+
+
+def split_3mf(parts, name="thing"):
+    """The page's multi-part 3MF (parts3MF in app/export.js): [(part name, filament, (dx, dy, dz))] of cubes."""
+    objs, comps, cfg = [], [], []
+    for k, (pname, fil, (dx, dy, dz)) in enumerate(parts):
+        v = "".join(f'<vertex x="{x + dx}" y="{y + dy}" z="{z + dz}"/>' for x, y, z in CUBE_V)
+        t = "".join(f'<triangle v1="{a}" v2="{b}" v3="{c}"/>' for a, b, c in CUBE_F)
+        objs.append(f'<object id="{k + 1}" type="model" name="{pname}"><mesh><vertices>{v}</vertices><triangles>{t}</triangles></mesh></object>')
+        comps.append(f'<component objectid="{k + 1}"/>')
+        cfg.append(f'<part id="{k + 1}" subtype="normal_part"><metadata key="name" value="{pname}"/><metadata key="extruder" value="{fil}"/></part>')
+    parent = len(parts) + 1
+    model = (f'<?xml version="1.0" encoding="UTF-8"?><model unit="millimeter" xmlns="{CORE}"><resources>{"".join(objs)}'
+             f'<object id="{parent}" type="model" name="{name}"><components>{"".join(comps)}</components></object></resources>'
+             f'<build><item objectid="{parent}"/></build></model>')
+    config = f'<?xml version="1.0" encoding="UTF-8"?><config><object id="{parent}"><metadata key="name" value="{name}"/>{"".join(cfg)}</object></config>'
+    return zip_bytes({"3D/3dmodel.model": model, "Metadata/model_settings.config": config})
+
+
+CORE = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"
+PROD = "http://schemas.microsoft.com/3dmanufacturing/production/2015/06"
+
+
+def orca_project(objects, plates=1, bed=256):
+    """An OrcaSlicer 2.5 project 3MF as export_3mf_copy writes it (layout copied from a real export): each object's
+    meshes in 3D/Objects/<name>_<id>.model, components + build items in 3D/3dmodel.model, names, filaments and
+    plate membership in Metadata/model_settings.config. objects: [(name, plate index, (x, y))]."""
+    files, comps, items, cfg, rels = {}, [], [], [], []
+    plate_items = {p: [] for p in range(plates)}
+    for k, (name, plate, (x, y)) in enumerate(objects):
+        mesh_id, oid = 2 * k + 1, 2 * k + 2
+        path = f"/3D/Objects/{name}_{oid}.model"
+        v = "".join(f'<vertex x="{a}" y="{b}" z="{c}"/>' for a, b, c in CUBE_V)
+        t = "".join(f'<triangle v1="{a}" v2="{b}" v3="{c}"/>' for a, b, c in CUBE_F)
+        files[path[1:]] = (f'<?xml version="1.0" encoding="UTF-8"?><model unit="millimeter" xmlns="{CORE}" xmlns:p="{PROD}" '
+                           f'requiredextensions="p"><resources><object id="{mesh_id}" type="model"><mesh><vertices>{v}</vertices>'
+                           f'<triangles>{t}</triangles></mesh></object></resources><build/></model>')
+        rels.append(f'<Relationship Target="{path}" Id="rel-{oid}" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>')
+        comps.append(f'<object id="{oid}" p:UUID="x" type="model"><components><component p:path="{path}" objectid="{mesh_id}" '
+                     f'transform="1 0 0 0 1 0 0 0 1 0 0 0"/></components></object>')
+        items.append(f'<item objectid="{oid}" transform="1 0 0 0 1 0 0 0 1 {x} {y} 0" printable="1"/>')
+        cfg.append(f'<object id="{oid}"><metadata key="name" value="{name}"/><metadata key="extruder" value="1"/>'
+                   f'<part id="{mesh_id}" subtype="normal_part"><metadata key="name" value="{name}"/></part></object>')
+        plate_items[plate].append(f'<model_instance><metadata key="object_id" value="{oid}"/><metadata key="instance_id" value="0"/>'
+                                  f'<metadata key="identify_id" value="{100 + k}"/></model_instance>')
+    plates_xml = "".join(f'<plate><metadata key="plater_id" value="{p + 1}"/>{"".join(plate_items[p])}</plate>' for p in range(plates))
+    files.update({
+        "[Content_Types].xml": "<Types/>", "_rels/.rels": "<Relationships/>",
+        "3D/3dmodel.model": (f'<?xml version="1.0" encoding="UTF-8"?><model unit="millimeter" xmlns="{CORE}" xmlns:p="{PROD}" '
+                             f'requiredextensions="p"><resources>{"".join(comps)}</resources><build>{"".join(items)}</build></model>'),
+        "3D/_rels/3dmodel.model.rels": f'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">{"".join(rels)}</Relationships>',
+        "Metadata/model_settings.config": f'<?xml version="1.0" encoding="UTF-8"?><config>{"".join(cfg)}{plates_xml}<assemble/></config>',
+        "Metadata/project_settings.config": json.dumps({"printable_area": ["0x0", f"{bed}x0", f"{bed}x{bed}", f"0x{bed}"],
+                                                        "filament_colour": ["#FF0000"], "filament_settings_id": ["Generic PLA"],
+                                                        "filament_type": ["PLA"], "flush_volumes_matrix": ["0"],
+                                                        "flush_volumes_vector": ["140", "140"], "layer_height": "0.2"}),
+    })
+    return zip_bytes(files)
+
+
+def read_3mf(data):
+    """(object names in build order, [(object name, [part (name, filament)], [instance (x, y)])]) of a 3MF."""
+    import io, zipfile, xml.etree.ElementTree as ET
+    z = zipfile.ZipFile(io.BytesIO(data))
+    root, cfg = ET.fromstring(z.read("3D/3dmodel.model")), ET.fromstring(z.read("Metadata/model_settings.config"))
+    q = lambda t: f"{{{CORE}}}{t}"
+    names = {o.get("id"): next((m.get("value") for m in o.findall("metadata") if m.get("key") == "name"), None)
+             for o in cfg.findall("object")}
+    out = {}
+    for it in root.find(q("build")).findall(q("item")):
+        t = [float(x) for x in it.get("transform").split()]
+        out.setdefault(it.get("objectid"), []).append((round(t[9], 3), round(t[10], 3)))
+    parts = {o.get("id"): [(next(m.get("value") for m in p.findall("metadata") if m.get("key") == "name"),
+                            next((m.get("value") for m in p.findall("metadata") if m.get("key") == "extruder"), None))
+                           for p in o.findall("part")] for o in cfg.findall("object")}
+    return [(names[oid], parts[oid], inst) for oid, inst in out.items()], z.namelist()
+
+
+class Project3mfTests(unittest.TestCase):
+    SPLIT = split_3mf([("Body", 2, (100, 100, 0)), ("Head", 5, (100, 100, 10))])  # 10x10x20 at (100..110, 100..110)
+
+    def apply(self, proj, mode, index, **kw):
+        import project3mf
+        out, info = project3mf.apply(proj, self.SPLIT, mode, index, **kw)
+        return read_3mf(out), out, info
+
+    def test_replace_object_puts_the_split_in_its_place(self):
+        proj = orca_project([("cube", 0, (50, 50)), ("bolt", 0, (150, 50))])
+        (objs, names), out, info = self.apply(proj, "replace_object", 1, name="bolt split", object_name="bolt")
+        self.assertEqual(objs, [("cube", [("cube", None)], [(50.0, 50.0)]),
+                                ("bolt split", [("Body", "2"), ("Head", "5")], [(105.0, 105.0)])])  # where it was split
+        self.assertNotIn("3D/Objects/bolt_4.model", names)  # the original's meshes went with it
+        self.assertIn("3D/Objects/cube_2.model", names)
+        import zipfile, io
+        z = zipfile.ZipFile(io.BytesIO(out))
+        self.assertNotIn(b"bolt_4", z.read("3D/_rels/3dmodel.model.rels"))
+        cfg = z.read("Metadata/model_settings.config").decode()
+        self.assertNotIn('value="4"', cfg)
+        self.assertLess(cfg.rindex("<object"), cfg.index("<plate"))  # OrcaSlicer reads objects before plates
+        self.assertEqual(cfg.count('key="object_id"'), 2)  # both on plate 1
+        self.assertEqual(info, {"removed": 1, "copies": 1, "plate": 1, "parts": 2, "filaments_added": 4})
+
+    def test_single_part_goes_on_the_originals_filament(self):
+        one = split_3mf([("bolt", 3, (100, 100, 0))])  # the page's one-part export (slot from the page is ignored)
+        proj = orca_project([("bolt", 0, (150, 50))])
+        import project3mf
+        out, info = project3mf.apply(proj, one, "replace_object", 0, object_name="bolt", single=True)
+        self.assertEqual(read_3mf(out)[0], [("bolt", [("bolt", "1")], [(105.0, 105.0)])])
+        self.assertEqual(info["filaments_added"], 0)
+
+    def test_painted_part_keeps_its_paint_and_adds_the_slots_it_uses(self):
+        import project3mf, zipfile, io
+        v = "".join(f'<vertex x="{x + 100}" y="{y + 100}" z="{z}"/>' for x, y, z in CUBE_V)
+        t = "".join(f'<triangle v1="{a}" v2="{b}" v3="{c}" paint_color="{"8" if k < 6 else "1C"}"/>' for k, (a, b, c) in enumerate(CUBE_F))
+        painted = zip_bytes({"3D/3dmodel.model": f'<?xml version="1.0"?><model unit="millimeter" xmlns="{CORE}"><resources>'
+                             f'<object id="1" type="model" name="bolt"><mesh><vertices>{v}</vertices><triangles>{t}</triangles>'
+                             f'</mesh></object></resources><build><item objectid="1"/></build></model>'})
+        self.assertEqual([project3mf.paint_state(c) for c in ("4", "8", "0C", "1C", "7C", "0FC", "0FFC")], [1, 2, 3, 4, 10, 18, 33])
+        out, info = project3mf.apply(orca_project([("bolt", 0, (150, 50))]), painted, "replace_object", 0,
+                                     object_name="bolt", single=True)
+        z = zipfile.ZipFile(io.BytesIO(out))
+        sub, = [n for n in z.namelist() if n.startswith("3D/Objects/")]
+        self.assertEqual(z.read(sub).decode().count('paint_color="1C"'), 6)
+        self.assertEqual(read_3mf(out)[0], [("bolt", [("bolt", "1")], [(105.0, 105.0)])])
+        self.assertEqual(info["filaments_added"], 3)  # slots 2..4
+
+    def test_new_filament_slots_extend_every_per_filament_setting(self):
+        proj = orca_project([("bolt", 0, (150, 50))])
+        _, out, _ = self.apply(proj, "replace_object", 0, colors={2: "#00ff00"})
+        import zipfile, io
+        st = json.loads(zipfile.ZipFile(io.BytesIO(out)).read("Metadata/project_settings.config"))
+        self.assertEqual(st["filament_settings_id"], ["Generic PLA"] * 5)
+        self.assertEqual(st["filament_type"], ["PLA"] * 5)
+        self.assertEqual(st["filament_colour"][:2], ["#FF0000", "#00ff00"])  # the page's color for slot 2
+        self.assertEqual(len(st["flush_volumes_matrix"]), 25)
+        self.assertEqual(st["flush_volumes_matrix"][1], "280")  # no existing volume to copy: OrcaSlicer's default
+        self.assertEqual(st["flush_volumes_matrix"][6], "0")  # diagonal
+        self.assertEqual(len(st["flush_volumes_vector"]), 10)
+        self.assertEqual(st["layer_height"], "0.2")
+
+    def test_add_keeps_the_original(self):
+        proj = orca_project([("bolt", 0, (150, 50))])
+        (objs, _), _, info = self.apply(proj, "add", 0, object_name="bolt")
+        self.assertEqual([(o[0], o[2]) for o in objs], [("bolt", [(150.0, 50.0)]), ("bolt", [(125.0, 105.0)])])  # +10 mm wide +10
+        self.assertEqual(info["removed"], 0)
+
+    def test_add_goes_left_when_the_right_is_off_the_plate(self):
+        split = split_3mf([("Body", 2, (240, 100, 0))])  # 240..250 on a 256 mm bed
+        proj = orca_project([("bolt", 0, (245, 105))])
+        import project3mf
+        out, _ = project3mf.apply(proj, split, "add", 0, object_name="bolt")
+        self.assertEqual(read_3mf(out)[0][-1][2], [(225.0, 105.0)])
+
+    def test_add_without_a_source_goes_to_the_middle_of_plate_1(self):
+        proj = orca_project([("bolt", 0, (150, 50))], bed=200)
+        (objs, _), _, _ = self.apply(proj, "add", None, name="thing")
+        self.assertEqual(objs[-1][0::2], ("thing", [(100.0, 100.0)]))
+
+    def test_replace_plate_clears_only_that_plate(self):
+        proj = orca_project([("a", 0, (50, 50)), ("b", 1, (350, 50)), ("c", 1, (400, 50))], plates=2)
+        (objs, _), out, info = self.apply(proj, "replace_plate", 1, object_name="b")
+        self.assertEqual([o[0] for o in objs], ["a", "b"])  # the split, named after the source
+        self.assertEqual((info["removed"], info["plate"]), (2, 2))
+        import zipfile, io
+        import xml.etree.ElementTree as ET
+        plates = ET.fromstring(zipfile.ZipFile(io.BytesIO(out)).read("Metadata/model_settings.config")).findall("plate")
+        self.assertEqual([len(p.findall("model_instance")) for p in plates], [1, 1])  # the split is on plate 2
+
+    def test_fill_plate_tiles_copies_on_the_right_plate(self):
+        proj = orca_project([("a", 0, (50, 50)), ("b", 1, (350, 50))], plates=2, bed=100)
+        (objs, _), _, info = self.apply(proj, "fill_plate", 1, object_name="b")
+        copies = [o for o in objs if o[0] == "b"]
+        # one object per copy, each with its own name and filaments
+        self.assertEqual({(tuple(p), len(i)) for _, p, i in copies}, {((("Body", "2"), ("Head", "5")), 1)})
+        inst = [i[0] for _, _, i in copies]
+        # 10 mm parts, 6 mm apart on a 100 mm bed: 6 x 6; plate 2 starts 1.2 bed widths to the right
+        self.assertEqual(info["copies"], 36)
+        self.assertEqual(len(inst), 36)
+        xs, ys = sorted({x for x, _ in inst}), sorted({y for _, y in inst})
+        self.assertAlmostEqual(xs[0] - 5, 120 + (100 - (6 * 10 + 5 * 6)) / 2)
+        self.assertAlmostEqual(xs[1] - xs[0], 16)
+        self.assertAlmostEqual(ys[0] - 5, (100 - 90) / 2)
+
+    def test_fill_skips_the_excluded_corner(self):
+        import project3mf
+        parts = project3mf.read_split(self.SPLIT)
+        full = project3mf.fill_offsets(parts, (0, 0, 100, 100), (0, 0))
+        cut = project3mf.fill_offsets(parts, (0, 0, 100, 100), (0, 0), [(0, 0, 18, 28)])  # X1-style purge corner
+        self.assertEqual(len(full) - len(cut), 2)  # copies at x 5..15 and y 5..15, 21..31 touch (0..18, 0..28)
+
+    def test_resolve_checks_the_name(self):
+        import project3mf
+        proj = orca_project([("cube", 0, (50, 50))])
+        with self.assertRaisesRegex(ValueError, "changed"):
+            project3mf.apply(proj, self.SPLIT, "replace_object", 0, object_name="bolt")
+        with self.assertRaisesRegex(ValueError, "no longer"):
+            project3mf.apply(proj, self.SPLIT, "replace_object", 3)
+
+    def test_handoff_payload_is_orcas_command_line(self):
+        import handoff
+        self.assertEqual(handoff.payload([r'C:\Users\d\Downloads\a "b".3mf']),
+                         r'"orca-slicer";"C:\\Users\\d\\Downloads\\a \"b\".3mf"')
+
+
+class SendToOrcaTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.objs = [fake_orca.FakeObject("cube", []), fake_orca.FakeObject("bolt", [])]
+        self.p = load_plugin(self.objs)
+        self.p.output_dir = lambda: self.tmp.name
+        import orca
+        orca._state["project"] = orca_project([("cube", 0, (50, 50)), ("bolt", 0, (150, 50))])
+        orca._state["project_path"] = "/home/d/prints/desk toy.3mf"
+        self.sent, self.handed = [], []
+        self.p.handoff.send = self.handed.append
+        self.p.handoff.supported = lambda: True
+        self.b = self.p.Bridge(self.sent.append)
+
+    def send(self, mode, obj=None):
+        data = base64.b64encode(Project3mfTests.SPLIT).decode()
+        src = {"id": obj.id(), "index": 0, "name": obj.name} if obj else None
+        self.b.handle({"cmd": "save", "id": 1, "name": "bolt_parts.3mf", "part": 0, "of": 1, "data": data,
+                       "mode": mode, "source": src, "colors": {"2": "#00ff00"}})
+        return self.sent[-1]
+
+    def test_replace_hands_over_the_edited_project(self):
+        m = self.send("replace_object", self.objs[1])  # found by id, though the page said index 0
+        path, = self.handed[0]
+        self.assertEqual(os.path.basename(path), "desk toy - Mesh Splitter.3mf")
+        self.assertEqual([o[0] for o in read_3mf(Path(path).read_bytes())[0]], ["cube", "bolt"])
+        self.assertEqual((m["cmd"], m["ask"], m["path"]), ("saved", "Open as project", path))
+        self.assertIn("Open as project", m["note"])
+        self.assertEqual(os.listdir(self.tmp.name).count(".mesh-splitter-project.3mf"), 0)  # the copy is cleaned up
+
+    def test_add_without_a_source(self):
+        m = self.send("add")
+        self.assertEqual(m["cmd"], "saved")
+        self.assertEqual([o[0] for o in read_3mf(Path(self.handed[0][0]).read_bytes())[0]], ["cube", "bolt", "bolt"])
+
+    def test_replace_needs_the_object_on_the_plate(self):
+        gone = fake_orca.FakeObject("gone", [])
+        m = self.send("replace_object", gone)
+        self.assertEqual(m["cmd"], "save_error")
+        self.assertIn("no longer on the plate", m["message"])
+        self.assertEqual(self.handed, [])
+
+    def test_without_handoff_the_project_is_saved(self):
+        self.p.handoff.supported = lambda: False
+        m = self.send("add")
+        self.assertEqual(self.handed, [])
+        self.assertIn("File > Open Project", m["note"])
+
+    def test_unreachable_orca_still_says_where_the_project_is(self):
+        def down(files):
+            raise RuntimeError("OrcaSlicer was not found on the session bus")
+        self.p.handoff.send = down
+        m = self.send("add")
+        self.assertEqual(m["cmd"], "saved")
+        self.assertTrue(os.path.exists(m["path"]))
+        self.assertIn("File > Open Project", m["note"])
+        self.assertIn(os.path.basename(m["path"]), m["note"])
+        self.assertTrue(m["warn"])
 
 
 class ReleaseNotesTests(unittest.TestCase):

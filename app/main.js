@@ -122,6 +122,7 @@ function loadRaw(name, raw) {
   if (+$("brushR").value > +$("brushR").max) $("brushR").value = (S.G.diag * 0.02).toFixed(1);
   syncSliders();
   lastActive = -1;
+  setPrintAs(initialPrintAs(), false);
   if (!restoreAutosave() && S.nF >= 200) { autoSplit(0, true); S.hist = { past: [], future: [] }; refreshUI(); }
   const fixes = [S.refined && `split long edges (+${S.refined.toLocaleString()} faces) so creases show`, S.flipped && `turned ${S.flipped} inside-out shell${S.flipped > 1 ? "s" : ""} right side out`].filter(Boolean);
   if (fixes.length) status(`${$("status").textContent} · On open: ${fixes.join("; ")}`);
@@ -1098,6 +1099,7 @@ function planTris(pl, ctx, out = []) {
   }
   // cap over the neighbor's hole: rings shrinking to the center, each smoothed more (one fan from the zigzag loop to the
   // center would show as a pie)
+  pl.nbFrom = out.length + (rings.length - 1) * 2 * n * 9; // the cap is the neighbor's surface: shown in its color
   const ed = per / n, rb = D0.reduce((m, _, i) => (i % 3 ? m : m + Math.hypot(D0[i], D0[i+1], D0[i+2]) / n), 0);
   const Kc = Math.max(2, Math.min(6, Math.round(rb / Math.max(3 * ed, 1e-6))));
   for (const t of [1 - 0.3 / Kc, ...Array.from({ length: Kc - 1 }, (_, k) => 1 - (k + 1) / Kc)]) {
@@ -1142,7 +1144,15 @@ function cutPlaneOver(lp, own, nb, ctx) {
   return { C, N };
 }
 // Closing triangles for every loop of part i (or of the unchanged rest, in mergedSoup), world space.
-function capTris(plans, ctx) { const out = []; for (const pl of plans) planTris(pl, ctx, out); return Float32Array.from(out); }
+// nbTris (optional) collects [first triangle, end, neighbor] of each Anchor cap that lies on a neighbor's surface.
+function capTris(plans, ctx, nbTris) {
+  const out = [];
+  for (const pl of plans) {
+    delete pl.nbFrom; planTris(pl, ctx, out);
+    if (nbTris && pl.nbFrom !== undefined && pl.nb > 0 && out.length > pl.nbFrom) nbTris.push([pl.nbFrom / 9, out.length / 9, pl.nb]);
+  }
+  return Float32Array.from(out);
+}
 
 // Display: the patches and sleeves of open gaps, drawn as their own mesh in the parts' colors.
 let fillMesh = null;
@@ -1157,7 +1167,8 @@ function updateFillMesh() {
     const p = S.parts[l]; if (!p || p.visible === false || hasRep(p) || trimMeshes.has(l)) continue; // a trimmed part's caps are in its trim mesh
     for (const pl of loopPlans(partLoops(l, ctx), ctx)) {
       if (pl.kind !== "patch" && pl.kind !== "bridge") continue;
-      const n0 = pos.length; planTris(pl, ctx, pos); for (let k = n0; k < pos.length; k += 9) own.push(l);
+      const n0 = pos.length; delete pl.nbFrom; planTris(pl, ctx, pos);
+      for (let k = n0; k < pos.length; k += 9) own.push(pl.nbFrom !== undefined && k >= pl.nbFrom && pl.nb > 0 ? pl.nb : l);
     }
   }
   if (!pos.length) return;
@@ -1352,12 +1363,17 @@ function nearestFace(i, w) {
 
 function filColor(n) { return orcaFil?.[n - 1] || S.parts.find((q) => q.filament === n)?.color || "#666"; }
 let orcaFil = null; // OrcaSlicer's filament colors by slot (plugin), used by the filament view
+// One part prints on the source object's filament (OrcaSlicer), else a plain light gray.
+const oneColor = () => orcaFil?.[(S.source?.orca?.filaments?.[0] || 1) - 1] || "#d9d9d9";
 let byFilament = false; try { byFilament = localStorage.getItem("meshsplit:byFil") === "1"; } catch {}
 // Display color of part i: its own color, or (filament view) the color of the first part on the same slot.
 function shownColor(i, plain) {
   const p = S.parts[i];
   let c = p.color;
-  if (byFilament && !plain) { const q = S.parts.find((q) => q.filament === p.filament); if (q) c = q.color; if (orcaFil?.[p.filament - 1]) c = orcaFil[p.filament - 1]; }
+  if (byFilament && !plain) {
+    if (S.printAs === "one") c = oneColor(); // One part prints on one filament, so it shows as one color
+    else { const q = S.parts.find((q) => q.filament === p.filament); if (q) c = q.color; if (orcaFil?.[p.filament - 1]) c = orcaFil[p.filament - 1]; }
+  }
   const col = new THREE.Color(c);
   if (!plain && i === S.active && i > 0) col.lerp(new THREE.Color(0xffffff), 0.45); // selected part reads lighter
   return col;
@@ -1628,7 +1644,7 @@ function refreshUI() {
     tr.title = i ? "Click: select · Ctrl/Shift+click: select more · Right-click: actions" : "Click: select · Right-click: actions";
     tr.innerHTML = `<td><span class="sw" style="background:${p.color}"></span></td>
       <td class="nm">${esc(p.name)}</td>
-      <td title="Filament slot"><span class="fil" style="background:${filColor(p.filament)}">${p.filament}</span></td>
+      <td class="fcol" title="Filament slot"><span class="fil" style="background:${filColor(p.filament)}">${p.filament}</span></td>
       <td class="n">${cnt[i].toLocaleString()}${p.seeds.length ? ` · ${p.seeds.length}●` : ""}</td>
       <td><button class="eye" title="${p.visible ? "Hide" : "Show"}">${icon(p.visible ? "eye" : "eyeOff")}</button></td>`;
     tr.onclick = (ev) => {
@@ -2252,7 +2268,7 @@ function showXfDims() {
   if (!S.G || !mesh || i <= 0) { info.hidden = true; return; }
   const b = partWorldBox(i), p = S.parts[i];
   const dims = isFinite(b[0]) ? `${(b[3]-b[0]).toFixed(1)} × ${(b[4]-b[1]).toFixed(1)} × ${(b[5]-b[2]).toFixed(1)} mm` : "no faces";
-  info.innerHTML = `Part name: ${esc(p.name)}<br>Size: ${dims}<br>Triangles: ${partCounts()[i].toLocaleString()} · Filament ${p.filament}`;
+  info.innerHTML = `Part name: ${esc(p.name)}<br>Size: ${dims}<br>Triangles: ${partCounts()[i].toLocaleString()}${S.printAs === "one" ? "" : ` · Filament ${p.filament}`}`;
   info.hidden = false;
 }
 $("xfPanel").addEventListener("focusin", () => { if (S.G) xfSnap = snapshot(); });
@@ -2923,21 +2939,65 @@ function download(name, data, type = "application/octet-stream") {
 }
 function exportPainted3MF() {
   if (!S.G) return;
+  download(`${S.name}_painted.3mf`, buildPainted3MF(true), "model/3mf");
   const ch = changedParts();
-  let fil = (f) => S.parts[S.labels[f]].filament, src = S;
-  if (ch.size) { // moved/replaced parts: rebuild one mesh from the merged shells
-    const m = mergedSoup(), w = weld(m.v, Uint32Array.from({ length: m.v.length / 3 }, (_, i) => i));
-    src = { pos: w.pos, tri: w.tri, nV: w.pos.length / 3, nF: w.tri.length / 3 }; fil = (f) => m.fil[f];
-  }
-  // smoothed boundaries split faces: no 1:1 map to the file, so the source 3MF is only reused when untouched
-  const keepSrc = S.source.type === "3mf" && !ch.size && S.tri === S.mesh0[1];
-  const out = core.painted3MF(S.name, src, fil, keepSrc ? S.source : null);
-  download(`${S.name}_painted.3mf`, out, "model/3mf");
   const fils = [...new Set(S.parts.filter((_, i) => partCounts()[i] > 0).map((p) => p.filament))].sort((a, b) => a - b);
   status(`Painted 3MF written. Uses filament slot(s) ${fils.join(", ")}; the slicer project needs at least ${Math.max(...fils)} filaments.` +
     (ch.size ? " Rebuilt from moved/replaced parts (overlaps fuse in the slicer); original 3MF settings not carried over." :
       S.source.type === "3mf" && S.tri !== S.mesh0[1] ? " Mesh rewritten for the smoothed boundaries; original 3MF settings not carried over." : ""));
 }
+// One mesh, each triangle painted with its part's filament. reuse: keep the source 3MF (and its settings) when the
+// mesh is untouched; Send to Orca passes false, since it writes the mesh into the project itself.
+function buildPainted3MF(reuse) {
+  const ch = changedParts();
+  let fil = (f) => S.parts[S.labels[f]].filament, src = S;
+  if (ch.size) { // moved/replaced parts: rebuild one mesh from the merged shells
+    const m = mergedSoup(), w = weld(m.v, Uint32Array.from({ length: m.v.length / 3 }, (_, i) => i));
+    // welding can collapse a sliver to a line (two corners on one point): drop those, or slicers report open edges
+    const keep = [], tri = [];
+    for (let f = 0; f < w.tri.length / 3; f++) {
+      const a = w.tri[3*f], b = w.tri[3*f+1], c = w.tri[3*f+2];
+      if (a !== b && b !== c && a !== c) { keep.push(m.fil[f]); tri.push(a, b, c); }
+    }
+    src = { pos: w.pos, tri: Uint32Array.from(tri), nV: w.pos.length / 3, nF: tri.length / 3 }; fil = (f) => keep[f];
+  }
+  // smoothed boundaries split faces: no 1:1 map to the file, so the source 3MF is only reused when untouched
+  const keepSrc = reuse && S.source.type === "3mf" && !ch.size && S.tri === S.mesh0[1];
+  return core.painted3MF(S.name, src, fil, keepSrc ? S.source : null);
+}
+// One part: the whole edited model as one closed mesh on one filament (moved/replaced parts overlap and fuse).
+const buildOne3MF = () => core.parts3MF(S.name, [{ name: S.name, filament: 1, soup: mergedSoup().v }]).out;
+function exportOne3MF() {
+  if (!S.G) return;
+  download(`${S.name}.3mf`, buildOne3MF(), "model/3mf");
+  status("3MF written: the model as one part.");
+}
+
+// ---------------------------------------------------------------- Print as: one part / painted / separate parts
+// How the result prints, chosen up front: it decides what the main Export / Send to Orca writes, and One part
+// hides the filament slots (part colors then only tell parts apart).
+const PRINT_AS = { one: "One part", paint: "Painted", parts: "Separate parts" };
+function setPrintAs(mode, save = true) {
+  if (!PRINT_AS[mode]) mode = "one";
+  S.printAs = mode;
+  document.body.classList.toggle("oneFil", mode === "one");
+  for (const b of $("printAs").children) b.classList.toggle("on", b.dataset.mode === mode);
+  if (S.G) refreshUI();
+  $("colorMode").title = `Filament colors (C): ${{ one: "the whole model in its one filament's color", paint: "each part in the color it's painted with", parts: "each part in its filament slot's color" }[mode]}`;
+  updateColors();
+  if (!ORCA.on) $("expMain").lastChild.textContent = { one: "Export 3MF", paint: "Export painted 3MF", parts: "Export parts 3MF" }[mode];
+  if (save) try { localStorage.setItem(`meshsplit:printAs:${S.name}`, mode); } catch {}
+}
+// Start from how the model prints now: OrcaSlicer's object (painted, several parts) or the opened 3MF.
+function initialPrintAs() {
+  try { const m = localStorage.getItem(`meshsplit:printAs:${S.name}`); if (PRINT_AS[m]) return m; } catch {}
+  const o = S.source?.orca, src = S.source || {};
+  if (o?.painted || src.painted) return "paint";
+  if ((o?.parts || 0) > 1 || (src.meshes?.length || 0) > 1) return "parts";
+  return "one";
+}
+for (const b of $("printAs").children) b.onclick = () => { setPrintAs(b.dataset.mode); status(`Print as: ${PRINT_AS[b.dataset.mode]}`); };
+const exportMain = () => ({ one: exportOne3MF, paint: exportPainted3MF, parts: exportParts3MF }[S.printAs || "one"])();
 
 // One closed mesh per part: the part's faces plus a fan cap over each open boundary loop.
 const partMesh = (pi) => meshOf((l) => l === pi);
@@ -2952,7 +3012,7 @@ function xformSoup(v, M) {
   return out;
 }
 // Final closed geometry of one part: its replacement, or its faces + caps, with the Transform applied.
-function partSoup(i, raw = false) {
+function partSoup(i, raw = false, nbTris = null) {
   const p = S.parts[i];
   if (!raw && trimOn(i)) { const t = trimResult(i); if (t) return t.pos; }
   if (hasRep(p)) { const M = repMatrix(i); return M ? xformSoup(REPS.get(p.rep.id).pos, M) : null; }
@@ -2962,7 +3022,8 @@ function partSoup(i, raw = false) {
   // caps start exactly on the part's own (float32) boundary positions, so the closed solid has no slivers
   ctx.fixL = i; ctx.fix = new Map(); ctx.fixV = body; let o = 0;
   for (let f = 0; f < S.nF; f++) if (S.labels[f] === i) { for (let c = 0; c < 3; c++, o += 3) ctx.fix.set(S.tri[3*f+c], o); }
-  const caps = capTris(loopPlans(m.loopList, ctx), ctx), out = new Float32Array(body.length + caps.length);
+  const nt = nbTris ? [] : null, caps = capTris(loopPlans(m.loopList, ctx), ctx, nt), out = new Float32Array(body.length + caps.length);
+  if (nt) for (const [a, e, l] of nt) nbTris.push([a + body.length / 9, e + body.length / 9, l]);
   out.set(body); out.set(caps, body.length); return out;
 }
 // Whole model as one triangle soup + filament per triangle. Unchanged parts keep their faces with the holes left by
@@ -2977,11 +3038,16 @@ function mergedSoup() {
     // the moved part or its sleeve takes that part's filament
     const ctx = fillCtx();
     for (const pl of loopPlans(rest.loopList, ctx)) {
-      const t = planTris(pl, ctx), f = S.parts[pl.kind === "patch" || pl.nb < 0 ? pl.own : pl.nb]?.filament ?? 1;
+      // (an Anchor's "under" cap: the anchored part's sweep covers it with the rest's own surface, so it keeps that color)
+      const t = planTris(pl, ctx), f = S.parts[pl.kind === "patch" || pl.kind === "under" || pl.nb < 0 ? pl.own : pl.nb]?.filament ?? 1;
       parts.push(Float32Array.from(t)); for (let o = 0; o < t.length; o += 9) fil.push(f);
     }
   }
-  for (const i of ch) { const v = partSoup(i); if (!v) continue; parts.push(v); for (let o = 0; o < v.length; o += 9) fil.push(S.parts[i].filament); }
+  for (const i of ch) {
+    const nt = [], v = partSoup(i, false, nt); if (!v) continue;
+    parts.push(v); const f0 = fil.length; for (let o = 0; o < v.length; o += 9) fil.push(S.parts[i].filament);
+    for (const [a, e, l] of nt) for (let t = a; t < e; t++) fil[f0 + t] = S.parts[l]?.filament ?? fil[f0 + t]; // Anchor cap on the neighbor
+  }
   const n = parts.reduce((a, v) => a + v.length, 0), v = new Float32Array(n); let o = 0;
   for (const a of parts) { v.set(a, o); o += a.length; }
   return { v, fil };
@@ -3056,7 +3122,7 @@ function restoreAutosave() {
 }
 $("exp3mf").onclick = () => { closeMenus(); later(exportPainted3MF); };
 $("expParts").onclick = () => { closeMenus(); later(exportParts3MF); };
-$("expMain").onclick = () => { closeMenus(); later(exportParts3MF); };
+$("expMain").onclick = () => { closeMenus(); later(exportMain); };
 $("expStl").onclick = () => { closeMenus(); later(exportSTLs); };
 $("expMerged").onclick = () => { closeMenus(); later(exportMergedSTL); };
 $("saveSess").onclick = () => { closeMenus(); saveSession(); };
@@ -3077,23 +3143,54 @@ if (qp) {
 
 // ---------------------------------------------------------------- OrcaSlicer plugin bridge
 // Inside OrcaSlicer the host injects window.orca (postMessage/onMessage). The plugin sends plate meshes
-// in base64 chunks and writes files the page exports (OrcaSlicer plugins cannot add objects to the plate,
-// so the result is a 3MF to import with Ctrl+I). Outside OrcaSlicer none of this runs.
+// in base64 chunks and writes files the page exports. Send to Orca hands the split to OrcaSlicer itself
+// (plugin/handoff.py): added as a new object, or replacing the object it came from, its plate, or filling that
+// plate with copies (plugin/project3mf.py). Outside OrcaSlicer none of this runs.
 const ORCA = { on: !!(window.orca && window.orca.postMessage), objects: [], rx: null, req: 0, saves: new Map(), seq: 0,
   nonce: Math.random().toString(36).slice(2, 8) }; // ids stay unique across page reloads (the plugin outlives the page)
 const CHUNK = 512 * 1024; // base64 chars per message
 function orcaSend(msg) { window.orca.postMessage(msg); }
 function u8ToB64(b) { let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }
-ORCA.save = (name, data) => {
+// send: { mode, source, colors } asks the plugin to put the 3MF into the open project and hand that to OrcaSlicer
+// (see ORCA.send) instead of only saving it.
+ORCA.save = (name, data, send = null) => {
   const b = typeof data === "string" ? new TextEncoder().encode(data) : data instanceof Uint8Array ? data : new Uint8Array(data);
   const t = u8ToB64(b), id = `${ORCA.nonce}-${++ORCA.seq}`, n = Math.max(1, Math.ceil(t.length / CHUNK));
   return new Promise((res, rej) => {
     ORCA.saves.set(id, { res, rej, name });
-    for (let i = 0; i < n; i++) orcaSend({ cmd: "save", id, name, part: i, of: n, data: t.slice(i * CHUNK, (i + 1) * CHUNK) });
-    status(`Saving ${name}…`);
-  }).then((path) => { status(`Saved ${path} · import it in OrcaSlicer with Ctrl+I`); return path; })
-    .catch((e) => { status(`Save failed: ${e.message}`); alert(`Save failed: ${e.message}`); });
+    for (let i = 0; i < n; i++) orcaSend({ cmd: "save", id, name, part: i, of: n, data: t.slice(i * CHUNK, (i + 1) * CHUNK), ...(send || {}) });
+    status(send ? "Sending to OrcaSlicer…" : `Saving ${name}…`);
+  }).then((m) => {
+    if (m.note) { status(m.note); toast(m.note, !m.warn); }
+    else status(`Saved ${m.path} · import it in OrcaSlicer with Ctrl+I`);
+    return m.path;
+  }).catch((e) => { status(`Save failed: ${e.message}`); alert(`Save failed: ${e.message}`); });
 };
+// Send to Orca. mode: add (a new object next to the original), replace_object, replace_plate or fill_plate
+// (those three need the model opened from the plate: the plugin finds the original by its id). The plugin puts
+// the split into a copy of the project and OrcaSlicer opens that as the project.
+ORCA.send = (mode) => {
+  if (!S.G) return;
+  const src = S.source?.orca;
+  if (mode !== "add" && !src) { alert("Open the model from the plate (Model > From the plate) to replace it there."); return; }
+  // Print as decides the file: One part (the plugin puts it on the original object's filament), Painted (one part,
+  // painted with the parts' filaments) or Parts (each part on its filament slot). The last two can use slots the
+  // project doesn't have yet: the plugin adds them, in the parts' colors.
+  const as = S.printAs || "one";
+  const out = as === "parts" ? buildParts3MF().out : as === "paint" ? buildPainted3MF(false) : buildOne3MF();
+  const colors = {}; // filament slot -> the part's color
+  if (as !== "one") for (const p of S.parts.slice(1)) colors[p.filament] ??= p.color;
+  return ORCA.save(`${S.name}_parts.3mf`, out, { mode, colors, single: as !== "parts", source: src ? { id: src.id, index: src.index, name: src.name } : null });
+};
+function orcaSendMenu() {
+  const src = S.source?.orca;
+  for (const id of ["sendReplace", "sendPlate", "sendFill"]) {
+    $(id).dataset.tip ??= $(id).title;
+    $(id).disabled = !src;
+    $(id).title = src ? $(id).dataset.tip : "Open the model from the plate (Model > From the plate) to replace it there";
+  }
+  $("sendReplace").lastChild.textContent = src ? `Replace ${src.name}` : "Replace object";
+}
 function orcaRenderObjects() {
   for (const box of [$("orcaMenu"), $("dropOrca")]) {
     box.innerHTML = "";
@@ -3133,14 +3230,16 @@ function orcaMesh(m) { // chunks of the requested transfer, in any order
     const bin = atob(R.parts.join("")), b = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
     const pos = new Float32Array(b.buffer, 0, R.nV * 3), tri = new Uint32Array(b.buffer, R.nV * 12, R.nF * 3);
-    loadRaw(R.name, { pos: Float32Array.from(pos), tri: Uint32Array.from(tri), source: { type: "orca" } });
+    loadRaw(R.name, { pos: Float32Array.from(pos), tri: Uint32Array.from(tri), source: { type: "orca", orca: { ...ORCA.cur } } });
     status(`Loaded ${R.name} from the plate`);
   } catch (e) { console.error(e); alert(e.message); }
   finally { busy(false); }
 }
 // Messages show in the page (the toast), not as a browser pop-up: the same in the browser and in OrcaSlicer, whose
 // plugin webviews don't document alert().
-window.alert = (t) => { const d = $("toast"); d.textContent = String(t); d.hidden = false; clearTimeout(d._t); d._t = setTimeout(() => (d.hidden = true), 8000); };
+// In-page message instead of the browser's alert(); ok: a result to read, not an error (no red stripe).
+function toast(t, ok = false) { const d = $("toast"); d.textContent = String(t); d.classList.toggle("ok", ok); d.hidden = false; clearTimeout(d._t); d._t = setTimeout(() => (d.hidden = true), 8000); }
+window.alert = (t) => toast(t);
 $("toast").onclick = () => ($("toast").hidden = true);
 if (ORCA.on) {
   document.body.classList.add("inOrca");
@@ -3148,8 +3247,15 @@ if (ORCA.on) {
   document.querySelectorAll(".orcaOnly").forEach((e) => (e.hidden = false));
   $("fileBtnLbl").textContent = "From plate";
   $("expMain").lastChild.textContent = "Send to Orca";
-  $("expMain").title = "Save a multi-part 3MF (each part keeps its filament slot) to Downloads, then import it in OrcaSlicer with Ctrl+I";
-  $("expParts").hidden = true;
+  $("expMain").title = $("sendAdd").title;
+  $("expMain").onclick = () => { closeMenus(); later(() => ORCA.send("add")); };
+  $("sendAdd").onclick = $("expMain").onclick;
+  $("sendReplace").onclick = () => { closeMenus(); later(() => ORCA.send("replace_object")); };
+  $("sendPlate").onclick = () => { closeMenus(); later(() => ORCA.send("replace_plate")); };
+  $("sendFill").onclick = () => { closeMenus(); later(() => ORCA.send("fill_plate")); };
+  $("expBtn").addEventListener("click", orcaSendMenu);
+  $("expParts").lastChild.textContent = "Multi-part 3MF to Downloads";
+  $("expParts").title = "Save a multi-part 3MF (each part keeps its filament slot) to Downloads, to import in OrcaSlicer with Ctrl+I";
   // Welcome screen: say where it runs, point at the web app instead of the plugin, and copy links
   // (the plugin page has no browser to open them in, and following one would replace the app).
   $("whereLocal").textContent = "in Orca";
@@ -3170,10 +3276,10 @@ if (ORCA.on) {
     else if (m.cmd === "plate_changed") orcaPlateChanged(m);
     else if (m.cmd === "saved" || m.cmd === "save_error") {
       const P = ORCA.saves.get(m.id); if (!P) return; ORCA.saves.delete(m.id);
-      m.cmd === "saved" ? P.res(m.path) : P.rej(new Error(m.message || "unknown error"));
+      m.cmd === "saved" ? P.res(m) : P.rej(new Error(m.message || "unknown error"));
     } else if (/^llm_/.test(m.cmd || "")) llmReply(m);
     else if (m.cmd === "error") { busy(false); ORCA.rx = null; ORCA.want = null; clearTimeout(rxTimer); status(m.message); alert(m.message); }
   });
   orcaSend({ cmd: "objects", auto: true });
 }
-window.app = { S, deleteGeometry, closeHoles, meshHoles, setAnchor, setGap, setTrim, trimResult, trimMeshes, setSlide, updateTrim, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, buildOne3MF, buildPainted3MF, setPrintAs, deleteGeometry, closeHoles, meshHoles, setAnchor, setGap, setTrim, trimResult, trimMeshes, setSlide, updateTrim, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };

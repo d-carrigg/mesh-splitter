@@ -119,6 +119,19 @@ class FakeWindow:
         return self.open
 
 
+class FakePlater:
+    """export_3mf_copy writes state["project"] (an OrcaSlicer project 3MF the test made)."""
+    def __init__(self, state):
+        self.state = state
+
+    def export_3mf_copy(self, path):
+        with open(path, "wb") as f:
+            f.write(self.state["project"])
+
+    def project_path(self):
+        return self.state.get("project_path", "")
+
+
 class FakeBundle:
     def __init__(self, colors):
         self.colors = colors
@@ -132,6 +145,7 @@ def install(objects, storage=None, colors=("#FF0000", "#00AE42")):
     state = {"model": FakeModel(objects), "permissions": [], "capabilities": [], "windows": [], "notifications": []}
     host = types.SimpleNamespace(
         model=lambda: state["model"],
+        plater=lambda: FakePlater(state),
         plugin=types.SimpleNamespace(storage=lambda: storage or tempfile.gettempdir()),
         preset_bundle=lambda: FakeBundle(list(colors)),
         ui=types.SimpleNamespace(

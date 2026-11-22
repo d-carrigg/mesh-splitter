@@ -1,6 +1,6 @@
 # Mesh Splitter
 
-Split one solid mesh into separate, color-coded parts for multi-color or multi-piece printing, right inside OrcaSlicer. Scale, rotate, or completely replace sections of the mesh for easy customization of single or multi-material prints. If you have ever been asked to print a part and customize "just this one thing," you may like this plugin.
+Split one solid mesh into separate, color-coded parts to edit it, color it, or print it in several filaments, right inside OrcaSlicer. Scale, rotate, or completely replace sections of the mesh for easy customization of single or multi-material prints. If you have ever been asked to print a part and customize "just this one thing," you may like this plugin.
 
 For the example photo, I made the eyes 1 part, then replaced them with a flipped version to change where the figure looked. It also runs in **any browser**.
 
@@ -12,7 +12,7 @@ For the example photo, I made the eyes 1 part, then replaced them with a flipped
 - **[Editing parts](features/editing-parts.md):** fill, brush, merge, Replace with…, show only, rename
 - **[AI part naming](features/ai-naming.md):** optional, opt-in part names and cut review
 - **[Move, rotate, scale and heal](features/transforms.md):** handles, snapping, undo, rotate on joint, heal joint, fill and anchor
-- **[Exporting](features/exporting.md):** Send to Orca, painted 3MF, part STLs, merged STL
+- **[Exporting](features/exporting.md):** Print as (one part, painted or parts), Send to Orca, part STLs, merged STL
 - **[Command line](features/command-line.md):** split and export from a script with `uv run mesh-splitter split`
 - **[Claude Code plugin](features/claude-code.md):** ask Claude Code to split and export a model for you
 - **[How it works](how-it-works.md):** the splitting algorithm, the shared core, and the math behind joint transforms
@@ -23,7 +23,7 @@ For the example photo, I made the eyes 1 part, then replaced them with a flipped
 2. In OrcaSlicer 2.5, open **Plugins**, click the arrow next to **Browse plugins**, then **Install local plugin** and pick the file.
 3. Tick **Activate** and allow writing to Downloads. A **Mesh Splitter** tab appears next to Prepare / Preview.
 
-The tab lists the objects on your plate, and a single object opens automatically. **Send to Orca** saves `<name>_parts.3mf` to Downloads. Import it with **Ctrl+I**, because Orca's plugin API can't add objects to the plate itself.
+The tab lists the objects on your plate, and a single object opens automatically. **[Print as](features/exporting.md#print-as)** picks how the result prints: as one part on its original filament (the default for a plain object), painted, or as separate parts on their own filaments. **Send to Orca** puts the split on the plate, next to the original. The arrow next to it can also replace the original or its plate, or fill the plate with copies. OrcaSlicer asks how to open it: pick **Open as project**.
 
 ## Run in a browser
 
@@ -44,7 +44,7 @@ It opens at `http://127.0.0.1:8766/app/`. Everything runs locally, and nothing i
 | W / E / R / Q | Move / rotate / scale handles, then hide them |
 | J | Rotate on joint: one ring about the part's cut axis, pivoting at the cut's center |
 | Shift (while dragging) | Snap to 1 mm, 15° or 5% |
-| C | Toggle part colors / filament colors |
+| C | Toggle part colors / filament colors (follows Print as) |
 | Home | Frame the model |
 | Del | Delete the part (its faces join the neighbor) |
 | Ctrl+Z / Ctrl+Y | Undo / redo |

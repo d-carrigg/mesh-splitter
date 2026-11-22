@@ -1,6 +1,6 @@
 # Mesh Splitter
 
-Split one solid mesh into separate, color-coded parts for multi-color or multi-piece printing, right inside OrcaSlicer. Scale, rotate, or completely replace sections of the mesh for easy customization of single or multi-material prints. If you have ever been asked to print a part and customize "just this one thing," you may like this plugin.
+Split one solid mesh into separate, color-coded parts to edit it, color it, or print it in several filaments, right inside OrcaSlicer. Scale, rotate, or completely replace sections of the mesh for easy customization of single or multi-material prints. If you have ever been asked to print a part and customize "just this one thing," you may like this plugin.
 
 For the example photo, I made the eyes 1 part, then replaced them with a flipped version to change where the figure looked. It also runs in **any browser**.
 
@@ -11,13 +11,13 @@ For the example photo, I made the eyes 1 part, then replaced them with a flipped
 Every feature is documented with pictures on the [docs site](https://d-carrigg.github.io/mesh-splitter/).
 
 - **Split in a few clicks:** [auto split](https://d-carrigg.github.io/mesh-splitter/features/splitting/#auto-split), [split by shells](https://d-carrigg.github.io/mesh-splitter/features/splitting/#split-by-shells), or [click a seed per part](https://d-carrigg.github.io/mesh-splitter/features/splitting/#seeds-and-add-part). Cuts follow the model's creases.
-- **One color per part:** each part gets its own filament slot. [Rename](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#rename), hide, or [show only one part](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#show-only-this-part). Fix parts by hand with [fill, brush and merge](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#fill).
+- **One color per part:** each part gets its own color, and its own filament slot when you print in several filaments. [Rename](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#rename), hide, or [show only one part](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#show-only-this-part). Fix parts by hand with [fill, brush and merge](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#fill).
 - **[Move, rotate, scale](https://d-carrigg.github.io/mesh-splitter/features/transforms/#move-rotate-scale-and-undo):** drag handles in the view (W / E / R, Shift to snap), with undo.
 - **[Rotate on joint](https://d-carrigg.github.io/mesh-splitter/features/transforms/#rotate-on-joint):** spin a part about its cut's axis (J), so a part on an angled surface stays seated on it.
 - **[Heal joint](https://d-carrigg.github.io/mesh-splitter/features/transforms/#heal-joint):** after moving or rotating a part, stretch or squeeze it near its cut so the cut's edge lands back on its neighbor (no gap).
 - **[Fill and anchor](https://d-carrigg.github.io/mesh-splitter/features/transforms/#fill-and-anchor):** when a part moves off another, patch the hole it leaves (Fill), or keep it joined with new material (Anchor).
 - **[Replace with…](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#replace-with):** right-click a part and swap in another STL. It snaps onto the joint and keeps the part's name and filament. A replacement made from the same model, such as edited eyes, stays in place.
-- **[Send to Orca](https://d-carrigg.github.io/mesh-splitter/features/exporting/#send-to-orca):** one multi-part 3MF, every part on its filament. Painted 3MF, merged STL and per-part STLs are also available.
+- **[Send to Orca](https://d-carrigg.github.io/mesh-splitter/features/exporting/#send-to-orca):** the edited model goes back on the plate: next to the original, in its place, or filling the plate. **Print as** picks one part on the original's filament, one painted part, or separate parts on their own filaments. Painted 3MF, merged STL and per-part STLs are also available.
 - **[Command line](https://d-carrigg.github.io/mesh-splitter/features/command-line/):** `uv run mesh-splitter split model.stl --auto 6 -o model.3mf` splits and exports without opening the app, with the same results.
 - **[Claude Code plugin](https://d-carrigg.github.io/mesh-splitter/features/claude-code/):** ask Claude to split a model for you (`/plugin marketplace add d-carrigg/mesh-splitter`).
 - **Optional [AI part naming](https://d-carrigg.github.io/mesh-splitter/features/ai-naming/):** suggests part names and flags bad cuts, in the browser and in OrcaSlicer, with OpenAI, OpenRouter, Claude or a local model (LM Studio, Ollama).
@@ -28,7 +28,7 @@ Every feature is documented with pictures on the [docs site](https://d-carrigg.g
 2. In OrcaSlicer 2.5, open **Plugins**, click the arrow next to **Browse plugins**, then **Install local plugin** and pick the file.
 3. Tick **Activate** and allow writing to Downloads. A **Mesh Splitter** tab appears next to Prepare / Preview.
 
-The tab lists the objects on your plate, and a single object opens automatically. **Send to Orca** saves `<name>_parts.3mf` to Downloads. Import it with **Ctrl+I**, because Orca's plugin API can't add objects to the plate itself.
+The tab lists the objects on your plate, and a single object opens automatically. **Send to Orca** puts the split on the plate, next to the original. The arrow next to it can also replace the original or its plate, or fill the plate with copies. OrcaSlicer asks how to open it: pick **Open as project**.
 
 ## Run in a browser
 
@@ -73,7 +73,7 @@ Then ask, for example, "split figure.stl into head, body and base and give me a 
 | W / E / R / Q | Move / rotate / scale handles, then hide them |
 | J | Rotate on joint: one ring about the part's cut axis, pivoting at the cut's center |
 | Shift (while dragging) | Snap to 1 mm, 15° or 5% |
-| C | Toggle part colors / filament colors |
+| C | Toggle part colors / filament colors (follows Print as) |
 | Home | Frame the model |
 | Del | Delete the part (its faces join the neighbor) |
 | Shift+Del | Delete the part's geometry from the model and close the holes it leaves |

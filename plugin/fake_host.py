@@ -2,7 +2,8 @@
 
     python fake_host.py MESH.stl|MESH.3mf [--out DIR]
 
-Each stdin line is one page -> plugin message; each stdout line is one plugin -> page message.
+Each stdin line is one page -> plugin message; each stdout line is one plugin -> page message, plus
+{"cmd": "__handoff", files} where the plugin would hand files to OrcaSlicer (Send to Orca).
 The mesh is put on the fake plate rotated 90 deg about Z and offset, so world transforms are exercised.
 """
 import argparse
@@ -50,6 +51,13 @@ def main():
             out.write(json.dumps(msg) + "\n")
             out.flush()
 
+    # Send to Orca: the open project is a minimal OrcaSlicer project with the mesh's object on plate 1, and the
+    # files are recorded instead of handed to a running OrcaSlicer (there is none here).
+    from test_plugin import orca_project
+    sys.modules["orca"]._state["project"] = orca_project([(Path(a.mesh).stem, 0, (128, 128))])
+    sys.modules["orca"]._state["project_path"] = os.path.join(a.out, "e2e project.3mf")
+    plugin.handoff.supported = lambda: True
+    plugin.handoff.send = lambda files: send({"cmd": "__handoff", "files": files})
     bridge = plugin.Bridge(send)
     for line in sys.stdin:
         if line.strip():

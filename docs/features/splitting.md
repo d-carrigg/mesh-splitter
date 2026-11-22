@@ -26,7 +26,7 @@ Splits the whole mesh into parts in one click. Cuts land on concave creases (the
 - With the automatic count, it over-splits first, then merges neighbors whose shared edge isn't a real crease. For soft, rounded models (a plush toy) lower **Crease** below 2 before splitting so softer creases count.
 - With a set count you get exactly that many parts.
 - Opening a model fixes two things first, and the status bar says so: inside-out shells are turned right side out, and a mesh made mostly of long, thin triangles (a CAD export) gets its long edges split so the creases show. The surface doesn't change.
-- Each part gets its own color and filament slot (F2, F3, …). Change either in the sidebar's **Part** section.
+- Each part gets its own color and filament slot (F2, F3, …). Change either in the sidebar's **Part** section. The slots only show when [Print as](exporting.md#print-as) is **Painted** or **Parts**. In **One part** (the default for a plain STL) the colors only tell the parts apart, and the model prints on one filament.
 - To refine the result, use [seeds](#seeds-and-add-part), [fill, brush or merge](editing-parts.md#fill). Every step can be undone with Ctrl+Z.
 
 ## Split by shells
@@ -44,7 +44,7 @@ Makes one part per disconnected piece (shell) of the mesh. Use it for files that
 ### Tips
 
 - A mesh with one connected shell can't be split this way. Use [auto split](#auto-split) or [seeds](#seeds-and-add-part) instead.
-- To print several shells in the same color, select them and [merge](editing-parts.md#merge) them, or give them the same filament slot.
+- To print the shells in different colors, set [Print as](exporting.md#print-as) to **Parts**. To print several shells in the same color, select them and [merge](editing-parts.md#merge) them, or give them the same filament slot.
 
 ## Seeds and Add part
 

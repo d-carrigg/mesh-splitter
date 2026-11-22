@@ -92,7 +92,7 @@ With no output option, it writes `<name>_parts.3mf` next to the mesh. Use any mi
 
 | Option | Writes |
 | --- | --- |
-| `-o, --out FILE` | Multi-part 3MF: one object, one part per split part with its name and filament slot. The same file as **Send to Orca**. Import it with **Ctrl+I**. |
+| `-o, --out FILE` | Multi-part 3MF: one object, one part per split part with its name and filament slot. The same file as **Multi-part 3MF to Downloads** in the plugin. Import it with **Ctrl+I**. |
 | `--painted FILE` | Painted 3MF: one mesh, each face painted with its part's filament slot. |
 | `--stl DIR` | One closed STL per part, with the cut openings capped. |
 | `--merged FILE` | All parts in one STL. Each part is closed, so the cut caps stay inside where parts touch. |

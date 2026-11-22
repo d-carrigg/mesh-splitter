@@ -15,7 +15,8 @@ this file. Install the wheel from Plugins > Install local plugin, then tick Acti
 
   page --orca.postMessage({cmd: 'objects'})--------------> plugin: list plate objects
   page --orca.postMessage({cmd: 'mesh', index})----------> plugin: world-space mesh, base64 chunks
-  page --orca.postMessage({cmd: 'save', id, name, ...})--> plugin: write the file to Downloads
+  page --orca.postMessage({cmd: 'save', id, name, ...})--> plugin: write the file to Downloads, or with a `mode`
+                                                           hand the split to OrcaSlicer (send_to_orca below)
   page --orca.postMessage({cmd: 'llm_*', ...})-----------> plugin: AI part naming settings / one request, only when
                                                            the user clicks (llm_providers below)
 
@@ -25,8 +26,11 @@ such as LM Studio on their own computer). OrcaSlicer asks the user's permission 
 request (ask_network_permission), and once AI naming is set up the plugin declares that one host with
 orca.request_permissions at load (register_capabilities below). Nothing else in the plugin uses the network.
 
-OrcaSlicer 2.5's plugin API reads the model but cannot add or replace objects, so the split comes back as
-a 3MF (one object, one part per split part, filament slot per part) that you import with Ctrl+I.
+OrcaSlicer 2.5's plugin API reads the model but cannot add or replace objects. So Send to Orca edits a copy of the
+open project (project3mf.py): it adds the split next to the original, or in its place, or fills its plate with
+copies. It then hands that copy to the running OrcaSlicer the way a second launch of OrcaSlicer would (handoff.py),
+and OrcaSlicer opens it as the project. Where the handoff isn't available (macOS) the project is saved to Downloads
+to open with File > Open Project.
 """
 import base64
 import json
@@ -44,6 +48,8 @@ try:
 except Exception:  # numpy is declared above; uv installs it when the plugin loads
     np = None
 
+import handoff  # noqa: E402
+import project3mf  # noqa: E402
 from llm_providers import abort as llm_abort, call as llm_call, check as llm_check, resolve as llm_resolve, status as llm_status, update as llm_update  # noqa: E402  __LLM_PROVIDERS__
 
 CHUNK = 512 * 1024
@@ -181,8 +187,12 @@ def list_objects(model):
         vols = obj.volumes()
         parts = [v for v in vols if v.is_model_part()]
         faces = sum(v.facets_count() for v in parts)
+        painted = getattr(obj, "is_mm_painted", None)
         out.append({"index": i, "id": int(obj.id()), "name": obj.name or f"Object {i + 1}", "parts": len(parts),
-                    "faces": int(faces), "ignored": len(vols) - len(parts)})
+                    "faces": int(faces), "ignored": len(vols) - len(parts),
+                    # how the object prints now: the page starts in the matching "Print as" mode
+                    "painted": bool(painted()) if painted else False,
+                    "filaments": sorted({int(v.extruder_id()) for v in parts if hasattr(v, "extruder_id")})})
     return out
 
 
@@ -242,6 +252,70 @@ def unique_path(folder, name):
         path = os.path.join(folder, f"{stem} ({n}){ext}")
         n += 1
     return path
+
+
+def write_new(folder, name, data):
+    path = unique_path(folder, name)
+    with open(path, "wb") as f:
+        f.write(data)
+    return path
+
+
+def object_index(model, src):
+    """Where the object the split came from is in the plate's object list now (it may have moved since)."""
+    objs = model.objects()
+    for i, o in enumerate(objs):
+        if src.get("id") is not None and int(o.id()) == int(src["id"]):
+            return i, o.name
+    raise ValueError(f"'{src.get('name') or 'The original object'}' is no longer on the plate; open it from the plate again")
+
+
+def send_to_orca(data, msg):
+    """Send to Orca: hand the page's multi-part 3MF (`data`) to OrcaSlicer. Runs on the UI thread (a page message),
+    which the plater calls need. Returns the 'saved' reply: the files written and a note for the user.
+
+      add             the split as a new object next to the original (plate 1's middle if it isn't from the plate)
+      replace_object  the split takes the original's place
+      replace_plate   the original's plate is cleared and the split takes the original's place
+      fill_plate      the original's plate is cleared and filled with copies of the split
+
+    msg["single"]: `data` is the edited model as one part, which goes on the original object's filament (the default;
+    otherwise each part keeps its filament slot). The plugin edits a copy of the project (project3mf.py) and hands it
+    to OrcaSlicer, which asks how to open it:
+    'Open as project' loads it. Unsaved changes are already in that copy, so 'No' is fine when it offers to save.
+    """
+    mode, src = msg["mode"], msg.get("source") or {}
+    folder = output_dir()
+    name = re.sub(r"_parts$", "", os.path.splitext(safe_name(msg.get("name")))[0]) or "Split"
+    index, src_name = object_index(orca.host.model(), src) if src else (None, None)
+    plater = orca.host.plater()
+    stem = os.path.splitext(os.path.basename(plater.project_path() or ""))[0] or "Untitled"
+    tmp = unique_path(folder, ".mesh-splitter-project.3mf")
+    try:
+        plater.export_3mf_copy(tmp)
+        with open(tmp, "rb") as f:
+            project = f.read()
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    colors = {int(k): v for k, v in (msg.get("colors") or {}).items() if str(k).isdigit()}
+    edited, info = project3mf.apply(project, data, mode, index, name=name, object_name=src_name, colors=colors,
+                                    single=bool(msg.get("single")))
+    path = write_new(folder, f"{safe_name(stem)} - Mesh Splitter.3mf", edited)
+    if not handoff.supported():
+        note = (f"Saved {os.path.basename(path)} to {folder}. Sending to OrcaSlicer isn't available on this system: "
+                "open it with File > Open Project.")
+        return {"path": path, "files": [path], "note": note}
+    try:
+        handoff.send([path])
+    except Exception as e:  # the project is saved either way: say where, and how to open it
+        note = (f"Couldn't reach OrcaSlicer ({e}). The project is saved as {os.path.basename(path)} in {folder}: "
+                "open it with File > Open Project.")
+        return {"path": path, "files": [path], "note": note, "warn": True, **info}
+    note = ("Sent to OrcaSlicer. When it asks, pick Open as project. It already has your unsaved changes, so No is "
+            f"fine when it offers to save. The project is now {os.path.basename(path)} in {folder}.")
+    notify("Mesh Splitter: " + note)
+    return {"path": path, "files": [path], "note": note, "ask": "Open as project", **info}
 
 
 class Bridge:
@@ -359,9 +433,13 @@ class Bridge:
         if any(x is None for x in buf):
             return
         del self.saves[sid]
+        data = base64.b64decode("".join(buf))
+        if msg.get("mode"):
+            self.send({"cmd": "saved", "id": sid, **send_to_orca(data, msg)})
+            return
         path = unique_path(output_dir(), safe_name(msg.get("name")))
         with open(path, "wb") as f:
-            f.write(base64.b64decode("".join(buf)))
+            f.write(data)
         self.send({"cmd": "saved", "id": sid, "path": path})
         if path.lower().endswith(".3mf"):
             notify(f"Mesh Splitter saved {os.path.basename(path)} to {os.path.dirname(path)}. Press Ctrl+I to import it.")
@@ -417,6 +495,7 @@ class MeshSplitterPlugin(orca.base):
     def register_capabilities(self):
         # Declared at load, so OrcaSlicer asks the user before the plugin uses them:
         #  - write files in ~/Downloads: Send to Orca saves the split 3MF there
+        #  - Linux only: run dbus-send to hand that 3MF to this OrcaSlicer (handoff.py; Windows needs no program)
         #  - only once the user has set up AI part naming: connect to that one provider's host, and start
         #    background threads (the request runs off the UI thread). Nothing is declared or sent before that;
         #    the first Connect or Name parts click asks OrcaSlicer's permission for the host (ask_network_permission).
@@ -424,6 +503,7 @@ class MeshSplitterPlugin(orca.base):
         ai_host = ai_naming_host()
         orca.request_permissions(
             fs_readwrite=[os.path.join(downloads_dir(), "*")],
+            process=handoff.PROCESSES,
             network=[ai_host] if ai_host else [],
             threading=bool(ai_host),
         )
