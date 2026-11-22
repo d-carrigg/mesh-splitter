@@ -5,6 +5,7 @@ Fix, swap, view and name parts after a split. Every edit can be undone with Ctrl
 - [Fill](#fill)
 - [Brush](#brush)
 - [Merge](#merge)
+- [Delete geometry](#delete-geometry)
 - [Replace with…](#replace-with)
 - [Show only this part](#show-only-this-part)
 - [Rename](#rename)
@@ -40,6 +41,16 @@ Joins parts into one.
 ![Two parts selected, then merged](img/merge.png)
 
 To remove a part instead, select it and press **Del**: its faces join the neighboring part.
+
+## Delete geometry
+
+Removes a part's faces from the model itself (**Del** keeps them and hands them to a neighbor). Use it to drop a piece you don't want to print, such as a broom handle you will print separately.
+
+![The broom handle deleted: holes left open, then closed](img/delete-geometry.png)
+
+- Right-click the part > **Delete geometry, close holes**, select it and click **Remove** in the sidebar's **Part** section, or press **Shift+Del**. Each hole it leaves in a neighboring part is closed with a patch that follows that part's surface, in that part's color.
+- **Delete geometry, leave holes** keeps the holes open. Right-click a part with holes > **Close holes in this part** to close them later.
+- Undo (Ctrl+Z) brings the part back.
 
 ## Replace with…
 
