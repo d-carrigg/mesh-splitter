@@ -8,6 +8,7 @@
 # author = "d-carrigg"
 # version = "__VERSION__"
 # ///
+# Copyright (c) 2026 Darin Carrigg. MIT License: see LICENSE. Official releases: https://github.com/d-carrigg/mesh-splitter
 """Mesh Splitter for OrcaSlicer 2.5 (stock build).
 
 Built by plugin/build.py into dist/mesh_splitter_any.whl, with the bundled app/index.html as page.html next to

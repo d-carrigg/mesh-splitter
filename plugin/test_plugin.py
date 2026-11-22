@@ -287,11 +287,12 @@ class BuildTests(unittest.TestCase):
             self.assertEqual(sorted(z.namelist()), sorted([
                 "mesh_splitter_any/__init__.py", "mesh_splitter_any/page.html",
                 "mesh_splitter_any/handoff.py", "mesh_splitter_any/project3mf.py",
-                info + "METADATA", info + "WHEEL", info + "top_level.txt", info + "RECORD"]))
+                info + "METADATA", info + "WHEEL", info + "top_level.txt", info + "RECORD", info + "LICENSE"]))
             meta = z.read(info + "METADATA").decode()
-            for line in ("Name: Mesh Splitter", "Version: 9.9.9", "Author: d-carrigg", "Requires-Dist: numpy"):
+            for line in ("Name: Mesh Splitter", "Version: 9.9.9", "Author: d-carrigg", "License: MIT", "Requires-Dist: numpy"):
                 self.assertIn(line, meta)
             self.assertIn("Tag: py3-none-any", z.read(info + "WHEEL").decode())
+            self.assertIn("Copyright (c) 2026 Darin Carrigg", z.read(info + "LICENSE").decode())
             z.extractall(d)
             fake_orca.install([])
             sys.path.insert(0, d)  # OrcaSlicer imports the package by name (top_level.txt)

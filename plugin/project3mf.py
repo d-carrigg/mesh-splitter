@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Darin Carrigg. MIT License: see LICENSE. Official releases: https://github.com/d-carrigg/mesh-splitter
 """Put a Mesh Splitter result into the open OrcaSlicer project: add it, replace an object or a plate, or fill a plate.
 
 OrcaSlicer 2.5's plugin API can read the plate but cannot add, remove or replace objects. It can write the whole
