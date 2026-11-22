@@ -263,6 +263,87 @@ function deletePart(i) {
   S.active = into > i ? into - 1 : into;
   afterEdit(into > 0 ? `Deleted ${p.name}, merged into ${S.parts[S.active].name}` : `Deleted ${p.name}`);
 }
+// ---------------------------------------------------------------- delete geometry / close holes
+// Delete geometry takes a part's faces out of the model itself (the merge-delete above keeps them). Where it touched
+// other parts it leaves holes in them; with `close` on (the default) each hole gets a patch that follows the surface
+// around it (patchRings, as Fill uses), made of real faces of the part around the hole. closeHoles does the same for
+// holes already in the mesh, so a hole left open can be closed later.
+function clearMeshCaches() { twinCache = { key: null, map: null }; loopCache.clear(); patchCache.clear(); pocketCache.clear(); healCache.clear(); }
+// Holes: boundary loops of the whole mesh (edges with one face), as [{ lp, own }] with own the part with most of its edges.
+function meshHoles() {
+  const m = meshOf(() => true); if (!m) return [];
+  const tw = twinLabels(fullHash()), nV = S.nV;
+  return m.loopList.map((lp) => {
+    const c = new Map(); for (const [a, b] of lp) { const l = tw.get(a * nV + b); c.set(l, (c.get(l) || 0) + 1); }
+    return { lp, own: [...c].sort((x, y) => y[1] - x[1])[0][0] };
+  });
+}
+// Close holes with new faces of the part around each. which(hole) picks the holes. Returns the number closed.
+function closeHoleFaces(which = () => true) {
+  const holes = meshHoles().filter(which); if (!holes.length) return 0;
+  const hash = fullHash(), P = Array.from(S.pos), T = Array.from(S.tri), L = Array.from(S.labels);
+  for (const { lp, own } of holes) {
+    const at = new Map(), keyOf = (x, y, z) => `${x},${y},${z}`;
+    for (const [a] of lp) at.set(keyOf(S.pos[3*a], S.pos[3*a+1], S.pos[3*a+2]), a);
+    const ring0 = new Float32Array(3 * lp.length); lp.forEach(([a], j) => { ring0[3*j] = S.pos[3*a]; ring0[3*j+1] = S.pos[3*a+1]; ring0[3*j+2] = S.pos[3*a+2]; });
+    const R = patchRings(lp, own > 0 ? own : -1, hash), out = [];
+    ringTris([ring0, ...R.rings], R.c, false, out);
+    const F = Float32Array.from(out), vid = (o) => { // loop points keep their vertex, so the patch is joined to the part
+      const k = keyOf(F[o], F[o+1], F[o+2]); let v = at.get(k);
+      if (v === undefined) { v = P.length / 3; P.push(F[o], F[o+1], F[o+2]); at.set(k, v); }
+      return v;
+    };
+    for (let o = 0; o < F.length; o += 9) {
+      const a = vid(o), b = vid(o + 3), c = vid(o + 6); if (a === b || b === c || a === c) continue;
+      T.push(a, b, c); L.push(Math.max(0, own));
+    }
+  }
+  setMesh(Float32Array.from(P), Uint32Array.from(T)); S.labels = Int32Array.from(L); clearMeshCaches();
+  return holes.length;
+}
+function closeHoles(i = -1) { // i > 0: only the holes in part i
+  const before = snapshot(), n = closeHoleFaces((h) => i <= 0 || h.own === i);
+  if (!n) { status(i > 0 ? `${S.parts[i].name} has no holes` : "No holes in the model"); return; }
+  pushUndo(before);
+  afterEdit(`Closed ${n} hole${n > 1 ? "s" : ""}${i > 0 ? ` in ${S.parts[i].name}` : ""}`);
+}
+const holesIn = (i) => (S.G ? meshHoles().filter((h) => i < 0 || h.own === i).length : 0);
+function deleteGeometry(js, close = true) {
+  js = [...new Set(js)].filter((j) => j > 0 && S.parts[j]);
+  if (!js.length) return;
+  const gone = new Set(js), keep = []; for (let f = 0; f < S.nF; f++) if (!gone.has(S.labels[f])) keep.push(f);
+  if (!keep.length) { status("Can't delete every part: nothing would be left"); return; }
+  const before = snapshot(), names = js.map((j) => S.parts[j].name);
+  // the deleted faces' vertices: a hole through one of them is a hole the delete opened
+  const rim = new Set(); for (let f = 0; f < S.nF; f++) if (gone.has(S.labels[f])) for (let c = 0; c < 3; c++) rim.add(S.tri[3*f+c]);
+  // compact the kept faces and their vertices; part indexes shift down past the deleted ones
+  const vmap = new Int32Array(S.nV).fill(-1), P = [], T = [], newF = new Int32Array(S.nF).fill(-1), shift = new Int32Array(S.parts.length);
+  for (let l = 0, d = 0; l < S.parts.length; l++) { if (gone.has(l)) { d++; shift[l] = -1; } else shift[l] = l - d; }
+  const rimNew = new Set();
+  keep.forEach((f, k) => {
+    newF[f] = k;
+    for (let c = 0; c < 3; c++) {
+      const v = S.tri[3*f+c];
+      if (vmap[v] < 0) { vmap[v] = P.length / 3; P.push(S.pos[3*v], S.pos[3*v+1], S.pos[3*v+2]); if (rim.has(v)) rimNew.add(vmap[v]); }
+      T.push(vmap[v]);
+    }
+  });
+  const labels = Int32Array.from(keep, (f) => shift[S.labels[f]]);
+  const uids = new Set(js.map((j) => S.parts[j].uid).filter(Boolean));
+  S.parts = S.parts.filter((_, l) => !gone.has(l));
+  for (const p of S.parts) { // seeds are face indexes; links to a deleted part go
+    p.seeds = p.seeds.map((f) => newF[f]).filter((f) => f >= 0);
+    if (p.follow && uids.has(p.follow.to)) delete p.follow;
+    if (p.reach && uids.has(p.reach.to)) { delete p.reach; if (p.xf) { delete p.xf.m; delete p.xf.rig; } }
+    if (p.hold && (uids.has(p.hold.a) || uids.has(p.hold.b))) { delete p.hold; if (p.xf) { delete p.xf.m; delete p.xf.rig; } }
+  }
+  mergeSel.clear(); S.active = 0;
+  setMesh(Float32Array.from(P), Uint32Array.from(T)); S.labels = labels; clearMeshCaches();
+  const n = close ? closeHoleFaces((h) => h.lp.some(([a]) => rimNew.has(a))) : 0;
+  pushUndo(before);
+  const what = names.length > 1 ? `${names.length} parts` : names[0];
+  afterEdit(close ? `Deleted ${what} from the model${n ? `; closed ${n} hole${n > 1 ? "s" : ""} it left` : ""}` : `Deleted ${what} from the model; holes left open (right-click > Close holes)`);
+}
 // Crease snapping and boundary anti-aliasing: see core.js.
 const snapCreases = (mask = null) => core.snapCreases(S, mask, smoothIters());
 function smoothCut(mask = null) { const tri0 = S.tri, n = core.smoothCut(S, mask); meshChanged(tri0); return n; }
@@ -1454,7 +1535,10 @@ function openCtx(ev) {
       : it("reach", `Reach for ${act.name} (turn at its joint, stretch)`, () => setReach(l, S.active));
     it("replace", p.rep ? "Replace with another…" : "Replace with…", () => replaceWith(l));
     if (p.rep) it("reset", "Remove replacement", () => { selectPart(l); $("repDel").click(); });
+    if (holesIn(l)) it("fill", "Close holes in this part", () => closeHoles(l));
     it("trash", "Delete (merge into neighbor)", () => deletePart(l), "danger");
+    it("trash", "Delete geometry, close holes", () => deleteGeometry([l], true), "danger");
+    it("trash", "Delete geometry, leave holes", () => deleteGeometry([l], false), "danger");
   }
   if (anyUn && l !== 0) it("fill", "Fill all unassigned", () => fillUnassigned(-1));
   else if (l === 0) it("fill", "Fill all unassigned", () => fillUnassigned(-1));
@@ -1494,6 +1578,8 @@ function openPartMenu(ev, i) {
     it("eyeOff", "Hide these", () => { sel.forEach((j) => (S.parts[j].visible = false)); afterEdit(); });
     items.push("-");
     it("trash", `Delete ${sel.length} parts (merge into neighbors)`, () => { const ps = sel.map((j) => S.parts[j]); mergeSel.clear(); for (const q of ps) { const j = S.parts.indexOf(q); if (j > 0) deletePart(j); } }, "danger");
+    it("trash", `Delete geometry of ${sel.length} parts, close holes`, () => deleteGeometry(sel, true), "danger");
+    it("trash", `Delete geometry of ${sel.length} parts, leave holes`, () => deleteGeometry(sel, false), "danger");
     showMenu(ev, `${sel.length} parts selected`, items); return;
   }
   it("text", "Rename", () => startRename(i));
@@ -1503,7 +1589,10 @@ function openPartMenu(ev, i) {
   if (p.seeds.length) it("eraser", "Clear points", () => { pushUndo(); p.seeds = []; afterEdit(); });
   items.push("-");
   if (i > 0) it("replace", p.rep ? "Replace with another…" : "Replace with…", () => replaceWith(i));
+  if (holesIn(i)) it("fill", "Close holes in this part", () => closeHoles(i));
   it("trash", "Delete (merge into neighbor)", () => deletePart(i), "danger");
+  it("trash", "Delete geometry, close holes", () => deleteGeometry([i], true), "danger");
+  it("trash", "Delete geometry, leave holes", () => deleteGeometry([i], false), "danger");
   showMenu(ev, `<span class="sw" style="background:${p.color}"></span>${esc(p.name)} · F${p.filament}`, items);
 }
 
@@ -1628,6 +1717,7 @@ $("pcName").onblur = () => { const p = act(); if (p) $("pcName").value = p.name;
 $("pcFil").onchange = () => { const p = act(); if (p) { p.filament = Math.max(1, Math.min(32, Math.round(+$("pcFil").value || 1))); refreshUI(); autosave(); } };
 $("pcClose").onclick = () => selectPart(0);
 $("pcDel").onclick = () => S.active > 0 && deletePart(S.active);
+$("pcDelGeo").onclick = () => S.active > 0 && later(() => deleteGeometry([S.active], true));
 // Tool panels dock at the right of the view. While one is open, the view's center moves to the middle of the
 // space left of it, so the model isn't hidden behind the panel and keeps its size.
 function fitViewToPanels() {
@@ -1744,7 +1834,7 @@ window.addEventListener("keydown", (e) => {
   }
   if (e.key === "Home" && S.G) { e.preventDefault(); frame(); return; }
   if (e.key === "Escape") { if (!$("ctxMenu").hidden) closeCtx(); else if (placing) stopPlacing(); else if (flow) closeFlow(); else if (pickingJoint) { pickingJoint = false; refreshUI(); status(""); } else if (S.G && S.active) selectPart(0); else if (!$("splitPanel").hidden) closeAuto(); return; }
-  if (e.key === "Delete" && S.G && S.active > 0) { deletePart(S.active); return; }
+  if (e.key === "Delete" && S.G && S.active > 0) { if (e.shiftKey) later(() => deleteGeometry(selected(), true)); else deletePart(S.active); return; }
   if (k === "c" && S.G) { setColorMode(!byFilament); return; }
   if (S.G && S.active > 0 && k === "j") { setGizmoJoint(!gzJointOn); return; }
   if (S.G && S.active > 0 && (k === "w" || k === "e" || k === "r")) { setGizmo({ w: "translate", e: "rotate", r: "scale" }[k]); return; }
@@ -2891,4 +2981,4 @@ if (ORCA.on) {
   });
   orcaSend({ cmd: "objects", auto: true });
 }
-window.app = { S, setAnchor, setGap, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, deleteGeometry, closeHoles, meshHoles, setAnchor, setGap, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };

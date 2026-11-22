@@ -76,6 +76,7 @@ Then ask, for example, "split figure.stl into head, body and base and give me a 
 | C | Toggle part colors / filament colors |
 | Home | Frame the model |
 | Del | Delete the part (its faces join the neighbor) |
+| Shift+Del | Delete the part's geometry from the model and close the holes it leaves |
 | Ctrl+Z / Ctrl+Y | Undo / redo |
 | Right-click | Part actions: rename, show only, replace, … |
 
