@@ -30,11 +30,7 @@ Inside OrcaSlicer, the main button is **Send to Orca**. It puts the edited model
 
 1. Install the plugin (see [Install in OrcaSlicer](../index.md#install-in-orcaslicer)) and open the **Mesh Splitter** tab.
 2. Pick the object from the plate in the file menu. A single object on the plate opens by itself.
-3. Split it, then click **Send to Orca**, or pick an option from the arrow next to it:
-   - **Add to plate** (the main button): the split goes next to the original.
-   - **Replace** *(object name)*: the split takes the original's place.
-   - **Replace plate:** the original's plate is cleared, and the split goes where the original was.
-   - **Fill plate:** the original's plate is cleared and filled with as many copies of the split as fit, 6 mm apart.
+3. Split it, then click **Send to Orca**. The split goes next to the original. If you deleted the original in OrcaSlicer, it goes where the original was.
 4. OrcaSlicer asks how to open the file. Pick **Open as project**. If it offers to save the current project, **No** is fine: your unsaved changes are already in the new one.
 
 What goes back depends on [Print as](#print-as).
@@ -47,13 +43,13 @@ OrcaSlicer's plugin API can read the plate but can't add or replace objects. So 
 
 - **Pick Open as project.** **Import geometry only** adds the whole project a second time.
 - **macOS:** OrcaSlicer opens 3MF files from other apps in a new window, so the plugin only saves the file. Open it with **File > Open Project**.
-- **Multi-part 3MF to Downloads** (in the arrow menu) still saves `<name>_parts.3mf` on its own, to import with **Ctrl+I**.
+- The file exports in the arrow menu (**Multi-part 3MF**, **Painted 3MF**, **Part STLs**, **Merged STL**) save a file instead. On Windows they ask where with the Save dialog; elsewhere they save to Downloads. Import a 3MF with **Ctrl+I**.
 
 ## Other exports
 
 The arrow next to the main button (in the plugin and the browser) also offers:
 
-- **Multi-part 3MF to Downloads** (plugin only): the split as `<name>_parts.3mf`, to import with **Ctrl+I**.
+- **Multi-part 3MF** in the plugin: the split as `<name>_parts.3mf`, to import with **Ctrl+I**.
 
 - **Painted 3MF:** the same mesh, each triangle painted with its part's filament.
 - **Part STLs (.zip):** one closed STL per part, cut faces capped.

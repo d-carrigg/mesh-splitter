@@ -3174,13 +3174,12 @@ ORCA.save = (name, data, send = null, note = "") => {
     return m.path;
   }).catch((e) => { status(`Save failed: ${e.message}`); alert(`Save failed: ${e.message}`); });
 };
-// Send to Orca. mode: add (a new object next to the original), replace_object, replace_plate or fill_plate
-// (those three need the model opened from the plate: the plugin finds the original by its id). The plugin puts
-// the split into a copy of the project and OrcaSlicer opens that as the project.
-ORCA.send = (mode) => {
+// Send to Orca: the plugin adds the split to a copy of the project, next to the original when it came from the plate,
+// and OrcaSlicer opens that copy as the project. (The plugin can also replace the original or its plate, but
+// OrcaSlicer asks "Open as project / Import geometry only" either way, so the page only offers the add.)
+ORCA.send = (mode = "add") => {
   if (!S.G) return;
   const src = S.source?.orca;
-  if (mode !== "add" && !src) { alert("Open the model from the plate (Model > From the plate) to replace it there."); return; }
   // Print as decides the file: One part (the plugin puts it on the original object's filament), Painted (one part,
   // painted with the parts' filaments) or Parts (each part on its filament slot). The last two can use slots the
   // project doesn't have yet: the plugin adds them, in the parts' colors.
@@ -3190,15 +3189,6 @@ ORCA.send = (mode) => {
   if (as !== "one") for (const p of S.parts.slice(1)) colors[p.filament] ??= p.color;
   return ORCA.save(`${S.name}_parts.3mf`, out, { mode, colors, single: as !== "parts", source: src ? { id: src.id, index: src.index, name: src.name } : null });
 };
-function orcaSendMenu() {
-  const src = S.source?.orca;
-  for (const id of ["sendReplace", "sendPlate", "sendFill"]) {
-    $(id).dataset.tip ??= $(id).title;
-    $(id).disabled = !src;
-    $(id).title = src ? $(id).dataset.tip : "Open the model from the plate (Model > From the plate) to replace it there";
-  }
-  $("sendReplace").lastChild.textContent = src ? `Replace ${src.name}` : "Replace object";
-}
 function orcaRenderObjects() {
   for (const box of [$("orcaMenu"), $("dropOrca")]) {
     box.innerHTML = "";
@@ -3255,15 +3245,9 @@ if (ORCA.on) {
   document.querySelectorAll(".orcaOnly").forEach((e) => (e.hidden = false));
   $("fileBtnLbl").textContent = "From plate";
   $("expMain").lastChild.textContent = "Send to Orca";
-  $("expMain").title = $("sendAdd").title;
-  $("expMain").onclick = () => { closeMenus(); later(() => ORCA.send("add")); };
-  $("sendAdd").onclick = $("expMain").onclick;
-  $("sendReplace").onclick = () => { closeMenus(); later(() => ORCA.send("replace_object")); };
-  $("sendPlate").onclick = () => { closeMenus(); later(() => ORCA.send("replace_plate")); };
-  $("sendFill").onclick = () => { closeMenus(); later(() => ORCA.send("fill_plate")); };
-  $("expBtn").addEventListener("click", orcaSendMenu);
-  $("expParts").lastChild.textContent = "Multi-part 3MF to Downloads";
-  $("expParts").title = "Save a multi-part 3MF (each part keeps its filament slot) to Downloads, to import in OrcaSlicer with Ctrl+I";
+  $("expMain").title = "Add the split to the plate, next to the original. OrcaSlicer asks how to open it: pick Open as project";
+  $("expMain").onclick = () => { closeMenus(); later(() => ORCA.send()); };
+  $("expParts").title = "Save a multi-part 3MF (each part keeps its filament slot), to import in OrcaSlicer with Ctrl+I";
   // Welcome screen: say where it runs, point at the web app instead of the plugin, and copy links
   // (the plugin page has no browser to open them in, and following one would replace the app).
   $("whereLocal").textContent = "in Orca";

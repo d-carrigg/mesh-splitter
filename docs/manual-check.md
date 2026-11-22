@@ -131,11 +131,11 @@ A hands-on pass over every feature, run on request ("check the whole app") rathe
 |---|---|---|
 | 10.1 | Start OrcaSlicer with the plugin installed. | It loads with no error; the **Mesh Splitter** tab is there. |
 | 10.2 | Put one object on the plate, open the tab. | The page shows the plugin UI (no browser top bar); the single object opens by itself and is auto split. With several objects, they are listed under **From the plate** in the Open menu. 📷 compare with `orca-plate-menu.png` |
-| 10.3 | Print as **One part**. Turn a part on its joint with **Heal joint** on. Arrow next to **Send to Orca** > **Replace** *(name)*. | OrcaSlicer asks how to open the file: pick **Open as project**. The object is replaced in place: one object, one part, on the original's filament, with the turned part. No added filaments. 📷 |
-| 10.4 | Print as **Painted**, **Replace** again. | One object, one part, painted with the parts' colors. OrcaSlicer has the extra filaments it needs. 📷 |
-| 10.5 | Print as **Parts**, **Send to Orca** (Add to plate). | The original stays; the model is placed next to it with one part per split part, each on its own filament. 📷 |
-| 10.6 | **Replace plate**, then **Fill plate**. | Replace plate clears the plate and puts the model where the original was. Fill plate fills the plate with named copies, 6 mm apart, none on excluded areas. 📷 |
-| 10.7 | Arrow > **Multi-part 3MF to Downloads**. | Saves `<name>_parts.3mf`; Ctrl+I imports it as one object with a part per split part. |
+| 10.3 | Print as **One part**. Turn a part on its joint with **Heal joint** on. **Send to Orca**. | OrcaSlicer asks how to open the file: pick **Open as project**. The model is added next to the original: one object, one part, on the original's filament, with the turned part. No added filaments. 📷 |
+| 10.4 | Print as **Painted**, **Send to Orca** again. | One object, one part, painted with the parts' colors. OrcaSlicer has the extra filaments it needs. 📷 |
+| 10.5 | Print as **Parts**, **Send to Orca**. | The model is placed next to the original with one part per split part, each on its own filament. 📷 |
+| 10.6 | Delete the original (and the sent copies) in OrcaSlicer, go back to the tab, **Send to Orca**. | No error: the model goes where the original was. Repeat once more: still no error. |
+| 10.7 | Arrow > **Multi-part 3MF**. | Windows: the Save dialog asks where (starts in Downloads). Elsewhere: saves `<name>_parts.3mf` to Downloads. Ctrl+I imports it as one object with a part per split part. |
 | 10.8 | AI names in the plugin against the mock server. | OrcaSlicer asks to allow the address; after Yes, names come back. |
 
 ## 11. Command line
