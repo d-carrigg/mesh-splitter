@@ -833,7 +833,7 @@ function renderFollowRow(i) {
   const row = $("followRow"); row.innerHTML = "";
   if (!S.G || i <= 0 || !S.parts[i]) return;
   const chip = (j, label) => {
-    const c = document.createElement("span"); c.className = "chip"; c.innerHTML = `<span class="sw" style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${S.parts[j].color}"></span>${esc(label)}`;
+    const c = document.createElement("span"); c.className = "chip"; c.innerHTML = `<span class="sw" style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${esc(S.parts[j].color)}"></span>${esc(label)}`;
     const x = document.createElement("button"); x.textContent = "×"; x.title = "Stop moving together";
     x.onclick = () => setFollow([j === leaderOf(i) ? i : j], null); c.appendChild(x); return c;
   };
@@ -1642,9 +1642,9 @@ function refreshUI() {
     rows.delete(key);
     tr.className = i === S.active ? "active" : mergeSel.has(i) ? "msel" : "";
     tr.title = i ? "Click: select · Ctrl/Shift+click: select more · Right-click: actions" : "Click: select · Right-click: actions";
-    tr.innerHTML = `<td><span class="sw" style="background:${p.color}"></span></td>
+    tr.innerHTML = `<td><span class="sw" style="background:${esc(p.color)}"></span></td>
       <td class="nm">${esc(p.name)}</td>
-      <td class="fcol" title="Filament slot"><span class="fil" style="background:${filColor(p.filament)}">${p.filament}</span></td>
+      <td class="fcol" title="Filament slot"><span class="fil" style="background:${esc(filColor(p.filament))}">${esc(p.filament)}</span></td>
       <td class="n">${cnt[i].toLocaleString()}${p.seeds.length ? ` · ${p.seeds.length}●` : ""}</td>
       <td><button class="eye" title="${p.visible ? "Hide" : "Show"}">${icon(p.visible ? "eye" : "eyeOff")}</button></td>`;
     tr.onclick = (ev) => {
@@ -1724,7 +1724,7 @@ function openCtx(ev) {
   { const sel2 = selected(); if (l > 0 && sel2.length === 2 && !sel2.includes(l)) it("reach", `Hold between ${S.parts[sel2[0]].name} and ${S.parts[sel2[1]].name}`, () => setHold(l, sel2[0], sel2[1])); }
   if (l > 0 && holdersOf(l)) it("unlink", "Release (no longer held)", () => setHold(l, 0));
   if (l > 0 && mergeSel.size && selected().includes(l)) it("merge", `Merge ${selected().length} selected into ${S.parts[S.active].name}`, mergeSelected);
-  showMenu(ev, `<span class="sw" style="background:${p.color}"></span>${esc(p.name)}`, items);
+  showMenu(ev, `<span class="sw" style="background:${esc(p.color)}"></span>${esc(p.name)}`, items);
 }
 function showMenu(ev, head, items) {
   const m = $("ctxMenu"); m.innerHTML = `<div class="hd">${head}</div>`;
@@ -1746,7 +1746,7 @@ function openPartMenu(ev, i) {
   if (i === 0) {
     it("fill", "Fill all unassigned", () => fillUnassigned(-1));
     it("eyeOff", p.visible ? "Hide" : "Show", () => { p.visible = !p.visible; afterEdit(); });
-    showMenu(ev, `<span class="sw" style="background:${p.color}"></span>${esc(p.name)}`, items); return;
+    showMenu(ev, `<span class="sw" style="background:${esc(p.color)}"></span>${esc(p.name)}`, items); return;
   }
   if (multi) {
     const main = S.parts[S.active];
@@ -1772,7 +1772,7 @@ function openPartMenu(ev, i) {
   it("trash", "Delete (merge into neighbor)", () => deletePart(i), "danger");
   it("trash", "Delete geometry, close holes", () => deleteGeometry([i], true), "danger");
   it("trash", "Delete geometry, leave holes", () => deleteGeometry([i], false), "danger");
-  showMenu(ev, `<span class="sw" style="background:${p.color}"></span>${esc(p.name)} · F${p.filament}`, items);
+  showMenu(ev, `<span class="sw" style="background:${esc(p.color)}"></span>${esc(p.name)} · F${esc(p.filament)}`, items);
 }
 
 // ---------------------------------------------------------------- guided add part
