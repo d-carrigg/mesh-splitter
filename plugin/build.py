@@ -129,10 +129,11 @@ def write_wheel(out, src, page, version):
         info + "METADATA": "Metadata-Version: 2.1\n"
                            f"Name: {header_field(header, 'name')}\nVersion: {version}\n"
                            f"Summary: {header_field(header, 'description')}\nAuthor: {header_field(header, 'author')}\n"
-                           "Requires-Python: >=3.12\n" + "".join(f"Requires-Dist: {d}\n" for d in deps),
+                           "License: MIT\nLicense-File: LICENSE\nRequires-Python: >=3.12\n" + "".join(f"Requires-Dist: {d}\n" for d in deps),
         info + "WHEEL": "Wheel-Version: 1.0\nGenerator: mesh-splitter plugin/build.py\nRoot-Is-Purelib: true\n"
                         "Tag: py3-none-any\n",
         info + "top_level.txt": PACKAGE + "\n",
+        info + "LICENSE": (HERE.parent / "LICENSE").read_text(encoding="utf-8"),
     }
     record = ""
     for name, text in files.items():

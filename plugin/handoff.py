@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Darin Carrigg. MIT License: see LICENSE. Official releases: https://github.com/d-carrigg/mesh-splitter
 """Hand a file to the running OrcaSlicer, the way a second launch of OrcaSlicer does.
 
 OrcaSlicer 2.5's plugin API has no call to add a file to the plate. But when OrcaSlicer is started a second time
