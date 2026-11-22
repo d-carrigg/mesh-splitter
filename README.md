@@ -22,6 +22,10 @@ Every feature is documented with pictures on the [docs site](https://d-carrigg.g
 - **[Claude Code plugin](https://d-carrigg.github.io/mesh-splitter/features/claude-code/):** ask Claude to split a model for you (`/plugin marketplace add d-carrigg/mesh-splitter`).
 - **Optional [AI part naming](https://d-carrigg.github.io/mesh-splitter/features/ai-naming/):** suggests part names and flags bad cuts, in the browser and in OrcaSlicer, with OpenAI, OpenRouter, Claude or a local model (LM Studio, Ollama).
 
+## Official releases
+
+The only official release is by @dcarrigg, on the [OrcaCloud Plugin Hub](https://cloud.orcaslicer.com/app/plugins/plugin-hub) and on [GitHub](https://github.com/d-carrigg/mesh-splitter/releases). Copies listed under other names are not made or checked by me. The official app shows "Official build by @dcarrigg" on its start screen.
+
 ## Install in OrcaSlicer
 
 1. Download `mesh_splitter_any.whl` from the [latest release](https://github.com/d-carrigg/mesh-splitter/releases/latest).
