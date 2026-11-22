@@ -153,12 +153,16 @@
     <label class="lbl" data-for="scale" title="Scale X/Y/Z together"><input id="xfLock" type="checkbox" checked> Uniform scale</label>
     <div class="row" data-for="rotate" style="margin:0;justify-content:space-between"><span class="lbl">Rotate around</span>
       <span class="seg"><button id="gzCenter" title="Rotate about the part's center">Part center</button><button id="gzJoint" title="Rotate on joint (J): one ring spins the part about its cut's axis, pivoting at the cut's center, so it stays seated on the part it joins. Shift snaps to 15°">Joint</button></span></div>
+    <div class="row" data-for="translate" style="margin:0;justify-content:space-between" title="Which way the move handles go"><span class="lbl">Move along</span>
+      <span class="seg"><button id="mvFree" title="Free: X, Y and Z">Free</button><button id="mvPlate" title="Plate: X and Y only, so the part keeps its height on the print plate (a foot stays on the plate)">Plate</button><button id="mvJoint" title="Joint: slide the part along its cut, in the plane of the part it joins">Joint</button></span></div>
     <div id="stretchRow" data-for="scale" style="display:flex;flex-direction:column;gap:6px" title="Stretch: lengthen (over 100%) or shorten this part along its length, from its joint with the rest, e.g. an arm from the shoulder. What it holds or carries moves out with its end. Applies to all selected parts.">
       <div class="row" style="margin:0"><span class="lbl" style="flex:1">Stretch</span><label class="lbl" title="Auto: the smallest stretch that keeps what this part holds or carries at least the gap away from other parts"><input id="stretchAuto" type="checkbox"> Auto</label><input id="stretchPct" type="number" min="20" max="500" step="5"><span class="small">%</span></div>
       <div class="row" id="stretchGapRow" style="margin:0"><span class="lbl" style="flex:1">Gap</span><input id="stretchGap" type="number" min="0" step="0.5"><span class="small">mm</span></div>
     </div>
     <div id="anchorRow" class="row" style="margin:0;justify-content:space-between" title="What happens at the cut when this part moves away from the part it joins. Applies to all selected parts."><span class="lbl">At the cut</span>
       <span class="seg"><button id="gapOpen" title="Open (default): leave the gap visible, as cut. Exports close each side with a flat cap">Open</button><button id="gapFill" title="Fill: patch the hole the part leaves in its neighbor, following the surface around it, and close the part's own cut">Fill</button><button id="gapAnchor" title="Anchor: keep the part joined where it attaches. New material sweeps from the neighbor to the moved cut, so a turned arm stays on the body">Anchor</button></span></div>
+    <div id="trimRow" class="row" style="margin:0" title="Trim overlap: after a move or rotate, cut away the part of this part that ends up inside other parts, so it doesn't poke into them (e.g. a foot slid in under the body). Pair it with Fill to close the hole it leaves. Applies to all selected parts.">
+      <label class="lbl" style="flex:1"><input id="trimOn" type="checkbox"> Trim overlap</label></div>
     <div id="healRow" style="display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--sep);padding-top:9px" title="Heal joint: after a move or rotate, stretch or squeeze this part near its cut so the cut's edge lands back on the neighbor's edge. Only faces within the blend distance of the cut change shape.">
       <div class="row" style="margin:0"><label class="lbl" style="flex:1"><input id="healOn" type="checkbox"> Heal joint</label><span class="lbl">Blend</span><input id="healR" type="number" min="0.5" step="0.5"><span class="small">mm</span></div>
       <span class="small">Stretches the part near its cut so it stays flush with its neighbor.</span>
@@ -220,6 +224,7 @@
     "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js",
     "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/",
     "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.9.18/build/index.module.js",
+    "three-bvh-csg": "https://cdn.jsdelivr.net/npm/three-bvh-csg@0.0.18/build/index.module.js",
     "fflate": "https://cdn.jsdelivr.net/npm/fflate@0.8.3/esm/browser.js"
   }
 }

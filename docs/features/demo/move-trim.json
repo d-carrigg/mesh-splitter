@@ -1,0 +1,127 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "curler.stl",
+ "out": null,
+ "viewport": {
+  "width": 1200,
+  "height": 800
+ },
+ "deviceScaleFactor": 1.5,
+ "camera": {
+  "az": -20,
+  "el": 18,
+  "dist": 1.0,
+  "lift": 0.12
+ },
+ "css": "#__cursor { display: none !important } #status { visibility: hidden }",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "eval",
+   "js": "window.cam=(p,t)=>{app.camera.position.set(...p); app.controls.target.set(...t); app.camera.up.set(0,0,1); app.camera.lookAt(...t); app.controls.update(); app.render()}; window.V1=()=>cam([-175,105,12],[-40,68,24]); window.V2=()=>cam([-150,150,95],[-45,72,22]); window.wait=(ms)=>new Promise(r=>setTimeout(r,ms)); document.getElementById('rightCol').style.visibility='hidden'; const x=app.ensureXf(8); x.t=[18,-6,0]; app.xfEdited(8); app.S.active=0; app.afterEdit(''); V1()"
+  },
+  {
+   "do": "shot",
+   "name": "_a-open",
+   "clip": [
+    300,
+    150,
+    700,
+    560
+   ]
+  },
+  {
+   "do": "eval",
+   "js": "(async()=>{app.setGap([8],'fill'); app.setTrim([8],true); app.S.active=0; app.refreshUI(); await wait(400); V1()})()"
+  },
+  {
+   "do": "eval",
+   "js": "wait(500).then(V1)"
+  },
+  {
+   "do": "shot",
+   "name": "_a-trim",
+   "clip": [
+    300,
+    150,
+    700,
+    560
+   ]
+  },
+  {
+   "do": "eval",
+   "js": "app.setTrim([8],false); app.S.active=0; app.refreshUI(); app.scene.traverse(o=>{if(o.isMesh && o.userData.P0) o.visible=false}); app.S.parts.forEach((p,i)=>{}); V2()"
+  },
+  {
+   "do": "eval",
+   "js": "wait(300).then(()=>{app.scene.traverse(o=>{if(o.isMesh && (o.userData.P0)) o.visible=true}); app.S.parts.forEach((p,i)=>{ if(i!==8) p.visible=false}); app.afterEdit(''); V2()})"
+  },
+  {
+   "do": "eval",
+   "js": "wait(300).then(V2)"
+  },
+  {
+   "do": "shot",
+   "name": "_b-untrimmed",
+   "clip": [
+    300,
+    150,
+    700,
+    560
+   ]
+  },
+  {
+   "do": "eval",
+   "js": "app.S.parts.forEach(p=>p.visible=true); app.setTrim([8],true); app.afterEdit('')"
+  },
+  {
+   "do": "eval",
+   "js": "wait(600).then(()=>{app.scene.traverse(o=>{if(o.isMesh && (o.userData.P0 || o.userData.own)) o.visible=false}); V2()})"
+  },
+  {
+   "do": "shot",
+   "name": "_b-trimmed",
+   "clip": [
+    300,
+    150,
+    700,
+    560
+   ]
+  },
+  {
+   "do": "compare",
+   "shots": [
+    "_a-open",
+    "_a-trim"
+   ],
+   "labels": [
+    "Foot moved in (Open): it pokes into the base",
+    "Fill + Trim overlap: base healed, foot cut to fit"
+   ],
+   "name": "move-trim"
+  },
+  {
+   "do": "compare",
+   "shots": [
+    "_b-untrimmed",
+    "_b-trimmed"
+   ],
+   "labels": [
+    "The foot alone, moved, untrimmed",
+    "Trimmed: its top now follows the base"
+   ],
+   "name": "trim-foot-alone"
+  },
+  {
+   "do": "eval",
+   "js": "app.scene.traverse(o=>{if(o.isMesh) o.visible=true}); document.getElementById('rightCol').style.visibility=''; app.S.active=8; app.setSlide('plate'); app.refreshUI(); cam([-330,-120,140],[-20,60,40])"
+  },
+  {
+   "do": "shot",
+   "name": "move-trim-ui",
+   "clip": "#xfCard"
+  }
+ ]
+}
