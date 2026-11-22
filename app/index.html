@@ -102,12 +102,6 @@
     <button id="redoBtn" disabled data-icon="redo" title="Redo (Ctrl+Y)"></button>
     <span class="menuWrap needMesh split"><button id="expMain" class="pri" data-icon="download" title="One object, each part a separate part with its filament slot set (opens as parts in OrcaSlicer / Bambu Studio)">Export 3MF</button><button id="expBtn" class="pri caret" title="More export formats"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="m6 9 6 6 6-6"/></svg></button>
       <div id="expMenu" class="menu" hidden>
-        <div class="orcaOnly mh" hidden>Send to OrcaSlicer</div>
-        <button id="sendAdd" class="orcaOnly" hidden data-icon="plus" title="Add the split to the plate as a new object, next to the original. OrcaSlicer asks how to open it: pick Open as project">Add to plate</button>
-        <button id="sendReplace" class="orcaOnly needSrc" hidden data-icon="replace" title="The split takes the original object's place on its plate. OrcaSlicer asks how to open it: pick Open as project">Replace object</button>
-        <button id="sendPlate" class="orcaOnly needSrc" hidden data-icon="replace" title="Clear the original's plate and put the split where the original was. OrcaSlicer asks how to open it: pick Open as project">Replace plate</button>
-        <button id="sendFill" class="orcaOnly needSrc" hidden data-icon="shells" title="Clear the original's plate and fill it with as many copies of the split as fit. OrcaSlicer asks how to open it: pick Open as project">Fill plate</button>
-        <div class="orcaOnly msep" hidden></div>
         <button id="expParts" data-icon="package" title="One object, each part a separate part with its filament slot set (opens as parts in OrcaSlicer / Bambu Studio)">Multi-part 3MF</button>
         <button id="exp3mf" data-icon="palette" title="Same mesh, each triangle painted with its part's filament slot (Bambu/Orca color painting)">Painted 3MF</button>
         <button id="expStl" data-icon="package" title="One closed STL per part, cut faces capped (.zip)">Part STLs (.zip)</button>

@@ -352,6 +352,15 @@ class Project:
         _, _, w, d = self.bed()
         return (plate % cols) * w * (1 + PLATE_GAP), -(plate // cols) * d * (1 + PLATE_GAP)
 
+    def plate_at(self, point):
+        """The plate (0-based) whose bed holds `point` (x, y), else the first."""
+        bx, by, bw, bd = self.bed()
+        for i in range(max(1, len(self.plates()))):
+            ox, oy = self.plate_origin(i)
+            if ox + bx <= point[0] <= ox + bx + bw and oy + by <= point[1] <= oy + by + bd:
+                return i
+        return 0
+
     def save(self):
         self.files[MAIN] = b'<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(self.root, encoding="utf-8").split(b"?>", 1)[-1].lstrip()
         self.files[CONFIG] = b'<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(self.cfg, encoding="utf-8").split(b"?>", 1)[-1].lstrip()
@@ -404,21 +413,34 @@ def beside(parts, here, bed, origin, gap=10.0):
     return (*spots[0], here[2])
 
 
-def apply(project_data, split_data, mode, index=None, name=None, object_name=None, colors=None, single=False):
+def apply(project_data, split_data, mode, index=None, name=None, object_name=None, colors=None, single=False,
+          in_place=False):
     """Returns (the project with the split in it, summary). index: OrcaSlicer's model index of the object the split
     came from (None for add, when the model didn't come from the plate). colors: {filament slot: "#rrggbb"} for
     slots the project doesn't have yet. single: the split is one part (the edited model, not for multi-color
-    printing), and it goes on the source object's filament instead of the slot in the split."""
+    printing), and it goes on the source object's filament instead of the slot in the split. in_place: the split
+    came from the plate but its object is gone (deleted in OrcaSlicer): every mode puts it where it is, on the plate
+    under it, and Replace plate / Fill plate clear that plate."""
     if mode not in MODES:
         raise ValueError(f"Unknown mode {mode}")
     proj = Project(project_data)
     parts = read_split(split_data)
     lo, hi = bounds(parts)
     here = ((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2])  # bottom center, plate coordinates
-    if index is None:
+    if index is None and in_place:  # nothing left to replace: the plate under it is the one to use
+        plate, src = proj.plate_at(here), None
+        if single:
+            parts = [(p[0], 1, p[2], p[3]) for p in parts]
+        gone = proj.objects_on_plate(plate) if mode in ("replace_plate", "fill_plate") else []
+        if mode == "fill_plate":
+            positions = [(here[0] + dx, here[1] + dy, here[2]) for dx, dy, _ in
+                         fill_offsets(parts, proj.bed(), proj.plate_origin(plate), proj.excluded())]
+        else:
+            positions = [here]
+    elif index is None:
         if mode != "add":
             raise ValueError("Open the model from the plate to replace it there")
-        plate, gone = 0, []
+        plate, gone, src = 0, [], None
         if single:
             parts = [(p[0], 1, p[2], p[3]) for p in parts]
         bx, by, bw, bd = proj.bed()
@@ -442,6 +464,14 @@ def apply(project_data, split_data, mode, index=None, name=None, object_name=Non
         proj.remove_object(oid)
     used = [p[1] for p in parts] + [paint_state(t[3]) for p in parts for t in p[3] if len(t) > 3]
     added = proj.ensure_filaments(max(used), colors or {})
+    first = len(proj.object_ids())
     proj.add_object(parts, name or object_name or "Split", positions, plate)
+    # Where the model the page works on is once OrcaSlicer opens this project: the original after an add from the
+    # plate, otherwise the split (its first copy). OrcaSlicer lists objects in build order.
+    ids = proj.object_ids()
+    if mode == "add" and src is not None:
+        at = {"index": ids.index(src), "name": object_name}
+    else:
+        at = {"index": first, "name": name or object_name or "Split"}
     return proj.save(), {"removed": len(gone), "copies": len(positions), "plate": plate + 1, "parts": len(parts),
-                         "filaments_added": added}
+                         "filaments_added": added, "source_at": at}

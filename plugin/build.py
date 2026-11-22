@@ -8,8 +8,8 @@ Builds are named as an unofficial copy unless --name meshsplitter is given or ME
 name and key and its page does not say "Official build"; only the official repo's CI keeps "Mesh Splitter" and
 mesh_splitter_any, so existing installs keep updating.
 
-The wheel holds the package mesh_splitter_any/ (__init__.py = plugin.py with llm_providers inlined, handoff.py and
-project3mf.py for Send to Orca, page.html = the bundled page) and its .dist-info. Everything is plain text, so a reviewer can read it as shipped. OrcaSlicer
+The wheel holds the package mesh_splitter_any/ (__init__.py = plugin.py with llm_providers inlined, handoff.py,
+project3mf.py and savedialog.py for Send to Orca and file exports, page.html = the bundled page) and its .dist-info. Everything is plain text, so a reviewer can read it as shipped. OrcaSlicer
 installs .whl plugins (Plugins > Install local plugin) and imports the package named in top_level.txt.
 The file name has no version so the local plugin key, and with it the plugin's saved settings, stay the same
 across updates.
@@ -110,7 +110,7 @@ COPY_NAME, COPY_PACKAGE = "Mesh Splitter (unofficial copy)", "mesh_splitter_copy
 OFFICIAL_LINE_RE = re.compile(r'<p id="official"[^>]*>.*?</p>', re.S)
 COPY_LINE = ('<p id="official" class="sub">Unofficial copy. The official Mesh Splitter is by '
              '<a href="https://github.com/d-carrigg/mesh-splitter#official-releases" target="_blank" rel="noopener">@dcarrigg</a>.</p>')
-SUBMODULES = ["handoff", "project3mf"]  # plugin/<name>.py, shipped next to __init__.py
+SUBMODULES = ["handoff", "project3mf", "savedialog"]  # plugin/<name>.py, shipped next to __init__.py
 SUBMODULE_RE = re.compile(rf"^import ({'|'.join(SUBMODULES)})  # noqa: E402$", re.M)
 HEADER_RE = re.compile(r"\A# /// script\n(.*?)^# ///\n", re.S | re.M)
 

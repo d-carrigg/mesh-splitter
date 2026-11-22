@@ -18,7 +18,7 @@ For the example photo, I made the eyes 1 part, then replaced them with a flipped
 
 1. Subscribe, then tick **Activate** and allow writing to Downloads. A **Mesh Splitter** tab appears next to Prepare / Preview.
 2. The tab lists the objects on your plate. A single object opens automatically.
-3. Split the mesh, then click **Send to Orca** (or Replace, Replace plate or Fill plate from the arrow next to it). When OrcaSlicer asks, pick **Open as project**.
+3. Split the mesh, then click **Send to Orca**. When OrcaSlicer asks, pick **Open as project**.
 
 **The only official release is by @dcarrigg, here on OrcaCloud and on [GitHub](https://github.com/d-carrigg/mesh-splitter/releases).** Copies listed under other names are not made or checked by me.
 
