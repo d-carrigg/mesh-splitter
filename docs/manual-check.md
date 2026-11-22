@@ -35,9 +35,9 @@ A hands-on pass over every feature, run on request ("check the whole app") rathe
 | 2.3 | Clear Parts, click **Split**. | Automatic count again (same as on open). |
 | 2.4 | Select one part, tick **Only inside the selected part**, Parts 2, **Split**. | Only that part is split in two; the others keep their faces and names. No empty (0-face) part is left in the list. |
 | 2.5 | Pick **Seeds**. Press Esc to deselect, click the head; Esc, click the body; Esc, click an arm. Then **Grow from seeds**. | A marker per click. After Grow: 3 parts grown from the clicks, boundaries on creases. Alt+click near a seed removes it. **Clear seeds** removes all. 📷 |
-| 2.6 | Pick **Paint**, select a part, pick the brush (B), set Pen size, drag over a neighboring part. | Painted faces join the selected part. Shift+drag erases (faces become unassigned, grey). Right-drag still orbits. |
+| 2.6 | Pick **Paint**, select a part, pick the brush (B), set Pen size, drag over a neighboring part. | Painted faces join the selected part. Shift+drag erases (faces become unassigned, gray). Right-drag still orbits. |
 | 2.7 | Pick the fill tool (F), click a region of another part. | The clicked region floods into the selected part up to creases sharper than **Fill stop angle**. |
-| 2.8 | Right-click a grey (unassigned) face. | Menu offers **Fill into nearest part** and **Fill all unassigned**; both clear the grey. |
+| 2.8 | Right-click a gray (unassigned) face. | Menu offers **Fill into nearest part** and **Fill all unassigned**; both clear the gray. |
 | 2.9 | **Smooth boundaries**. | Part borders look smooth (no stair steps along triangles). |
 | 2.10 | Open `rocket.stl`, Split > **Shells** > **Split by shells**. | Header said `2 shells`; result is `Shell 1`, `Shell 2`, each on its own slot. On `robot.stl` (1 shell) it says it can't split by shells (a message in the page, not a browser pop-up). 📷 |
 | 2.11 | Back on `robot.stl`: Parts header **Add** (+), click a spot on the model. | A new part grows from the point at once; a small card shows **Point**, **Crease** slider and **Done**. Moving Crease regrows it live; **Point** + click adds more area; **Done** closes. 📷 |

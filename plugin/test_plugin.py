@@ -575,6 +575,17 @@ class SendToOrcaTests(unittest.TestCase):
         self.assertEqual(self.handed, [])
         self.assertIn("File > Open Project", m["note"])
 
+    def test_unreachable_orca_still_says_where_the_project_is(self):
+        def down(files):
+            raise RuntimeError("OrcaSlicer was not found on the session bus")
+        self.p.handoff.send = down
+        m = self.send("add")
+        self.assertEqual(m["cmd"], "saved")
+        self.assertTrue(os.path.exists(m["path"]))
+        self.assertIn("File > Open Project", m["note"])
+        self.assertIn(os.path.basename(m["path"]), m["note"])
+        self.assertTrue(m["warn"])
+
 
 class ReleaseNotesTests(unittest.TestCase):
     def test_release_please_notes_become_plain_lines(self):

@@ -3161,7 +3161,7 @@ ORCA.save = (name, data, send = null) => {
     for (let i = 0; i < n; i++) orcaSend({ cmd: "save", id, name, part: i, of: n, data: t.slice(i * CHUNK, (i + 1) * CHUNK), ...(send || {}) });
     status(send ? "Sending to OrcaSlicer…" : `Saving ${name}…`);
   }).then((m) => {
-    if (m.note) { status(m.note); alert(m.note); }
+    if (m.note) { status(m.note); toast(m.note, !m.warn); }
     else status(`Saved ${m.path} · import it in OrcaSlicer with Ctrl+I`);
     return m.path;
   }).catch((e) => { status(`Save failed: ${e.message}`); alert(`Save failed: ${e.message}`); });
@@ -3237,7 +3237,9 @@ function orcaMesh(m) { // chunks of the requested transfer, in any order
 }
 // Messages show in the page (the toast), not as a browser pop-up: the same in the browser and in OrcaSlicer, whose
 // plugin webviews don't document alert().
-window.alert = (t) => { const d = $("toast"); d.textContent = String(t); d.hidden = false; clearTimeout(d._t); d._t = setTimeout(() => (d.hidden = true), 8000); };
+// In-page message instead of the browser's alert(); ok: a result to read, not an error (no red stripe).
+function toast(t, ok = false) { const d = $("toast"); d.textContent = String(t); d.classList.toggle("ok", ok); d.hidden = false; clearTimeout(d._t); d._t = setTimeout(() => (d.hidden = true), 8000); }
+window.alert = (t) => toast(t);
 $("toast").onclick = () => ($("toast").hidden = true);
 if (ORCA.on) {
   document.body.classList.add("inOrca");

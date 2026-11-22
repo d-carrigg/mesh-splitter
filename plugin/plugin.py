@@ -306,7 +306,12 @@ def send_to_orca(data, msg):
         note = (f"Saved {os.path.basename(path)} to {folder}. Sending to OrcaSlicer isn't available on this system: "
                 "open it with File > Open Project.")
         return {"path": path, "files": [path], "note": note}
-    handoff.send([path])
+    try:
+        handoff.send([path])
+    except Exception as e:  # the project is saved either way: say where, and how to open it
+        note = (f"Couldn't reach OrcaSlicer ({e}). The project is saved as {os.path.basename(path)} in {folder}: "
+                "open it with File > Open Project.")
+        return {"path": path, "files": [path], "note": note, "warn": True, **info}
     note = ("Sent to OrcaSlicer. When it asks, pick Open as project. It already has your unsaved changes, so No is "
             f"fine when it offers to save. The project is now {os.path.basename(path)} in {folder}.")
     notify("Mesh Splitter: " + note)

@@ -13,6 +13,7 @@ body.inOrca #top { display:none; }
 .spacer { flex:1; }
 .caretI { width:14px !important; height:14px !important; opacity:.7; }
 #toast { position:absolute; left:50%; bottom:34px; transform:translateX(-50%); max-width:min(640px, 90%); background:var(--gp); border-left:3px solid #ff5d5d; color:var(--fg); padding:8px 12px; border-radius:3px; z-index:20; cursor:pointer; box-shadow:0 3px 12px #0008; }
+#toast.ok { border-left-color:var(--acc); }
 .mh { color:var(--mute); font-size:11px; text-transform:uppercase; letter-spacing:.06em; padding:6px 8px 2px; }
 /* Print as: One part hides filament slots (the colors only tell parts apart) */
 body.oneFil .filOnly, body.oneFil .parts td.fcol { display:none !important; }
