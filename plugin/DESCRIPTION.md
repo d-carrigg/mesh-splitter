@@ -12,7 +12,7 @@ For the example photo, I made the eyes 1 part, then replaced them with a flipped
 - **Move, rotate, scale:** move, rotate, and scale both within the context of the world axes and of the part orientation. This means you can do things like rotate limbs and increase specific part sizes.
 - **Multicolor / multi-material printing:** individual parts can be given their own materials and colors pulled from your printer.
 - **Replace with…:** right-click a part and swap in another STL. It snaps onto the joint and keeps the part's name and filament.
-- **Send to Orca:** the edited model goes back on the plate: next to the original, in its place, or filling the plate. One part on the original's filament by default, or every part on its own filament for multi-color. Painted 3MF, merged STL and per-part STLs are also available.
+- **Send to Orca:** the edited model goes back on the plate: next to the original, in its place, or filling the plate. **Print as** picks one part on the original's filament, one painted part, or separate parts on their own filaments. Painted 3MF, merged STL and per-part STLs are also available.
 
 ## How to use
 

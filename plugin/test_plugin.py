@@ -102,8 +102,8 @@ class BridgeTests(unittest.TestCase):
         m = self.sent[-1]
         self.assertTrue(m["auto"])
         objs = [{k: v for k, v in o.items() if k != "id"} for o in m["objects"]]
-        self.assertEqual(objs, [{"index": 0, "name": "cube", "parts": 1, "faces": 4, "ignored": 0},
-                                {"index": 1, "name": "Object 2", "parts": 0, "faces": 0, "ignored": 0}])
+        self.assertEqual(objs, [{"index": 0, "name": "cube", "parts": 1, "faces": 4, "ignored": 0, "painted": False, "filaments": []},
+                                {"index": 1, "name": "Object 2", "parts": 0, "faces": 0, "ignored": 0, "painted": False, "filaments": []}])
         self.assertNotEqual(m["objects"][0]["id"], m["objects"][1]["id"])
         self.assertEqual(m["filament_colors"], ["#FF0000", "#00AE42"])
 
@@ -431,6 +431,22 @@ class Project3mfTests(unittest.TestCase):
         out, info = project3mf.apply(proj, one, "replace_object", 0, object_name="bolt", single=True)
         self.assertEqual(read_3mf(out)[0], [("bolt", [("bolt", "1")], [(105.0, 105.0)])])
         self.assertEqual(info["filaments_added"], 0)
+
+    def test_painted_part_keeps_its_paint_and_adds_the_slots_it_uses(self):
+        import project3mf, zipfile, io
+        v = "".join(f'<vertex x="{x + 100}" y="{y + 100}" z="{z}"/>' for x, y, z in CUBE_V)
+        t = "".join(f'<triangle v1="{a}" v2="{b}" v3="{c}" paint_color="{"8" if k < 6 else "1C"}"/>' for k, (a, b, c) in enumerate(CUBE_F))
+        painted = zip_bytes({"3D/3dmodel.model": f'<?xml version="1.0"?><model unit="millimeter" xmlns="{CORE}"><resources>'
+                             f'<object id="1" type="model" name="bolt"><mesh><vertices>{v}</vertices><triangles>{t}</triangles>'
+                             f'</mesh></object></resources><build><item objectid="1"/></build></model>'})
+        self.assertEqual([project3mf.paint_state(c) for c in ("4", "8", "0C", "1C", "7C", "0FC", "0FFC")], [1, 2, 3, 4, 10, 18, 33])
+        out, info = project3mf.apply(orca_project([("bolt", 0, (150, 50))]), painted, "replace_object", 0,
+                                     object_name="bolt", single=True)
+        z = zipfile.ZipFile(io.BytesIO(out))
+        sub, = [n for n in z.namelist() if n.startswith("3D/Objects/")]
+        self.assertEqual(z.read(sub).decode().count('paint_color="1C"'), 6)
+        self.assertEqual(read_3mf(out)[0], [("bolt", [("bolt", "1")], [(105.0, 105.0)])])
+        self.assertEqual(info["filaments_added"], 3)  # slots 2..4
 
     def test_new_filament_slots_extend_every_per_filament_setting(self):
         proj = orca_project([("bolt", 0, (150, 50))])

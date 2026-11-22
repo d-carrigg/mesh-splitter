@@ -56,6 +56,7 @@ export function parse3MF(buf, parseXml) {
   };
   const findObj = (doc, id) => { for (const o of Array.from(doc.getElementsByTagName("object"))) if (o.getAttribute("id") === String(id)) return o; return null; };
   const pos = [], tri = [], meshes = [];
+  let painted = false; // any triangle with OrcaSlicer / Bambu color paint
   function addObject(file, id, M, depth) {
     if (depth > 16) return;
     const obj = findObj(getDoc(file), id);
@@ -67,8 +68,10 @@ export function parse3MF(buf, parseXml) {
         const x = +v.getAttribute("x"), y = +v.getAttribute("y"), z = +v.getAttribute("z");
         pos.push(x*M[0] + y*M[3] + z*M[6] + M[9], x*M[1] + y*M[4] + z*M[7] + M[10], x*M[2] + y*M[5] + z*M[8] + M[11]);
       }
-      for (const t of Array.from(meshEl.getElementsByTagName("triangle")))
+      for (const t of Array.from(meshEl.getElementsByTagName("triangle"))) {
         tri.push(v0 + +t.getAttribute("v1"), v0 + +t.getAttribute("v2"), v0 + +t.getAttribute("v3"));
+        if (!painted && t.getAttribute("paint_color")) painted = true;
+      }
       meshes.push({ file: norm(file), objectId: String(id), triStart: t0, triCount: tri.length / 3 - t0 });
     }
     const compsEl = kids(obj).find((c) => c.localName === "components");
@@ -83,7 +86,7 @@ export function parse3MF(buf, parseXml) {
   if (items.length) for (const it of Array.from(items)) addObject(root, it.getAttribute("objectid"), parseT(it.getAttribute("transform")), 0);
   else for (const o of Array.from(rootDoc.getElementsByTagName("object"))) addObject(root, o.getAttribute("id"), I12, 0);
   if (!tri.length) throw new Error("No triangles found in 3MF");
-  return { pos: new Float32Array(pos), tri: new Uint32Array(tri), source: { type: "3mf", files, meshes } };
+  return { pos: new Float32Array(pos), tri: new Uint32Array(tri), source: { type: "3mf", files, meshes, painted } };
 }
 
 // Merge coincident vertices so faces share edges. Face order is preserved (needed to write paint back).

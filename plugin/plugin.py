@@ -187,8 +187,12 @@ def list_objects(model):
         vols = obj.volumes()
         parts = [v for v in vols if v.is_model_part()]
         faces = sum(v.facets_count() for v in parts)
+        painted = getattr(obj, "is_mm_painted", None)
         out.append({"index": i, "id": int(obj.id()), "name": obj.name or f"Object {i + 1}", "parts": len(parts),
-                    "faces": int(faces), "ignored": len(vols) - len(parts)})
+                    "faces": int(faces), "ignored": len(vols) - len(parts),
+                    # how the object prints now: the page starts in the matching "Print as" mode
+                    "painted": bool(painted()) if painted else False,
+                    "filaments": sorted({int(v.extruder_id()) for v in parts if hasattr(v, "extruder_id")})})
     return out
 
 

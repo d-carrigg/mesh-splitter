@@ -122,6 +122,7 @@ function loadRaw(name, raw) {
   if (+$("brushR").value > +$("brushR").max) $("brushR").value = (S.G.diag * 0.02).toFixed(1);
   syncSliders();
   lastActive = -1;
+  setPrintAs(initialPrintAs(), false);
   if (!restoreAutosave() && S.nF >= 200) { autoSplit(0, true); S.hist = { past: [], future: [] }; refreshUI(); }
   const fixes = [S.refined && `split long edges (+${S.refined.toLocaleString()} faces) so creases show`, S.flipped && `turned ${S.flipped} inside-out shell${S.flipped > 1 ? "s" : ""} right side out`].filter(Boolean);
   if (fixes.length) status(`${$("status").textContent} · On open: ${fixes.join("; ")}`);
@@ -1628,7 +1629,7 @@ function refreshUI() {
     tr.title = i ? "Click: select · Ctrl/Shift+click: select more · Right-click: actions" : "Click: select · Right-click: actions";
     tr.innerHTML = `<td><span class="sw" style="background:${p.color}"></span></td>
       <td class="nm">${esc(p.name)}</td>
-      <td title="Filament slot"><span class="fil" style="background:${filColor(p.filament)}">${p.filament}</span></td>
+      <td class="fcol" title="Filament slot"><span class="fil" style="background:${filColor(p.filament)}">${p.filament}</span></td>
       <td class="n">${cnt[i].toLocaleString()}${p.seeds.length ? ` · ${p.seeds.length}●` : ""}</td>
       <td><button class="eye" title="${p.visible ? "Hide" : "Show"}">${icon(p.visible ? "eye" : "eyeOff")}</button></td>`;
     tr.onclick = (ev) => {
@@ -2923,6 +2924,16 @@ function download(name, data, type = "application/octet-stream") {
 }
 function exportPainted3MF() {
   if (!S.G) return;
+  download(`${S.name}_painted.3mf`, buildPainted3MF(true), "model/3mf");
+  const ch = changedParts();
+  const fils = [...new Set(S.parts.filter((_, i) => partCounts()[i] > 0).map((p) => p.filament))].sort((a, b) => a - b);
+  status(`Painted 3MF written. Uses filament slot(s) ${fils.join(", ")}; the slicer project needs at least ${Math.max(...fils)} filaments.` +
+    (ch.size ? " Rebuilt from moved/replaced parts (overlaps fuse in the slicer); original 3MF settings not carried over." :
+      S.source.type === "3mf" && S.tri !== S.mesh0[1] ? " Mesh rewritten for the smoothed boundaries; original 3MF settings not carried over." : ""));
+}
+// One mesh, each triangle painted with its part's filament. reuse: keep the source 3MF (and its settings) when the
+// mesh is untouched; Send to Orca passes false, since it writes the mesh into the project itself.
+function buildPainted3MF(reuse) {
   const ch = changedParts();
   let fil = (f) => S.parts[S.labels[f]].filament, src = S;
   if (ch.size) { // moved/replaced parts: rebuild one mesh from the merged shells
@@ -2930,14 +2941,40 @@ function exportPainted3MF() {
     src = { pos: w.pos, tri: w.tri, nV: w.pos.length / 3, nF: w.tri.length / 3 }; fil = (f) => m.fil[f];
   }
   // smoothed boundaries split faces: no 1:1 map to the file, so the source 3MF is only reused when untouched
-  const keepSrc = S.source.type === "3mf" && !ch.size && S.tri === S.mesh0[1];
-  const out = core.painted3MF(S.name, src, fil, keepSrc ? S.source : null);
-  download(`${S.name}_painted.3mf`, out, "model/3mf");
-  const fils = [...new Set(S.parts.filter((_, i) => partCounts()[i] > 0).map((p) => p.filament))].sort((a, b) => a - b);
-  status(`Painted 3MF written. Uses filament slot(s) ${fils.join(", ")}; the slicer project needs at least ${Math.max(...fils)} filaments.` +
-    (ch.size ? " Rebuilt from moved/replaced parts (overlaps fuse in the slicer); original 3MF settings not carried over." :
-      S.source.type === "3mf" && S.tri !== S.mesh0[1] ? " Mesh rewritten for the smoothed boundaries; original 3MF settings not carried over." : ""));
+  const keepSrc = reuse && S.source.type === "3mf" && !ch.size && S.tri === S.mesh0[1];
+  return core.painted3MF(S.name, src, fil, keepSrc ? S.source : null);
 }
+// One part: the whole edited model as one closed mesh on one filament (moved/replaced parts overlap and fuse).
+const buildOne3MF = () => core.parts3MF(S.name, [{ name: S.name, filament: 1, soup: mergedSoup().v }]).out;
+function exportOne3MF() {
+  if (!S.G) return;
+  download(`${S.name}.3mf`, buildOne3MF(), "model/3mf");
+  status("3MF written: the model as one part.");
+}
+
+// ---------------------------------------------------------------- Print as: one part / painted / separate parts
+// How the result prints, chosen up front: it decides what the main Export / Send to Orca writes, and One part
+// hides the filament slots (part colors then only tell parts apart).
+const PRINT_AS = { one: "One part", paint: "Painted", parts: "Separate parts" };
+function setPrintAs(mode, save = true) {
+  if (!PRINT_AS[mode]) mode = "one";
+  S.printAs = mode;
+  document.body.classList.toggle("oneFil", mode === "one");
+  for (const b of $("printAs").children) b.classList.toggle("on", b.dataset.mode === mode);
+  if (mode === "one" && byFilament) setColorMode(false);
+  if (!ORCA.on) $("expMain").lastChild.textContent = { one: "Export 3MF", paint: "Export painted 3MF", parts: "Export parts 3MF" }[mode];
+  if (save) try { localStorage.setItem(`meshsplit:printAs:${S.name}`, mode); } catch {}
+}
+// Start from how the model prints now: OrcaSlicer's object (painted, several parts) or the opened 3MF.
+function initialPrintAs() {
+  try { const m = localStorage.getItem(`meshsplit:printAs:${S.name}`); if (PRINT_AS[m]) return m; } catch {}
+  const o = S.source?.orca, src = S.source || {};
+  if (o?.painted || src.painted) return "paint";
+  if ((o?.parts || 0) > 1 || (src.meshes?.length || 0) > 1) return "parts";
+  return "one";
+}
+for (const b of $("printAs").children) b.onclick = () => { setPrintAs(b.dataset.mode); status(`Print as: ${PRINT_AS[b.dataset.mode]}`); };
+const exportMain = () => ({ one: exportOne3MF, paint: exportPainted3MF, parts: exportParts3MF }[S.printAs || "one"])();
 
 // One closed mesh per part: the part's faces plus a fan cap over each open boundary loop.
 const partMesh = (pi) => meshOf((l) => l === pi);
@@ -3056,7 +3093,7 @@ function restoreAutosave() {
 }
 $("exp3mf").onclick = () => { closeMenus(); later(exportPainted3MF); };
 $("expParts").onclick = () => { closeMenus(); later(exportParts3MF); };
-$("expMain").onclick = () => { closeMenus(); later(exportParts3MF); };
+$("expMain").onclick = () => { closeMenus(); later(exportMain); };
 $("expStl").onclick = () => { closeMenus(); later(exportSTLs); };
 $("expMerged").onclick = () => { closeMenus(); later(exportMergedSTL); };
 $("saveSess").onclick = () => { closeMenus(); saveSession(); };
@@ -3107,13 +3144,14 @@ ORCA.send = (mode) => {
   if (!S.G) return;
   const src = S.source?.orca;
   if (mode !== "add" && !src) { alert("Open the model from the plate (Model > From the plate) to replace it there."); return; }
-  // Default: the edited model as one part, which the plugin puts on the original object's filament. With
-  // "Parts on their own filaments" each part keeps its filament slot (and the plugin adds slots the project lacks).
-  const multi = $("sendMulti").checked;
-  const out = multi ? buildParts3MF().out : core.parts3MF(S.name, [{ name: S.name, filament: 1, soup: mergedSoup().v }]).out;
-  const colors = {}; // filament slot -> the part's color, for slots the project doesn't have yet
-  if (multi) for (const p of S.parts.slice(1)) colors[p.filament] ??= p.color;
-  return ORCA.save(`${S.name}_parts.3mf`, out, { mode, colors, single: !multi, source: src ? { id: src.id, index: src.index, name: src.name } : null });
+  // Print as decides the file: One part (the plugin puts it on the original object's filament), Painted (one part,
+  // painted with the parts' filaments) or Parts (each part on its filament slot). The last two can use slots the
+  // project doesn't have yet: the plugin adds them, in the parts' colors.
+  const as = S.printAs || "one";
+  const out = as === "parts" ? buildParts3MF().out : as === "paint" ? buildPainted3MF(false) : buildOne3MF();
+  const colors = {}; // filament slot -> the part's color
+  if (as !== "one") for (const p of S.parts.slice(1)) colors[p.filament] ??= p.color;
+  return ORCA.save(`${S.name}_parts.3mf`, out, { mode, colors, single: as !== "parts", source: src ? { id: src.id, index: src.index, name: src.name } : null });
 };
 function orcaSendMenu() {
   const src = S.source?.orca;
@@ -3185,8 +3223,6 @@ if (ORCA.on) {
   $("sendPlate").onclick = () => { closeMenus(); later(() => ORCA.send("replace_plate")); };
   $("sendFill").onclick = () => { closeMenus(); later(() => ORCA.send("fill_plate")); };
   $("expBtn").addEventListener("click", orcaSendMenu);
-  try { $("sendMulti").checked = localStorage.getItem("meshsplit:sendMulti") === "1"; } catch {}
-  $("sendMulti").onchange = () => { try { localStorage.setItem("meshsplit:sendMulti", $("sendMulti").checked ? "1" : "0"); } catch {} };
   $("expParts").lastChild.textContent = "Multi-part 3MF to Downloads";
   $("expParts").title = "Save a multi-part 3MF (each part keeps its filament slot) to Downloads, to import in OrcaSlicer with Ctrl+I";
   // Welcome screen: say where it runs, point at the web app instead of the plugin, and copy links

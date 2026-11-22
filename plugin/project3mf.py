@@ -96,7 +96,8 @@ def fmt(x):
 # ---------------------------------------------------------------- the split (the page's multi-part 3MF)
 
 def read_split(data):
-    """[(name, extruder, vertices [(x,y,z)], triangles [(a,b,c)])] from the page's multi-part 3MF."""
+    """[(name, extruder, vertices [(x,y,z)], triangles [(a,b,c) or (a,b,c,paint_color)])] from the page's 3MF: the
+    multi-part 3MF (one mesh object per part) or the painted 3MF (one mesh, OrcaSlicer paint_color per triangle)."""
     z = zipfile.ZipFile(io.BytesIO(data))
     root = ET.fromstring(z.read(MAIN))
     cfg = ET.fromstring(z.read(CONFIG)) if CONFIG in z.namelist() else ET.Element("config")
@@ -110,12 +111,35 @@ def read_split(data):
         if mesh is None:
             continue
         v = [(float(e.get("x")), float(e.get("y")), float(e.get("z"))) for e in mesh.find(q("vertices"))]
-        t = [(int(e.get("v1")), int(e.get("v2")), int(e.get("v3"))) for e in mesh.find(q("triangles"))]
+        t = [(int(e.get("v1")), int(e.get("v2")), int(e.get("v3"))) + ((e.get("paint_color"),) if e.get("paint_color") else ())
+             for e in mesh.find(q("triangles"))]
         name, ext = info.get(o.get("id"), (o.get("name"), 1))
         parts.append((name or o.get("name") or f"Part {len(parts) + 1}", ext, v, t))
     if not parts:
         raise ValueError("The split has no parts")
     return parts
+
+
+def paint_state(code):
+    """The filament slot in an OrcaSlicer paint_color code of an unsplit triangle (TriangleSelector's bit stream,
+    the inverse of paintCode in app/export.js). 0 means the part's own filament. Split triangles count as 0."""
+    bits = []
+    for ch in reversed(code or ""):
+        v = int(ch, 16)
+        bits += [(v >> i) & 1 for i in range(4)]
+    if len(bits) < 4 or bits[0] or bits[1]:
+        return 0
+    n = bits[2] | bits[3] << 1
+    if n < 3:
+        return n
+    n, i = 3, 4
+    while i + 4 <= len(bits):
+        k = bits[i] | bits[i + 1] << 1 | bits[i + 2] << 2 | bits[i + 3] << 3
+        n += k
+        i += 4
+        if k != 15:
+            break
+    return n
 
 
 def bounds(parts):
@@ -242,7 +266,8 @@ class Project:
                 sub.write(f'  <object id="{first + k}" type="model"><mesh><vertices>\n')
                 sub.write("".join(f'<vertex x="{fmt(x - origin[0])}" y="{fmt(y - origin[1])}" z="{fmt(z - origin[2])}"/>\n' for x, y, z in V))
                 sub.write("</vertices><triangles>\n")
-                sub.write("".join(f'<triangle v1="{a}" v2="{b}" v3="{c}"/>\n' for a, b, c in T))
+                sub.write("".join(f'<triangle v1="{t[0]}" v2="{t[1]}" v3="{t[2]}"'
+                                  + (f' paint_color="{t[3]}"' if len(t) > 3 else "") + '/>\n' for t in T))
                 sub.write("</triangles></mesh></object>\n")
             sub.write(" </resources>\n <build/>\n</model>\n")
             self.files[path.lstrip("/")] = sub.getvalue().encode("utf-8")
@@ -414,7 +439,8 @@ def apply(project_data, split_data, mode, index=None, name=None, object_name=Non
             positions = [here]
     for oid in gone:
         proj.remove_object(oid)
-    added = proj.ensure_filaments(max(p[1] for p in parts), colors or {})
+    used = [p[1] for p in parts] + [paint_state(t[3]) for p in parts for t in p[3] if len(t) > 3]
+    added = proj.ensure_filaments(max(used), colors or {})
     proj.add_object(parts, name or object_name or "Split", positions, plate)
     return proj.save(), {"removed": len(gone), "copies": len(positions), "plate": plate + 1, "parts": len(parts),
                          "filaments_added": added}
