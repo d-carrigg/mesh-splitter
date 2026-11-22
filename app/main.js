@@ -3169,7 +3169,7 @@ ORCA.save = (name, data, send = null, note = "") => {
     if (send && m.source && S.source?.orca) { S.source.orca = { ...S.source.orca, ...m.source, id: null }; ORCA.cur = { ...S.source.orca }; }
     if (m.note) { status(m.note); toast(m.note, !m.warn); return m.path; }
     const base = String(m.path).split(/[\\/]/).pop(), where = m.folder || String(m.path).slice(0, -base.length - 1);
-    const msg = `Saved ${base} to ${where}.` + (/\.3mf$/i.test(base) ? " Import it in OrcaSlicer with Ctrl+I." : "");
+    const msg = `Saved ${base} to ${where}${m.warn || ""}.` + (/\.3mf$/i.test(base) ? " Import it in OrcaSlicer with Ctrl+I." : "");
     status(msg); toast(note ? `${msg} ${note}` : msg, !note);
     return m.path;
   }).catch((e) => { status(`Save failed: ${e.message}`); alert(`Save failed: ${e.message}`); });

@@ -169,6 +169,19 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(asked[-1][1], os.path.dirname(chosen))  # starts where the last save went
         self.assertEqual(self.sent[-1], {"cmd": "saved", "id": 6, "cancelled": True})
 
+    def test_save_dialog_failure_still_saves_to_downloads(self):
+        def broken(*a):
+            raise RuntimeError("Windows could not show the Save dialog (error 0x3002)")
+        for mod, attr, val in ((self.p.savedialog, "supported", lambda: True), (self.p.handoff, "main_window", lambda: None),
+                               (self.p.savedialog, "ask", broken)):
+            patcher = mock.patch.object(mod, attr, val)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.b.handle({"cmd": "save", "id": 7, "name": "x.stl", "part": 0, "of": 1, "data": "AAAA"})
+        m = self.sent[-1]
+        self.assertEqual((m["cmd"], m["path"]), ("saved", os.path.join(self.tmp.name, "x.stl")))
+        self.assertIn("0x3002", m["warn"])
+
     def test_save_dialog_filter(self):
         self.assertEqual(self.p.savedialog.filter_string("a.stl"), "STL file (*.stl)\0*.stl\0All files (*.*)\0*.*\0")
 

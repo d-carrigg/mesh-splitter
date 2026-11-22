@@ -474,17 +474,22 @@ class Bridge:
             self.send({"cmd": "saved", "id": sid, **send_to_orca(data, msg)})
             return
         name = safe_name(msg.get("name"))
+        path, warn = None, ""
         if savedialog.supported():
-            path = savedialog.ask(name, last_save_dir() or output_dir(), handoff.main_window())
-            if not path:
-                self.send({"cmd": "saved", "id": sid, "cancelled": True})
-                return
-        else:  # no system dialog here: Downloads, never overwriting an earlier export
+            try:
+                path = savedialog.ask(name, last_save_dir() or output_dir(), handoff.main_window())
+            except Exception as e:  # the dialog itself failed: still save the file, and say where
+                warn = f" (the Save dialog didn't open: {e})"
+            else:
+                if not path:
+                    self.send({"cmd": "saved", "id": sid, "cancelled": True})
+                    return
+        if not path:  # no system dialog here: Downloads, never overwriting an earlier export
             path = unique_path(output_dir(), name)
         with open(path, "wb") as f:
             f.write(data)
         remember_save_dir(os.path.dirname(path))
-        self.send({"cmd": "saved", "id": sid, "path": path, "folder": os.path.dirname(path)})
+        self.send({"cmd": "saved", "id": sid, "path": path, "folder": os.path.dirname(path), **({"warn": warn} if warn else {})})
         if path.lower().endswith(".3mf"):
             notify(f"Mesh Splitter saved {os.path.basename(path)} to {os.path.dirname(path)}. Press Ctrl+I to import it.")
 
