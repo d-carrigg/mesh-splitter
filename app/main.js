@@ -1099,6 +1099,7 @@ function planTris(pl, ctx, out = []) {
   }
   // cap over the neighbor's hole: rings shrinking to the center, each smoothed more (one fan from the zigzag loop to the
   // center would show as a pie)
+  pl.nbFrom = out.length + (rings.length - 1) * 2 * n * 9; // the cap is the neighbor's surface: shown in its color
   const ed = per / n, rb = D0.reduce((m, _, i) => (i % 3 ? m : m + Math.hypot(D0[i], D0[i+1], D0[i+2]) / n), 0);
   const Kc = Math.max(2, Math.min(6, Math.round(rb / Math.max(3 * ed, 1e-6))));
   for (const t of [1 - 0.3 / Kc, ...Array.from({ length: Kc - 1 }, (_, k) => 1 - (k + 1) / Kc)]) {
@@ -1143,7 +1144,15 @@ function cutPlaneOver(lp, own, nb, ctx) {
   return { C, N };
 }
 // Closing triangles for every loop of part i (or of the unchanged rest, in mergedSoup), world space.
-function capTris(plans, ctx) { const out = []; for (const pl of plans) planTris(pl, ctx, out); return Float32Array.from(out); }
+// nbTris (optional) collects [first triangle, end, neighbor] of each Anchor cap that lies on a neighbor's surface.
+function capTris(plans, ctx, nbTris) {
+  const out = [];
+  for (const pl of plans) {
+    delete pl.nbFrom; planTris(pl, ctx, out);
+    if (nbTris && pl.nbFrom !== undefined && pl.nb > 0 && out.length > pl.nbFrom) nbTris.push([pl.nbFrom / 9, out.length / 9, pl.nb]);
+  }
+  return Float32Array.from(out);
+}
 
 // Display: the patches and sleeves of open gaps, drawn as their own mesh in the parts' colors.
 let fillMesh = null;
@@ -1158,7 +1167,8 @@ function updateFillMesh() {
     const p = S.parts[l]; if (!p || p.visible === false || hasRep(p) || trimMeshes.has(l)) continue; // a trimmed part's caps are in its trim mesh
     for (const pl of loopPlans(partLoops(l, ctx), ctx)) {
       if (pl.kind !== "patch" && pl.kind !== "bridge") continue;
-      const n0 = pos.length; planTris(pl, ctx, pos); for (let k = n0; k < pos.length; k += 9) own.push(l);
+      const n0 = pos.length; delete pl.nbFrom; planTris(pl, ctx, pos);
+      for (let k = n0; k < pos.length; k += 9) own.push(pl.nbFrom !== undefined && k >= pl.nbFrom && pl.nb > 0 ? pl.nb : l);
     }
   }
   if (!pos.length) return;
@@ -2943,7 +2953,13 @@ function buildPainted3MF(reuse) {
   let fil = (f) => S.parts[S.labels[f]].filament, src = S;
   if (ch.size) { // moved/replaced parts: rebuild one mesh from the merged shells
     const m = mergedSoup(), w = weld(m.v, Uint32Array.from({ length: m.v.length / 3 }, (_, i) => i));
-    src = { pos: w.pos, tri: w.tri, nV: w.pos.length / 3, nF: w.tri.length / 3 }; fil = (f) => m.fil[f];
+    // welding can collapse a sliver to a line (two corners on one point): drop those, or slicers report open edges
+    const keep = [], tri = [];
+    for (let f = 0; f < w.tri.length / 3; f++) {
+      const a = w.tri[3*f], b = w.tri[3*f+1], c = w.tri[3*f+2];
+      if (a !== b && b !== c && a !== c) { keep.push(m.fil[f]); tri.push(a, b, c); }
+    }
+    src = { pos: w.pos, tri: Uint32Array.from(tri), nV: w.pos.length / 3, nF: tri.length / 3 }; fil = (f) => keep[f];
   }
   // smoothed boundaries split faces: no 1:1 map to the file, so the source 3MF is only reused when untouched
   const keepSrc = reuse && S.source.type === "3mf" && !ch.size && S.tri === S.mesh0[1];
@@ -2996,7 +3012,7 @@ function xformSoup(v, M) {
   return out;
 }
 // Final closed geometry of one part: its replacement, or its faces + caps, with the Transform applied.
-function partSoup(i, raw = false) {
+function partSoup(i, raw = false, nbTris = null) {
   const p = S.parts[i];
   if (!raw && trimOn(i)) { const t = trimResult(i); if (t) return t.pos; }
   if (hasRep(p)) { const M = repMatrix(i); return M ? xformSoup(REPS.get(p.rep.id).pos, M) : null; }
@@ -3006,7 +3022,8 @@ function partSoup(i, raw = false) {
   // caps start exactly on the part's own (float32) boundary positions, so the closed solid has no slivers
   ctx.fixL = i; ctx.fix = new Map(); ctx.fixV = body; let o = 0;
   for (let f = 0; f < S.nF; f++) if (S.labels[f] === i) { for (let c = 0; c < 3; c++, o += 3) ctx.fix.set(S.tri[3*f+c], o); }
-  const caps = capTris(loopPlans(m.loopList, ctx), ctx), out = new Float32Array(body.length + caps.length);
+  const nt = nbTris ? [] : null, caps = capTris(loopPlans(m.loopList, ctx), ctx, nt), out = new Float32Array(body.length + caps.length);
+  if (nt) for (const [a, e, l] of nt) nbTris.push([a + body.length / 9, e + body.length / 9, l]);
   out.set(body); out.set(caps, body.length); return out;
 }
 // Whole model as one triangle soup + filament per triangle. Unchanged parts keep their faces with the holes left by
@@ -3021,11 +3038,16 @@ function mergedSoup() {
     // the moved part or its sleeve takes that part's filament
     const ctx = fillCtx();
     for (const pl of loopPlans(rest.loopList, ctx)) {
-      const t = planTris(pl, ctx), f = S.parts[pl.kind === "patch" || pl.nb < 0 ? pl.own : pl.nb]?.filament ?? 1;
+      // (an Anchor's "under" cap: the anchored part's sweep covers it with the rest's own surface, so it keeps that color)
+      const t = planTris(pl, ctx), f = S.parts[pl.kind === "patch" || pl.kind === "under" || pl.nb < 0 ? pl.own : pl.nb]?.filament ?? 1;
       parts.push(Float32Array.from(t)); for (let o = 0; o < t.length; o += 9) fil.push(f);
     }
   }
-  for (const i of ch) { const v = partSoup(i); if (!v) continue; parts.push(v); for (let o = 0; o < v.length; o += 9) fil.push(S.parts[i].filament); }
+  for (const i of ch) {
+    const nt = [], v = partSoup(i, false, nt); if (!v) continue;
+    parts.push(v); const f0 = fil.length; for (let o = 0; o < v.length; o += 9) fil.push(S.parts[i].filament);
+    for (const [a, e, l] of nt) for (let t = a; t < e; t++) fil[f0 + t] = S.parts[l]?.filament ?? fil[f0 + t]; // Anchor cap on the neighbor
+  }
   const n = parts.reduce((a, v) => a + v.length, 0), v = new Float32Array(n); let o = 0;
   for (const a of parts) { v.set(a, o); o += a.length; }
   return { v, fil };
