@@ -23,7 +23,7 @@ For the example photo, I made the eyes 1 part, then replaced them with a flipped
 2. In OrcaSlicer 2.5, open **Plugins**, click the arrow next to **Browse plugins**, then **Install local plugin** and pick the file.
 3. Tick **Activate** and allow writing to Downloads. A **Mesh Splitter** tab appears next to Prepare / Preview.
 
-The tab lists the objects on your plate, and a single object opens automatically. **Send to Orca** saves `<name>_parts.3mf` to Downloads. Import it with **Ctrl+I**, because Orca's plugin API can't add objects to the plate itself.
+The tab lists the objects on your plate, and a single object opens automatically. **Send to Orca** puts the split on the plate, next to the original. The arrow next to it can also replace the original or its plate, or fill the plate with copies. OrcaSlicer asks how to open it: pick **Open as project**.
 
 ## Run in a browser
 

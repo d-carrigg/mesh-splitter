@@ -7,7 +7,7 @@ Get the parts out as a 3MF or STLs, from OrcaSlicer or the browser.
 
 ## Send to Orca
 
-Inside OrcaSlicer, the main button is **Send to Orca**. It saves one multi-part 3MF: one object, with each part as a separate part on its own filament slot, and the part names kept.
+Inside OrcaSlicer, the main button is **Send to Orca**. It puts the split on the plate as one object, with each part on its own filament slot and the part names kept.
 
 ![The plugin tab after Send to Orca](img/orca-send.png)
 
@@ -15,18 +15,30 @@ Inside OrcaSlicer, the main button is **Send to Orca**. It saves one multi-part 
 
 1. Install the plugin (see [Install in OrcaSlicer](../index.md#install-in-orcaslicer)) and open the **Mesh Splitter** tab.
 2. Pick the object from the plate in the file menu. A single object on the plate opens by itself.
-3. Split it, then click **Send to Orca**.
-4. It saves `<name>_parts.3mf` to Downloads, and the status bar shows the path. In OrcaSlicer, import it with **Ctrl+I**.
+3. Split it, then click **Send to Orca**, or pick an option from the arrow next to it:
+   - **Add to plate** (the main button): the split goes next to the original.
+   - **Replace** *(object name)*: the split takes the original's place.
+   - **Replace plate:** the original's plate is cleared, and the split goes where the original was.
+   - **Fill plate:** the original's plate is cleared and filled with as many copies of the split as fit, 6 mm apart.
+4. OrcaSlicer asks how to open the file. Pick **Open as project**. If it offers to save the current project, **No** is fine: your unsaved changes are already in the new one.
+
+Filament slots the split uses that the project doesn't have yet are added, with the parts' colors.
 
 ![Objects on the plate, in the file menu](img/orca-plate-menu.png)
 
-### Why a file
+### How it works
 
-OrcaSlicer's plugin API can read the plate's meshes but can't add or replace objects, so the result comes back as a file to import.
+OrcaSlicer's plugin API can read the plate but can't add or replace objects. So the plugin edits a copy of the open project, saves it to Downloads as `<project> - Mesh Splitter.3mf`, and hands it to OrcaSlicer the same way opening a file from your file manager does. Everything else in the project (other objects and plates, settings, paint) stays as it was.
+
+- **Pick Open as project.** **Import geometry only** adds the whole project a second time.
+- **macOS:** OrcaSlicer opens 3MF files from other apps in a new window, so the plugin only saves the file. Open it with **File > Open Project**.
+- **Multi-part 3MF to Downloads** (in the arrow menu) still saves `<name>_parts.3mf` on its own, to import with **Ctrl+I**.
 
 ## Other exports
 
 The arrow next to the main button (in the plugin and the browser) also offers:
+
+- **Multi-part 3MF to Downloads** (plugin only): the split as `<name>_parts.3mf`, to import with **Ctrl+I**.
 
 - **Painted 3MF:** the same mesh, each triangle painted with its part's filament.
 - **Part STLs (.zip):** one closed STL per part, cut faces capped.

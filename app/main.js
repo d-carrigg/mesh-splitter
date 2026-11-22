@@ -3077,23 +3077,50 @@ if (qp) {
 
 // ---------------------------------------------------------------- OrcaSlicer plugin bridge
 // Inside OrcaSlicer the host injects window.orca (postMessage/onMessage). The plugin sends plate meshes
-// in base64 chunks and writes files the page exports (OrcaSlicer plugins cannot add objects to the plate,
-// so the result is a 3MF to import with Ctrl+I). Outside OrcaSlicer none of this runs.
+// in base64 chunks and writes files the page exports. Send to Orca hands the split to OrcaSlicer itself
+// (plugin/handoff.py): added as a new object, or replacing the object it came from, its plate, or filling that
+// plate with copies (plugin/project3mf.py). Outside OrcaSlicer none of this runs.
 const ORCA = { on: !!(window.orca && window.orca.postMessage), objects: [], rx: null, req: 0, saves: new Map(), seq: 0,
   nonce: Math.random().toString(36).slice(2, 8) }; // ids stay unique across page reloads (the plugin outlives the page)
 const CHUNK = 512 * 1024; // base64 chars per message
 function orcaSend(msg) { window.orca.postMessage(msg); }
 function u8ToB64(b) { let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }
-ORCA.save = (name, data) => {
+// send: { mode, source, colors } asks the plugin to put the 3MF into the open project and hand that to OrcaSlicer
+// (see ORCA.send) instead of only saving it.
+ORCA.save = (name, data, send = null) => {
   const b = typeof data === "string" ? new TextEncoder().encode(data) : data instanceof Uint8Array ? data : new Uint8Array(data);
   const t = u8ToB64(b), id = `${ORCA.nonce}-${++ORCA.seq}`, n = Math.max(1, Math.ceil(t.length / CHUNK));
   return new Promise((res, rej) => {
     ORCA.saves.set(id, { res, rej, name });
-    for (let i = 0; i < n; i++) orcaSend({ cmd: "save", id, name, part: i, of: n, data: t.slice(i * CHUNK, (i + 1) * CHUNK) });
-    status(`Saving ${name}…`);
-  }).then((path) => { status(`Saved ${path} · import it in OrcaSlicer with Ctrl+I`); return path; })
-    .catch((e) => { status(`Save failed: ${e.message}`); alert(`Save failed: ${e.message}`); });
+    for (let i = 0; i < n; i++) orcaSend({ cmd: "save", id, name, part: i, of: n, data: t.slice(i * CHUNK, (i + 1) * CHUNK), ...(send || {}) });
+    status(send ? "Sending to OrcaSlicer…" : `Saving ${name}…`);
+  }).then((m) => {
+    if (m.note) { status(m.note); alert(m.note); }
+    else status(`Saved ${m.path} · import it in OrcaSlicer with Ctrl+I`);
+    return m.path;
+  }).catch((e) => { status(`Save failed: ${e.message}`); alert(`Save failed: ${e.message}`); });
 };
+// Send to Orca. mode: add (a new object next to the original), replace_object, replace_plate or fill_plate
+// (those three need the model opened from the plate: the plugin finds the original by its id). The plugin puts
+// the split into a copy of the project and OrcaSlicer opens that as the project.
+ORCA.send = (mode) => {
+  if (!S.G) return;
+  const src = S.source?.orca;
+  if (mode !== "add" && !src) { alert("Open the model from the plate (Model > From the plate) to replace it there."); return; }
+  const { out } = buildParts3MF();
+  const colors = {}; // filament slot -> the part's color, for slots the project doesn't have yet
+  for (const p of S.parts.slice(1)) colors[p.filament] ??= p.color;
+  return ORCA.save(`${S.name}_parts.3mf`, out, { mode, colors, source: src ? { id: src.id, index: src.index, name: src.name } : null });
+};
+function orcaSendMenu() {
+  const src = S.source?.orca;
+  for (const id of ["sendReplace", "sendPlate", "sendFill"]) {
+    $(id).dataset.tip ??= $(id).title;
+    $(id).disabled = !src;
+    $(id).title = src ? $(id).dataset.tip : "Open the model from the plate (Model > From the plate) to replace it there";
+  }
+  $("sendReplace").lastChild.textContent = src ? `Replace ${src.name}` : "Replace object";
+}
 function orcaRenderObjects() {
   for (const box of [$("orcaMenu"), $("dropOrca")]) {
     box.innerHTML = "";
@@ -3133,7 +3160,7 @@ function orcaMesh(m) { // chunks of the requested transfer, in any order
     const bin = atob(R.parts.join("")), b = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
     const pos = new Float32Array(b.buffer, 0, R.nV * 3), tri = new Uint32Array(b.buffer, R.nV * 12, R.nF * 3);
-    loadRaw(R.name, { pos: Float32Array.from(pos), tri: Uint32Array.from(tri), source: { type: "orca" } });
+    loadRaw(R.name, { pos: Float32Array.from(pos), tri: Uint32Array.from(tri), source: { type: "orca", orca: { ...ORCA.cur } } });
     status(`Loaded ${R.name} from the plate`);
   } catch (e) { console.error(e); alert(e.message); }
   finally { busy(false); }
@@ -3148,8 +3175,15 @@ if (ORCA.on) {
   document.querySelectorAll(".orcaOnly").forEach((e) => (e.hidden = false));
   $("fileBtnLbl").textContent = "From plate";
   $("expMain").lastChild.textContent = "Send to Orca";
-  $("expMain").title = "Save a multi-part 3MF (each part keeps its filament slot) to Downloads, then import it in OrcaSlicer with Ctrl+I";
-  $("expParts").hidden = true;
+  $("expMain").title = $("sendAdd").title;
+  $("expMain").onclick = () => { closeMenus(); later(() => ORCA.send("add")); };
+  $("sendAdd").onclick = $("expMain").onclick;
+  $("sendReplace").onclick = () => { closeMenus(); later(() => ORCA.send("replace_object")); };
+  $("sendPlate").onclick = () => { closeMenus(); later(() => ORCA.send("replace_plate")); };
+  $("sendFill").onclick = () => { closeMenus(); later(() => ORCA.send("fill_plate")); };
+  $("expBtn").addEventListener("click", orcaSendMenu);
+  $("expParts").lastChild.textContent = "Multi-part 3MF to Downloads";
+  $("expParts").title = "Save a multi-part 3MF (each part keeps its filament slot) to Downloads, to import in OrcaSlicer with Ctrl+I";
   // Welcome screen: say where it runs, point at the web app instead of the plugin, and copy links
   // (the plugin page has no browser to open them in, and following one would replace the app).
   $("whereLocal").textContent = "in Orca";
@@ -3170,7 +3204,7 @@ if (ORCA.on) {
     else if (m.cmd === "plate_changed") orcaPlateChanged(m);
     else if (m.cmd === "saved" || m.cmd === "save_error") {
       const P = ORCA.saves.get(m.id); if (!P) return; ORCA.saves.delete(m.id);
-      m.cmd === "saved" ? P.res(m.path) : P.rej(new Error(m.message || "unknown error"));
+      m.cmd === "saved" ? P.res(m) : P.rej(new Error(m.message || "unknown error"));
     } else if (/^llm_/.test(m.cmd || "")) llmReply(m);
     else if (m.cmd === "error") { busy(false); ORCA.rx = null; ORCA.want = null; clearTimeout(rxTimer); status(m.message); alert(m.message); }
   });

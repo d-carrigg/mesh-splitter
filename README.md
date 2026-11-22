@@ -17,7 +17,7 @@ Every feature is documented with pictures on the [docs site](https://d-carrigg.g
 - **[Heal joint](https://d-carrigg.github.io/mesh-splitter/features/transforms/#heal-joint):** after moving or rotating a part, stretch or squeeze it near its cut so the cut's edge lands back on its neighbor (no gap).
 - **[Fill and anchor](https://d-carrigg.github.io/mesh-splitter/features/transforms/#fill-and-anchor):** when a part moves off another, patch the hole it leaves (Fill), or keep it joined with new material (Anchor).
 - **[Replace with…](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/#replace-with):** right-click a part and swap in another STL. It snaps onto the joint and keeps the part's name and filament. A replacement made from the same model, such as edited eyes, stays in place.
-- **[Send to Orca](https://d-carrigg.github.io/mesh-splitter/features/exporting/#send-to-orca):** one multi-part 3MF, every part on its filament. Painted 3MF, merged STL and per-part STLs are also available.
+- **[Send to Orca](https://d-carrigg.github.io/mesh-splitter/features/exporting/#send-to-orca):** the split goes on the plate with every part on its filament: next to the original, in its place, or filling the plate. Painted 3MF, merged STL and per-part STLs are also available.
 - **[Command line](https://d-carrigg.github.io/mesh-splitter/features/command-line/):** `uv run mesh-splitter split model.stl --auto 6 -o model.3mf` splits and exports without opening the app, with the same results.
 - **[Claude Code plugin](https://d-carrigg.github.io/mesh-splitter/features/claude-code/):** ask Claude to split a model for you (`/plugin marketplace add d-carrigg/mesh-splitter`).
 - **Optional [AI part naming](https://d-carrigg.github.io/mesh-splitter/features/ai-naming/):** suggests part names and flags bad cuts, in the browser and in OrcaSlicer, with OpenAI, OpenRouter, Claude or a local model (LM Studio, Ollama).
@@ -28,7 +28,7 @@ Every feature is documented with pictures on the [docs site](https://d-carrigg.g
 2. In OrcaSlicer 2.5, open **Plugins**, click the arrow next to **Browse plugins**, then **Install local plugin** and pick the file.
 3. Tick **Activate** and allow writing to Downloads. A **Mesh Splitter** tab appears next to Prepare / Preview.
 
-The tab lists the objects on your plate, and a single object opens automatically. **Send to Orca** saves `<name>_parts.3mf` to Downloads. Import it with **Ctrl+I**, because Orca's plugin API can't add objects to the plate itself.
+The tab lists the objects on your plate, and a single object opens automatically. **Send to Orca** puts the split on the plate, next to the original. The arrow next to it can also replace the original or its plate, or fill the plate with copies. OrcaSlicer asks how to open it: pick **Open as project**.
 
 ## Run in a browser
 

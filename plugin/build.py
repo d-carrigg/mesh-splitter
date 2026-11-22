@@ -2,8 +2,8 @@
 
     cd plugin && npm ci && python build.py      ->  dist/mesh_splitter_any.whl
 
-The wheel holds the package mesh_splitter_any/ (__init__.py = plugin.py with llm_providers inlined, page.html =
-the bundled page) and its .dist-info. Everything is plain text, so a reviewer can read it as shipped. OrcaSlicer
+The wheel holds the package mesh_splitter_any/ (__init__.py = plugin.py with llm_providers inlined, handoff.py and
+project3mf.py for Send to Orca, page.html = the bundled page) and its .dist-info. Everything is plain text, so a reviewer can read it as shipped. OrcaSlicer
 installs .whl plugins (Plugins > Install local plugin) and imports the package named in top_level.txt.
 The file name has no version so the local plugin key, and with it the plugin's saved settings, stay the same
 across updates.
@@ -99,6 +99,8 @@ def project_version():
 
 
 PACKAGE = "mesh_splitter_any"
+SUBMODULES = ["handoff", "project3mf"]  # plugin/<name>.py, shipped next to __init__.py
+SUBMODULE_RE = re.compile(rf"^import ({'|'.join(SUBMODULES)})  # noqa: E402$", re.M)
 HEADER_RE = re.compile(r"\A# /// script\n(.*?)^# ///\n", re.S | re.M)
 
 
@@ -117,8 +119,12 @@ def write_wheel(out, src, page, version):
     header, code = m.group(1), src[m.end():]
     deps = json.loads(re.search(r"^# dependencies = (\[.*\])$", header, re.M).group(1))
     info = f"{PACKAGE}-{version}.dist-info/"
+    if len(SUBMODULE_RE.findall(code)) != len(SUBMODULES):
+        sys.exit(f"plugin.py: expected `import <name>  # noqa: E402` for each of {SUBMODULES}")
+    code = SUBMODULE_RE.sub(r"from . import \1  # noqa: E402", code)  # in the package they're siblings
     files = {
         f"{PACKAGE}/__init__.py": code,
+        **{f"{PACKAGE}/{m}.py": (HERE / f"{m}.py").read_text(encoding="utf-8") for m in SUBMODULES},
         f"{PACKAGE}/page.html": page,
         info + "METADATA": "Metadata-Version: 2.1\n"
                            f"Name: {header_field(header, 'name')}\nVersion: {version}\n"

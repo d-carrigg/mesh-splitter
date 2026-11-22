@@ -12,13 +12,13 @@ For the example photo, I made the eyes 1 part, then replaced them with a flipped
 - **Move, rotate, scale:** move, rotate, and scale both within the context of the world axes and of the part orientation. This means you can do things like rotate limbs and increase specific part sizes.
 - **Multicolor / multi-material printing:** individual parts can be given their own materials and colors pulled from your printer.
 - **Replace with…:** right-click a part and swap in another STL. It snaps onto the joint and keeps the part's name and filament.
-- **Send to Orca:** one multi-part 3MF with every part on its filament. Painted 3MF, merged STL and per-part STLs are also available.
+- **Send to Orca:** the split goes on the plate with every part on its filament: next to the original, in its place, or filling the plate. Painted 3MF, merged STL and per-part STLs are also available.
 
 ## How to use
 
 1. Subscribe, then tick **Activate** and allow writing to Downloads. A **Mesh Splitter** tab appears next to Prepare / Preview.
 2. The tab lists the objects on your plate. A single object opens automatically.
-3. Split the mesh, then click **Send to Orca**. It saves `<name>_parts.3mf` to Downloads. Import it with **Ctrl+I** (Orca's plugin API can't add objects to the plate itself).
+3. Split the mesh, then click **Send to Orca** (or Replace, Replace plate or Fill plate from the arrow next to it). When OrcaSlicer asks, pick **Open as project**.
 
 Source (MIT): [github.com/d-carrigg/mesh-splitter](https://github.com/d-carrigg/mesh-splitter)
 
