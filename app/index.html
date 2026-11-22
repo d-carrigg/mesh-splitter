@@ -16,6 +16,7 @@
       <div id="fileMenu" class="menu" hidden>
         <div class="orcaOnly mh" hidden>From the plate</div>
         <div id="orcaMenu" class="orcaOnly sub" hidden></div>
+        <label class="orcaOnly chk" hidden title="When OrcaSlicer opens or starts another project, load its model here without asking"><input id="newProjAuto" type="checkbox"> Load new projects automatically</label>
         <button id="openBtn" data-icon="open" title="Open STL / 3MF">Open file…<span class="meta">Ctrl+O</span></button>
         <div id="recentHd" class="mh">Recent</div>
         <div id="recentMenu" class="sub"></div>
@@ -63,6 +64,13 @@
 
 <div id="view">
   <div id="toast" hidden title="Click to dismiss"></div>
+  <div id="newProj" class="float card" hidden>
+    <b>OrcaSlicer has a new project</b>
+    <span id="newProjText" class="small"></span>
+    <div id="newProjList"></div>
+    <label class="small"><input id="newProjRemember" type="checkbox"> Do this automatically next time</label>
+    <div class="row" style="margin:0"><span style="flex:1"></span><button id="newProjKeep">Keep current model</button></div>
+  </div>
   <div id="drop">
     <div id="welcome">
       <h1>Welcome to Mesh Splitter</h1>

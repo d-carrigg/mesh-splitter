@@ -3184,6 +3184,7 @@ ORCA.send = (mode = "add") => {
   // painted with the parts' filaments) or Parts (each part on its filament slot). The last two can use slots the
   // project doesn't have yet: the plugin adds them, in the parts' colors.
   const as = S.printAs || "one";
+  ORCA.sentAt = Date.now(); // the project this opens in OrcaSlicer is ours: don't offer to load it (orcaNewProject)
   const out = as === "parts" ? buildParts3MF().out : as === "paint" ? buildPainted3MF(false) : buildOne3MF();
   const colors = {}; // filament slot -> the part's color
   if (as !== "one") for (const p of S.parts.slice(1)) colors[p.filament] ??= p.color;
@@ -3213,10 +3214,46 @@ let plateTimer = 0;
 function orcaPlateChanged(m) {
   clearTimeout(plateTimer);
   plateTimer = setTimeout(() => orcaSend({ cmd: "objects" }), 300);
+  if (/^(NewProject|ProjectOpened|ProjectClosed)$/.test(m.event || "")) ORCA.projEvent = true;
   const c = ORCA.cur, hit = c && ((m.id && m.id === String(c.id)) || (m.index >= 0 && m.index === c.index));
   if (S.G && hit && /Changed|Deleted|Transformed/.test(m.event || ""))
     status(`${S.name} changed on the plate since you opened it. Reopen it from the file menu to pick up the change.`);
 }
+// A new project in OrcaSlicer (opened or started, or every object on the plate swapped) while a model from the old
+// plate is open here: offer to load the new one, or load it without asking once the user opts in. The split of the
+// old model stays in the autosave, so opening that model again picks it up.
+const NEWPROJ_KEY = "meshsplit:autoLoadNewProject";
+function newProjAuto() { try { return localStorage.getItem(NEWPROJ_KEY) === "1"; } catch { return false; } }
+function setNewProjAuto(on) { try { localStorage.setItem(NEWPROJ_KEY, on ? "1" : "0"); } catch {} $("newProjAuto").checked = on; }
+function orcaNewProject(prev, objs) {
+  const src = S.G && S.source?.orca, ids = new Set(objs.map((o) => o.id));
+  if (ORCA.projEvent || (src && !ids.has(src.id) && !prev.some((o) => ids.has(o.id)))) ORCA.newProj = true;
+  ORCA.projEvent = false;
+  if (!ORCA.newProj) return;
+  if (!objs.length) { $("newProj").hidden = true; return; } // an empty project: wait for its first model
+  ORCA.newProj = false;
+  if (!src || ids.has(src.id)) return; // nothing from the plate open here, or it's still on the plate
+  const own = ORCA.sentAt && Date.now() - ORCA.sentAt < 600000; ORCA.sentAt = 0;
+  if (own) return; // the project our own Send to Orca opened
+  if (newProjAuto() && objs.length === 1) {
+    const old = S.name; $("newProj").hidden = true; orcaLoad(objs[0]);
+    toast(`Loaded ${objs[0].name} from the new OrcaSlicer project. Your split of ${old} is saved: open it again to continue it.`, true);
+    return;
+  }
+  $("newProjText").textContent = `Load ${objs.length === 1 ? "its model" : "one of its models"} here? Your split of ${S.name} is saved: open it again to continue it.`;
+  const list = $("newProjList"); list.innerHTML = "";
+  for (const o of objs) {
+    const b = document.createElement("button"); b.className = "pri"; b.title = o.name;
+    b.textContent = `Load ${o.name}`;
+    b.onclick = () => { if ($("newProjRemember").checked) setNewProjAuto(true); $("newProj").hidden = true; orcaLoad(o); };
+    list.appendChild(b);
+  }
+  $("newProjRemember").checked = false;
+  $("newProjRemember").parentElement.hidden = newProjAuto(); // already on: several models, so the user picks one
+  $("newProj").hidden = false;
+}
+$("newProjKeep").onclick = () => ($("newProj").hidden = true);
+$("newProjAuto").onchange = () => setNewProjAuto($("newProjAuto").checked);
 function orcaMesh(m) { // chunks of the requested transfer, in any order
   if (!m.req || m.req !== ORCA.want) return; // a stale or superseded transfer
   if (!ORCA.rx || ORCA.rx.req !== m.req) ORCA.rx = { req: m.req, name: m.name, nV: m.nV, nF: m.nF, parts: new Array(m.of), got: 0 };
@@ -3261,7 +3298,7 @@ if (ORCA.on) {
   window.orca.onMessage((m) => {
     if (!m || typeof m !== "object") return;
     if (m.cmd === "objects") {
-      ORCA.objects = m.objects || []; orcaRenderObjects();
+      const prev = ORCA.objects; ORCA.objects = m.objects || []; orcaRenderObjects(); orcaNewProject(prev, ORCA.objects);
       if (Array.isArray(m.filament_colors) && m.filament_colors.length) { orcaFil = m.filament_colors; updateColors(); }
       if (m.auto && !S.G && ORCA.objects.length === 1) orcaLoad(ORCA.objects[0]);
     } else if (m.cmd === "mesh") orcaMesh(m);
@@ -3272,6 +3309,10 @@ if (ORCA.on) {
     } else if (/^llm_/.test(m.cmd || "")) llmReply(m);
     else if (m.cmd === "error") { busy(false); ORCA.rx = null; ORCA.want = null; clearTimeout(rxTimer); status(m.message); alert(m.message); }
   });
+  $("newProjAuto").checked = newProjAuto();
+  // Back on the tab or window: refresh the plate list, in case OrcaSlicer didn't report a project change.
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) orcaSend({ cmd: "objects" }); });
+  window.addEventListener("focus", () => orcaSend({ cmd: "objects" }));
   orcaSend({ cmd: "objects", auto: true });
 }
 window.app = { S, buildOne3MF, buildPainted3MF, setPrintAs, deleteGeometry, closeHoles, meshHoles, setAnchor, setGap, setTrim, trimResult, trimMeshes, setSlide, updateTrim, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
