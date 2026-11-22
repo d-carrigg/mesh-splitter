@@ -1,6 +1,12 @@
 """Build the OrcaSlicer plugin: bundle app/ (index.html, styles.css, main.js) into one self-contained page and package it in a wheel.
 
-    cd plugin && npm ci && python build.py      ->  dist/mesh_splitter_any.whl
+    cd plugin && npm ci && python build.py              ->  dist/mesh_splitter_copy_any.whl  (unofficial copy)
+    cd plugin && npm ci && python build.py --name meshsplitter   ->  dist/mesh_splitter_any.whl  (official name)
+
+Builds are named as an unofficial copy unless --name meshsplitter is given or MESH_SPLITTER_NAME=meshsplitter is set
+(the official repo sets it as an Actions variable). So a fork or clone that builds and publishes gets its own plugin
+name and key and its page does not say "Official build"; only the official repo's CI keeps "Mesh Splitter" and
+mesh_splitter_any, so existing installs keep updating.
 
 The wheel holds the package mesh_splitter_any/ (__init__.py = plugin.py with llm_providers inlined, handoff.py,
 project3mf.py and savedialog.py for Send to Orca and file exports, page.html = the bundled page) and its .dist-info. Everything is plain text, so a reviewer can read it as shipped. OrcaSlicer
@@ -98,7 +104,12 @@ def project_version():
     return m.group(1)
 
 
-PACKAGE = "mesh_splitter_any"
+NAME_ENV, OFFICIAL_ID = "MESH_SPLITTER_NAME", "meshsplitter"
+OFFICIAL_NAME, OFFICIAL_PACKAGE = "Mesh Splitter", "mesh_splitter_any"
+COPY_NAME, COPY_PACKAGE = "Mesh Splitter (unofficial copy)", "mesh_splitter_copy_any"  # OrcaCloud wants the _any suffix
+OFFICIAL_LINE_RE = re.compile(r'<p id="official"[^>]*>.*?</p>', re.S)
+COPY_LINE = ('<p id="official" class="sub">Unofficial copy. The official Mesh Splitter is by '
+             '<a href="https://github.com/d-carrigg/mesh-splitter#official-releases" target="_blank" rel="noopener">@dcarrigg</a>.</p>')
 SUBMODULES = ["handoff", "project3mf", "savedialog"]  # plugin/<name>.py, shipped next to __init__.py
 SUBMODULE_RE = re.compile(rf"^import ({'|'.join(SUBMODULES)})  # noqa: E402$", re.M)
 HEADER_RE = re.compile(r"\A# /// script\n(.*?)^# ///\n", re.S | re.M)
@@ -111,28 +122,38 @@ def header_field(header, key):
     return m.group(1)
 
 
-def write_wheel(out, src, page, version):
+def as_copy(src, page):
+    """Rename the plugin to the unofficial copy name and replace the page's "Official build" line."""
+    name_line = f'# name = "{OFFICIAL_NAME}"'
+    if src.count(name_line) != 1:
+        sys.exit(f"plugin.py: expected one `{name_line}` in the script header")
+    if len(OFFICIAL_LINE_RE.findall(page)) != 1:
+        sys.exit('app/index.html: expected one <p id="official"> line')
+    return src.replace(name_line, f'# name = "{COPY_NAME}"'), OFFICIAL_LINE_RE.sub(COPY_LINE, page)
+
+
+def write_wheel(out, src, page, version, package):
     """A pure-Python wheel: OrcaSlicer reads Name/Version/Summary/Author/Requires-Dist from METADATA."""
     m = HEADER_RE.match(src)
     if not m:
         sys.exit("plugin.py: script header not found")
     header, code = m.group(1), src[m.end():]
     deps = json.loads(re.search(r"^# dependencies = (\[.*\])$", header, re.M).group(1))
-    info = f"{PACKAGE}-{version}.dist-info/"
+    info = f"{package}-{version}.dist-info/"
     if len(SUBMODULE_RE.findall(code)) != len(SUBMODULES):
         sys.exit(f"plugin.py: expected `import <name>  # noqa: E402` for each of {SUBMODULES}")
     code = SUBMODULE_RE.sub(r"from . import \1  # noqa: E402", code)  # in the package they're siblings
     files = {
-        f"{PACKAGE}/__init__.py": code,
-        **{f"{PACKAGE}/{m}.py": (HERE / f"{m}.py").read_text(encoding="utf-8") for m in SUBMODULES},
-        f"{PACKAGE}/page.html": page,
+        f"{package}/__init__.py": code,
+        **{f"{package}/{m}.py": (HERE / f"{m}.py").read_text(encoding="utf-8") for m in SUBMODULES},
+        f"{package}/page.html": page,
         info + "METADATA": "Metadata-Version: 2.1\n"
                            f"Name: {header_field(header, 'name')}\nVersion: {version}\n"
                            f"Summary: {header_field(header, 'description')}\nAuthor: {header_field(header, 'author')}\n"
                            "License: MIT\nLicense-File: LICENSE\nRequires-Python: >=3.12\n" + "".join(f"Requires-Dist: {d}\n" for d in deps),
         info + "WHEEL": "Wheel-Version: 1.0\nGenerator: mesh-splitter plugin/build.py\nRoot-Is-Purelib: true\n"
                         "Tag: py3-none-any\n",
-        info + "top_level.txt": PACKAGE + "\n",
+        info + "top_level.txt": package + "\n",
         info + "LICENSE": (HERE.parent / "LICENSE").read_text(encoding="utf-8"),
     }
     record = ""
@@ -150,9 +171,13 @@ def write_wheel(out, src, page, version):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--version", default=project_version(), help="defaults to [project].version in pyproject.toml")
-    ap.add_argument("--out", default=str(HERE / "dist" / f"{PACKAGE}.whl"))
+    ap.add_argument("--name", default=os.environ.get(NAME_ENV, ""),
+                    help=f"{OFFICIAL_ID} for the official name and key (default: ${NAME_ENV}); anything else builds an unofficial copy")
+    ap.add_argument("--out", help="defaults to dist/<package>.whl")
     ap.add_argument("--page-out", help="also write the bundled page here (for testing in a browser)")
     a = ap.parse_args()
+    a.official = a.name == OFFICIAL_ID
+    package = OFFICIAL_PACKAGE if a.official else COPY_PACKAGE
     page = build_page()
     size = len(page.encode("utf-8"))
     if size > MAX_PAGE:
@@ -161,13 +186,16 @@ def main():
     if src.count("__VERSION__") != 1:
         sys.exit("plugin.py: expected one __VERSION__")
     src = src.replace("__VERSION__", a.version)
-    out = Path(a.out)
-    write_wheel(out, src, page, a.version)
+    if not a.official:
+        src, page = as_copy(src, page)
+    out = Path(a.out or HERE / "dist" / f"{package}.whl")
+    write_wheel(out, src, page, a.version, package)
+    kind = "official" if a.official else "unofficial copy"
     if a.page_out:
         page_out = Path(a.page_out)
         page_out.parent.mkdir(parents=True, exist_ok=True)
         page_out.write_text(page, encoding="utf-8")
-    print(f"{out}  (page {size:,} bytes, plugin {out.stat().st_size:,} bytes, v{a.version})")
+    print(f"{out}  (page {size:,} bytes, plugin {out.stat().st_size:,} bytes, v{a.version}, {kind})")
 
 
 if __name__ == "__main__":

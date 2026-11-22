@@ -31,6 +31,7 @@ import traceback
 import orca
 
 OUT = os.environ.get("MESH_SPLITTER_PROBE_OUT", "")
+PACKAGE = os.environ.get("MESH_SPLITTER_PROBE_PACKAGE", "mesh_splitter_any")  # the wheel's package name
 
 
 def model_objects():
@@ -45,12 +46,12 @@ def probe():
     try:
         # Plugins load in parallel and the command-line models arrive later: wait for both.
         deadline = time.time() + 120
-        while time.time() < deadline and (len(model_objects()) < 2 or "mesh_splitter_any" not in sys.modules):
+        while time.time() < deadline and (len(model_objects()) < 2 or PACKAGE not in sys.modules):
             time.sleep(1)
-        mod = sys.modules.get("mesh_splitter_any")
+        mod = sys.modules.get(PACKAGE)
         r["checks"]["module_loaded"] = mod is not None
         if mod is None:
-            raise RuntimeError("mesh_splitter_any is not in sys.modules: the plugin did not load")
+            raise RuntimeError(f"{PACKAGE} is not in sys.modules: the plugin did not load")
         r["checks"]["page_bytes"] = len(mod.page_html())
         r["checks"]["numpy"] = mod.np is not None
         objs = model_objects()
