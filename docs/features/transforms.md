@@ -6,6 +6,7 @@ Change a part's position, angle and size, and keep it joined to its neighbor.
 - [Rotate on joint](#rotate-on-joint)
 - [Heal joint](#heal-joint)
 - [Fill and anchor](#fill-and-anchor)
+- [Move along the plate or joint, and trim overlap](#move-along-the-plate-or-joint-and-trim-overlap)
 - [Stretch](#stretch)
 - [Collision warning](#collision-warning)
 
@@ -103,6 +104,33 @@ When a part moves away from the part it joined, the cut opens and both sides sho
 - Parts that move together (Move with, Hold, Reach) don't open a gap, so nothing is added between them.
 - Anchor works best with rotate on joint or a turn about the shoulder. [Heal joint](#heal-joint) is the other way to close a small gap: it bends the part back onto its neighbor instead of adding material.
 - Replaced parts always use Fill.
+
+## Move along the plate or joint, and trim overlap
+
+Slide a part along the plate or along the part it joins, and cut off whatever ends up inside other parts. For example, a foot slid in under the body stays on the plate, the body's base closes where the foot was, and the foot loses the bit that would poke into the base.
+
+![A foot moved in: it pokes into the base, then Fill + Trim overlap](img/move-trim.png)
+
+![The foot alone: untrimmed, then trimmed to follow the base](img/trim-foot-alone.png)
+
+### How to use it
+
+1. Select the part and press **W** for the move handles.
+2. In the Transform panel, set **Move along**:
+   - **Free:** X, Y and Z (the default).
+   - **Plate:** X and Y only, so the part keeps its height on the plate.
+   - **Joint:** the two directions in the plane of the part's cut, so it slides along the part it joins.
+3. Set **At the cut** to **Fill** to close the hole the part leaves in its neighbor (see [Fill and anchor](#fill-and-anchor)).
+4. Tick **Trim overlap**. After a move or rotate, the part is cut where it overlaps other parts.
+
+![The Transform panel with Move along, Fill and Trim overlap](img/move-trim-ui.png)
+
+### Tips
+
+- Trim only changes the part it's on. The other parts keep their shape, and a Fill patch on the neighbor counts as its surface, so the trimmed part fits against it.
+- The trimmed shape is used by Send to Orca, the multi-part 3MF and all STL exports, and it stays a closed solid.
+- While you drag, the part shows untrimmed; the trim updates when you stop.
+- Trim overlap applies to all selected parts. Replaced parts can't be trimmed.
 
 ## Stretch
 

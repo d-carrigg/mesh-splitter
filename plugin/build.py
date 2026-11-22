@@ -37,7 +37,7 @@ STYLE_RE = re.compile(r'<link rel="stylesheet" href="\./styles\.css">')
 def check_versions(html):
     """The importmap pins CDN versions; package.json must pin the same ones."""
     pkg = json.loads((HERE / "package.json").read_text())["devDependencies"]
-    for name in ("three", "three-mesh-bvh", "fflate"):
+    for name in ("three", "three-mesh-bvh", "three-bvh-csg", "fflate"):
         m = re.search(rf"/npm/{re.escape(name)}@([\d.]+)/", html)
         if m and m.group(1) != pkg[name]:
             sys.exit(f"{name}: app/index.html uses {m.group(1)}, package.json pins {pkg[name]}")

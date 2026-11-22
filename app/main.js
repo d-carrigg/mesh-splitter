@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
+import { Brush, Evaluator, SUBTRACTION } from "three-bvh-csg";
 import { zipSync } from "fflate";
 import * as core from "./core.js";
 import { PALETTE, UNASSIGNED_COLOR, weld, soupIndex, paintCode, stlBinary, safeName as safe } from "./core.js";
@@ -340,7 +341,7 @@ let xfKey = "";
 function applyXf() {
   if (!mesh) return;
   const Ms = S.parts.map(xfMatrix), any = Ms.some(Boolean);
-  const key = any ? JSON.stringify(S.parts.map((p) => [p.xf || 0, p.heal || 0, p.anchor || 0, p.fill || 0, p.visible !== false])) + "|" + fullHash() : "";
+  const key = any ? JSON.stringify(S.parts.map((p) => [p.xf || 0, p.heal || 0, p.anchor || 0, p.fill || 0, p.trim || 0, p.visible !== false])) + "|" + fullHash() : "";
   if (key === xfKey) return;
   xfKey = key;
   const geo = mesh.geometry, P = geo.getAttribute("position").array, N = geo.getAttribute("normal").array, { P0, N0 } = mesh.userData;
@@ -359,9 +360,11 @@ function applyXf() {
   geo.getAttribute("position").needsUpdate = true; geo.getAttribute("normal").needsUpdate = true;
   geo.computeBoundingBox(); geo.computeBoundingSphere();
   geo.disposeBoundsTree?.(); geo.computeBoundsTree();
+  clearTrimMeshes(); // stale until the trim is redone; the part shows untrimmed meanwhile
   updateFillMesh();
   render();
   scheduleHits();
+  scheduleTrim();
 }
 
 // ---------------------------------------------------------------- collisions
@@ -1065,7 +1068,7 @@ function updateFillMesh() {
   for (const k of nb) { const [a, b] = k.split("|").map(Number); if (ch.has(a) || ch.has(b)) { involved.add(a); involved.add(b); } }
   const pos = [], own = [];
   for (const l of involved) {
-    const p = S.parts[l]; if (!p || p.visible === false || hasRep(p)) continue;
+    const p = S.parts[l]; if (!p || p.visible === false || hasRep(p) || trimMeshes.has(l)) continue; // a trimmed part's caps are in its trim mesh
     for (const pl of loopPlans(partLoops(l, ctx), ctx)) {
       if (pl.kind !== "patch" && pl.kind !== "bridge") continue;
       const n0 = pos.length; planTris(pl, ctx, pos); for (let k = n0; k < pos.length; k += 9) own.push(l);
@@ -1109,6 +1112,158 @@ function setGap(js, mode) {
 }
 const setAnchor = (js, on) => setGap(js, on ? "anchor" : "fill"); // Anchor, or Fill
 
+// ---------------------------------------------------------------- trim
+// part.trim: a moved part loses whatever ends up inside other parts, e.g. a foot slid in under the body is cut off
+// where it would poke into the body. The other parts keep their shape (a Fill patch on the neighbor counts as its
+// surface). Works on the closed solids (partSoup), so the display, Part STLs, the 3MFs and the Merged STL all match.
+const trimMeshes = new Map(); // part index -> trimmed display mesh (the part's faces in the main mesh are hidden)
+const trimCache = new Map();
+let trimTimer = 0;
+const trimOn = (i) => i > 0 && !!S.parts[i]?.trim && !hasRep(S.parts[i]) && !isIdXf(S.parts[i].xf) && S.parts[i].visible !== false;
+function worldBox(v) {
+  const b = new THREE.Box3(); for (let o = 0; o < v.length; o += 3) b.expandByPoint(new THREE.Vector3(v[o], v[o+1], v[o+2])); return b;
+}
+// The part's closed solid minus every other visible part whose box meets it: { pos, nrm } (world, triangle soup).
+function trimResult(i) {
+  const key = `${xfKey}|${i}`;
+  if (trimCache.has(key)) return trimCache.get(key);
+  if (trimCache.size > 16) trimCache.clear();
+  let out = null;
+  const A = partSoup(i, true);
+  if (A?.length) {
+    const box = worldBox(A), cnt = partCounts(), ev = new Evaluator();
+    ev.attributes = ["position", "normal"]; ev.useGroups = false;
+    const brush = (v) => {
+      const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(v, 3));
+      g.setAttribute("normal", new THREE.BufferAttribute(smoothNormals(v), 3));
+      const b = new Brush(g); b.updateMatrixWorld(); return b;
+    };
+    let R = brush(A), cut = 0;
+    S.parts.forEach((q, j) => {
+      if (j === i || j === 0 || q.visible === false || (!cnt[j] && !hasRep(q))) return;
+      const B = partSoup(j, true); if (!B?.length || !worldBox(B).intersectsBox(box)) return;
+      try { R = ev.evaluate(R, brush(B), SUBTRACTION); cut++; } catch (e) { console.warn(`trim ${q.name}:`, e); }
+    });
+    const g = R.geometry.index ? R.geometry.toNonIndexed() : R.geometry;
+    const disp = Float32Array.from(g.getAttribute("position").array);
+    out = { disp, nrm: Float32Array.from(g.getAttribute("normal").array), cut, get pos() { return (this._pos ||= cut ? closeTJunctions(disp, 1e-4).v : A); } };
+  }
+  trimCache.set(key, out); return out;
+}
+// The CSG result has T-junctions (a vertex of one triangle inside another's edge) along the cut. For export: weld
+// it, then split those triangles at the vertices on their open edges, so the part is a closed solid again.
+function snapWeld(v, tol) { // move vertices within tol of an earlier one onto it; drop triangles that collapse
+  const g = new Map(), out = [], c = (x) => Math.floor(x / tol), rep = new Float32Array(3);
+  const find = (x, y, z) => {
+    const i = c(x), j = c(y), k = c(z);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let d = -1; d <= 1; d++) for (const p of g.get(`${i+a},${j+b},${k+d}`) || [])
+      if ((p[0]-x)**2 + (p[1]-y)**2 + (p[2]-z)**2 <= tol*tol) return p;
+    const p = [x, y, z], key = `${i},${j},${k}`; if (!g.has(key)) g.set(key, []); g.get(key).push(p); return p;
+  };
+  for (let o = 0; o < v.length; o += 9) {
+    const P = [find(v[o], v[o+1], v[o+2]), find(v[o+3], v[o+4], v[o+5]), find(v[o+6], v[o+7], v[o+8])];
+    if (P[0] === P[1] || P[1] === P[2] || P[0] === P[2]) continue;
+    out.push(...P[0], ...P[1], ...P[2]);
+  }
+  return Float32Array.from(out);
+}
+function closeTJunctions(v, tol) {
+  v = snapWeld(v, tol);
+  for (let pass = 0; pass < 4; pass++) {
+    const key = (o) => `${v[o]},${v[o+1]},${v[o+2]}`; // welded: equal points are exactly equal
+    const E = new Map(), K = [];
+    for (let o = 0; o < v.length; o += 9) { const k = [key(o), key(o+3), key(o+6)]; K.push(k); for (let e = 0; e < 3; e++) { const ab = k[e] + "|" + k[(e+1)%3]; E.set(ab, (E.get(ab) || 0) + 1); } }
+    const open = []; const bv = new Map();
+    K.forEach((k, t) => { for (let e = 0; e < 3; e++) if (!E.has(k[(e+1)%3] + "|" + k[e])) { open.push([t, e]); for (const c of [e, (e+1)%3]) bv.set(k[c], 9*t + 3*c); } });
+    if (!open.length) return { v, open: 0 };
+    // grid of boundary vertices
+    const cell = 50 * tol, g = new Map(), gk = (x, y, z) => `${Math.floor(x/cell)},${Math.floor(y/cell)},${Math.floor(z/cell)}`;
+    for (const [k, o] of bv) { const c = gk(v[o], v[o+1], v[o+2]); if (!g.has(c)) g.set(c, []); g.get(c).push(o); }
+    const split = new Map(); // tri -> [[e, [t params, offsets]]]
+    let found = 0;
+    for (const [t, e] of open) {
+      const a = 9*t + 3*e, b = 9*t + 3*((e+1)%3);
+      const ax = v[a], ay = v[a+1], az = v[a+2], dx = v[b]-ax, dy = v[b+1]-ay, dz = v[b+2]-az, L2 = dx*dx+dy*dy+dz*dz;
+      if (L2 < tol*tol) continue;
+      const pts = [];
+      const lo = [Math.min(ax, v[b]), Math.min(ay, v[b+1]), Math.min(az, v[b+2])].map((x) => Math.floor((x - 2*tol)/cell));
+      const hi = [Math.max(ax, v[b]), Math.max(ay, v[b+1]), Math.max(az, v[b+2])].map((x) => Math.floor((x + 2*tol)/cell));
+      if ((hi[0]-lo[0]+1)*(hi[1]-lo[1]+1)*(hi[2]-lo[2]+1) > 4096) { // long edge: scan all
+        for (const o of bv.values()) test(o);
+      } else for (let i = lo[0]; i <= hi[0]; i++) for (let j = lo[1]; j <= hi[1]; j++) for (let k = lo[2]; k <= hi[2]; k++) for (const o of g.get(`${i},${j},${k}`) || []) test(o);
+      function test(o) {
+        const px = v[o]-ax, py = v[o+1]-ay, pz = v[o+2]-az, s = (px*dx+py*dy+pz*dz) / L2;
+        if (s <= 1e-6 || s >= 1 - 1e-6) return;
+        const ex = px - s*dx, ey = py - s*dy, ez = pz - s*dz;
+        if (ex*ex+ey*ey+ez*ez > 4*tol*tol) return;
+        const kk = key(o); if (kk === key(a) || kk === key(b)) return;
+        pts.push([s, o]);
+      }
+      if (!pts.length) continue;
+      pts.sort((x, y) => x[0] - y[0]); found++;
+      if (!split.has(t)) split.set(t, [[], [], []]);
+      split.get(t)[e] = pts.filter((p, i) => !i || key(p[1]) !== key(pts[i-1][1])).map((p) => p[1]);
+    }
+    if (!found) return { v, open: open.length };
+    const out = [];
+    for (let t = 0, o = 0; o < v.length; o += 9, t++) {
+      const sp = split.get(t);
+      if (!sp) { for (let k = 0; k < 9; k++) out.push(v[o+k]); continue; }
+      const poly = []; for (let e = 0; e < 3; e++) { poly.push([v[o+3*e], v[o+3*e+1], v[o+3*e+2]]); for (const p of sp[e]) poly.push([v[p], v[p+1], v[p+2]]); }
+      const c = [0, 1, 2].map((k) => (v[o+k] + v[o+3+k] + v[o+6+k]) / 3);
+      for (let i = 0; i < poly.length; i++) out.push(...c, ...poly[i], ...poly[(i+1) % poly.length]);
+    }
+    v = Float32Array.from(out);
+  }
+  return { v, open: -1 };
+}
+
+function clearTrimMeshes() {
+  if (!trimMeshes.size) return;
+  for (const m of trimMeshes.values()) { scene.remove(m); m.geometry.dispose(); }
+  trimMeshes.clear(); updateVisibility();
+}
+function scheduleTrim() {
+  clearTimeout(trimTimer);
+  if (!S.parts.some((_, i) => trimOn(i))) return;
+  trimTimer = setTimeout(updateTrim, gizmo?.dragging ? 250 : 0);
+}
+function updateTrim() {
+  clearTrimMeshes();
+  if (!mesh || !S.G) return;
+  S.parts.forEach((p, i) => {
+    if (!trimOn(i)) return;
+    const t = trimResult(i); if (!t?.disp.length) return;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(t.disp, 3)); g.setAttribute("normal", new THREE.BufferAttribute(t.nrm, 3));
+    g.setAttribute("color", new THREE.BufferAttribute(new Float32Array(t.disp.length), 3));
+    g.computeBoundsTree();
+    const m = new THREE.Mesh(g, material); // the main mesh's material and vertex colors, so the part keeps its exact color
+    m.userData.part = i; trimMeshes.set(i, m); scene.add(m);
+  });
+  updateVisibility(); updateFillMesh(); updateColors();
+}
+function setTrim(js, on) {
+  js = js.filter((j) => j > 0 && S.parts[j] && !hasRep(S.parts[j]));
+  if (!js.length) return;
+  pushUndo();
+  for (const j of js) { if (on) S.parts[j].trim = true; else delete S.parts[j].trim; }
+  const names = js.map((j) => S.parts[j].name).join(", ");
+  afterEdit(on ? `Trim: ${names} ${js.length > 1 ? "are" : "is"} cut where ${js.length > 1 ? "they overlap" : "it overlaps"} other parts (after a move)` : `Trim off on ${names}`);
+}
+// The original face of part i nearest a world point (clicks on a trimmed part select / act on that part).
+function nearestFace(i, w) {
+  const M = xfMatrix(S.parts[i]), p = M ? w.clone().applyMatrix4(M.clone().invert()) : w;
+  let best = -1, bd = Infinity;
+  for (let f = 0; f < S.nF; f++) {
+    if (S.labels[f] !== i) continue;
+    const a = 3 * S.tri[3*f], b = 3 * S.tri[3*f+1], c = 3 * S.tri[3*f+2];
+    const x = (S.pos[a] + S.pos[b] + S.pos[c]) / 3 - p.x, y = (S.pos[a+1] + S.pos[b+1] + S.pos[c+1]) / 3 - p.y, z = (S.pos[a+2] + S.pos[b+2] + S.pos[c+2]) / 3 - p.z;
+    const d = x*x + y*y + z*z; if (d < bd) { bd = d; best = f; }
+  }
+  return best;
+}
+
 function filColor(n) { return orcaFil?.[n - 1] || S.parts.find((q) => q.filament === n)?.color || "#666"; }
 let orcaFil = null; // OrcaSlicer's filament colors by slot (plugin), used by the filament view
 let byFilament = false; try { byFilament = localStorage.getItem("meshsplit:byFil") === "1"; } catch {}
@@ -1127,6 +1282,7 @@ function updateColors(plain = false) {
   const col = mesh.geometry.getAttribute("color").array;
   const cs = S.parts.map((_, i) => shownColor(i, plain).convertSRGBToLinear());
   for (const m of repMeshes.values()) if (S.parts[m.userData.part]) m.material.color.copy(shownColor(m.userData.part, plain));
+  for (const [i, m] of trimMeshes) if (S.parts[i]) { const c = shownColor(i, plain).convertSRGBToLinear(), a = m.geometry.getAttribute("color"); for (let k = 0; k < a.count; k++) a.setXYZ(k, c.r, c.g, c.b); a.needsUpdate = true; }
   for (let f = 0; f < S.nF; f++) {
     const c = cs[S.labels[f]] || cs[0];
     for (let k = 0; k < 3; k++) { col[9*f+3*k] = c.r; col[9*f+3*k+1] = c.g; col[9*f+3*k+2] = c.b; }
@@ -1138,7 +1294,7 @@ function updateColors(plain = false) {
 let visKey = "";
 function updateVisibility() {
   if (!mesh) return;
-  const vis = S.parts.map((p) => p.visible && !(p.rep && REPS.has(p.rep.id)));
+  const vis = S.parts.map((p, i) => p.visible && !(p.rep && REPS.has(p.rep.id)) && !trimMeshes.has(i));
   const key = vis.join(",") + "|" + (vis.every(Boolean) ? "" : hashLabels());
   if (key === visKey && mesh.geometry.boundsTree) return;
   visKey = key;
@@ -1210,7 +1366,9 @@ function hit(ev) {
   if (!mesh) return null;
   const r = renderer.domElement.getBoundingClientRect();
   ray.setFromCamera(new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1), camera);
-  const h = ray.intersectObject(mesh, false)[0];
+  let h = ray.intersectObject(mesh, false)[0];
+  const th = trimMeshes.size ? ray.intersectObjects([...trimMeshes.values()], false)[0] : null;
+  if (th && (!h || th.distance < h.distance)) h = { ...th, face: { ...th.face, a: 3 * nearestFace(th.object.userData.part, th.point) } };
   if (!h) return null;
   const face = Math.floor(h.face.a / 3), M = xfMatrix(S.parts[S.labels[face]]);
   // tools work in the original mesh space; the brush ring is drawn at the world hit
@@ -1969,6 +2127,8 @@ function refreshXfPanel() {
   $("gapAnchor").classList.toggle("on", ok && !!p?.anchor); $("gapFill").classList.toggle("on", ok && !!p?.fill && !p?.anchor);
   $("gapOpen").classList.toggle("on", ok && !p?.fill && !p?.anchor);
   $("stretchRow").classList.toggle("hide", !ok || !!p?.rep);
+  $("trimRow").classList.toggle("hide", !ok || !!p?.rep); $("trimOn").checked = ok && !!p?.trim;
+  for (const [id, m] of [["mvFree", "free"], ["mvPlate", "plate"], ["mvJoint", "joint"]]) $(id).classList.toggle("on", gzSlide === m);
   const au = ok && !!p.xf?.st?.auto;
   if (ok && document.activeElement !== $("stretchPct")) $("stretchPct").value = +((p.xf?.st?.k ?? 1) * 100).toFixed(au ? 0 : 1);
   $("stretchAuto").checked = au; $("stretchPct").disabled = au; $("stretchGapRow").classList.toggle("hide", !au);
@@ -2032,6 +2192,7 @@ $("healR").onchange = () => {
 $("gapOpen").onclick = () => { if (S.G && S.active > 0) setGap(selected(), "open"); };
 $("gapFill").onclick = () => { if (S.G && S.active > 0) setGap(selected(), "fill"); };
 $("gapAnchor").onclick = () => { if (S.G && S.active > 0) setGap(selected(), "anchor"); };
+$("trimOn").onchange = () => { if (S.G && S.active > 0) setTrim(selected(), $("trimOn").checked); };
 $("stretchAuto").onchange = () => { if (S.G && S.active > 0) setAutoStretch(selected(), $("stretchAuto").checked); };
 $("stretchGap").onchange = () => {
   const g = +$("stretchGap").value; if (!S.G || S.active <= 0 || !(g >= 0)) { refreshUI(); return; }
@@ -2077,10 +2238,14 @@ function syncGizmo() {
   gzSync = false;
   const jf = gzMode === "rotate" && gzJointOn ? jointFrame(i) : null;
   if (jf) { gzSync = true; gzProxy.position.copy(jf.J); gzProxy.quaternion.copy(jf.q); gzProxy.scale.set(1, 1, 1); gzProxy.updateMatrixWorld(); gzSync = false; }
+  const sf = gzMode === "translate" && gzSlide === "joint" ? jointFrame(i) : null; // slide along the cut: local X/Z span its plane
+  if (sf) { gzSync = true; gzProxy.quaternion.copy(sf.q); gzProxy.scale.set(1, 1, 1); gzProxy.updateMatrixWorld(); gzSync = false; }
   gizmo.setMode(gzMode);
-  gizmo.setSpace(gzMode === "scale" || jf ? "local" : "world");
+  gizmo.setSpace(gzMode === "scale" || jf || sf ? "local" : "world");
   gizmo.showX = gizmo.showZ = !jf; // on a joint only the ring about the joint axis (local Y) is offered
-  showJointAxis(jf);
+  gizmo.showY = !sf; // sliding on the joint: no handle off the cut's plane
+  if (gzMode === "translate" && gzSlide === "plate") gizmo.showZ = false; // on the plate: no up/down handle
+  showJointAxis(jf || sf);
   if (gizmo.object !== gzProxy) gizmo.attach(gzProxy);
   render();
 }
@@ -2088,6 +2253,19 @@ function syncGizmo() {
 // The gizmo proxy sits at J with local Y along n; a drag becomes a rotation about that axis through J.
 let gzJointOn = false, gzJoint = null;
 try { gzJointOn = localStorage.getItem("meshsplit:gzJoint") === "1"; } catch {}
+// Move along: "free" (X/Y/Z), "plate" (X/Y only: the part keeps its height, so a foot stays on the plate) or "joint"
+// (the two axes in the plane of the part's cut: it slides along the part it joins).
+let gzSlide = "free";
+try { gzSlide = localStorage.getItem("meshsplit:gzSlide") || "free"; } catch {}
+function setSlide(m) {
+  gzSlide = m;
+  try { localStorage.setItem("meshsplit:gzSlide", m); } catch {}
+  if (m === "joint" && S.G && S.active > 0 && !jointFrame(S.active)) status(`${S.parts[S.active].name} has no cut, so it moves on the world axes`);
+  refreshUI();
+}
+$("mvFree").onclick = () => setSlide("free");
+$("mvPlate").onclick = () => setSlide("plate");
+$("mvJoint").onclick = () => setSlide("joint");
 const jointCache = new Map();
 function jointFrame(i) {
   const key = `${i}|${S.nF}|${fullHash()}|${S.parts.map((q) => (q.follow?.to ?? "") + "," + (q.hold ? q.hold.a + q.hold.b : "") + "," + (q.reach?.to ?? "")).join(";")}`;
@@ -2153,6 +2331,14 @@ gizmo.addEventListener("objectChange", () => {
     gzSync = true; gzProxy.quaternion.copy(tw.multiply(gzJoint.q0)); gzProxy.position.copy(gzJoint.J); gzSync = false;
     xfEdited(i); applyXf(); syncReps(); drawSeeds(); showXfDims();
     for (let k = 0; k < 3; k++) { xfIn("R", k).value = +x.r[k].toFixed(2); xfIn("T", k).value = +x.t[k].toFixed(3); }
+    return;
+  }
+  if (gizmo.mode === "translate" && gzSlide !== "free") { // Move along plate / joint: only the position changes
+    const z = x.t[2];
+    x.t = [0, 1, 2].map((k) => +(gzProxy.position.getComponent(k) - x.c[k]).toFixed(3));
+    if (gzSlide === "plate") x.t[2] = z;
+    xfEdited(i); applyXf(); syncReps(); drawSeeds(); showXfDims();
+    for (let k = 0; k < 3; k++) xfIn("T", k).value = +x.t[k].toFixed(3);
     return;
   }
   const sc = gzProxy.scale.toArray().map((v) => (Math.abs(v) < 0.01 ? (v < 0 ? -0.01 : 0.01) : v));
@@ -2236,7 +2422,7 @@ function shoot(view, w, h, mode) {
     for (let f = 0; f < S.nF; f++) { const l = S.labels[f] + 1, r = (l & 255) / 255, g = (l >> 8) / 255; for (let k = 0; k < 9; k += 3) { ids[9*f+k] = r; ids[9*f+k+1] = g; } }
     const saved = keep.slice(); keep.set(ids); col.needsUpdate = true; mesh.material = idMat;
     const rmats = [];
-    for (const m of repMeshes.values()) { const l = m.userData.part + 1; rmats.push([m, m.material]); m.material = new THREE.MeshBasicMaterial({ color: new THREE.Color((l & 255) / 255, (l >> 8) / 255, 0), toneMapped: false, side: THREE.DoubleSide }); }
+    for (const m of [...repMeshes.values(), ...trimMeshes.values()]) { const l = m.userData.part + 1; rmats.push([m, m.material]); m.material = new THREE.MeshBasicMaterial({ color: new THREE.Color((l & 255) / 255, (l >> 8) / 255, 0), toneMapped: false, side: THREE.DoubleSide }); }
     if (fillMesh) fillMesh.visible = false;
     shotR.render(scene, shotCam);
     if (fillMesh) fillMesh.visible = true;
@@ -2668,8 +2854,9 @@ function xformSoup(v, M) {
   return out;
 }
 // Final closed geometry of one part: its replacement, or its faces + caps, with the Transform applied.
-function partSoup(i) {
+function partSoup(i, raw = false) {
   const p = S.parts[i];
+  if (!raw && trimOn(i)) { const t = trimResult(i); if (t) return t.pos; }
   if (hasRep(p)) { const M = repMatrix(i); return M ? xformSoup(REPS.get(p.rep.id).pos, M) : null; }
   const m = partMesh(i); if (!m) return null;
   const M = xfMatrix(p), faces = Float32Array.from(m.verts.slice(0, m.nFaceVerts)), ctx = fillCtx();
@@ -2891,4 +3078,4 @@ if (ORCA.on) {
   });
   orcaSend({ cmd: "objects", auto: true });
 }
-window.app = { S, setAnchor, setGap, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, setAnchor, setGap, setTrim, trimResult, trimMeshes, setSlide, updateTrim, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
