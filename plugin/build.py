@@ -157,7 +157,9 @@ def main():
     out = Path(a.out)
     write_wheel(out, src, page, a.version)
     if a.page_out:
-        Path(a.page_out).write_text(page, encoding="utf-8")
+        page_out = Path(a.page_out)
+        page_out.parent.mkdir(parents=True, exist_ok=True)
+        page_out.write_text(page, encoding="utf-8")
     print(f"{out}  (page {size:,} bytes, plugin {out.stat().st_size:,} bytes, v{a.version})")
 
 
