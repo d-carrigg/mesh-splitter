@@ -424,6 +424,14 @@ class Project3mfTests(unittest.TestCase):
         self.assertEqual(cfg.count('key="object_id"'), 2)  # both on plate 1
         self.assertEqual(info, {"removed": 1, "copies": 1, "plate": 1, "parts": 2, "filaments_added": 4})
 
+    def test_single_part_goes_on_the_originals_filament(self):
+        one = split_3mf([("bolt", 3, (100, 100, 0))])  # the page's one-part export (slot from the page is ignored)
+        proj = orca_project([("bolt", 0, (150, 50))])
+        import project3mf
+        out, info = project3mf.apply(proj, one, "replace_object", 0, object_name="bolt", single=True)
+        self.assertEqual(read_3mf(out)[0], [("bolt", [("bolt", "1")], [(105.0, 105.0)])])
+        self.assertEqual(info["filaments_added"], 0)
+
     def test_new_filament_slots_extend_every_per_filament_setting(self):
         proj = orca_project([("bolt", 0, (150, 50))])
         _, out, _ = self.apply(proj, "replace_object", 0, colors={2: "#00ff00"})

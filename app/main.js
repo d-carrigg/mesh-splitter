@@ -3107,10 +3107,13 @@ ORCA.send = (mode) => {
   if (!S.G) return;
   const src = S.source?.orca;
   if (mode !== "add" && !src) { alert("Open the model from the plate (Model > From the plate) to replace it there."); return; }
-  const { out } = buildParts3MF();
+  // Default: the edited model as one part, which the plugin puts on the original object's filament. With
+  // "Parts on their own filaments" each part keeps its filament slot (and the plugin adds slots the project lacks).
+  const multi = $("sendMulti").checked;
+  const out = multi ? buildParts3MF().out : core.parts3MF(S.name, [{ name: S.name, filament: 1, soup: mergedSoup().v }]).out;
   const colors = {}; // filament slot -> the part's color, for slots the project doesn't have yet
-  for (const p of S.parts.slice(1)) colors[p.filament] ??= p.color;
-  return ORCA.save(`${S.name}_parts.3mf`, out, { mode, colors, source: src ? { id: src.id, index: src.index, name: src.name } : null });
+  if (multi) for (const p of S.parts.slice(1)) colors[p.filament] ??= p.color;
+  return ORCA.save(`${S.name}_parts.3mf`, out, { mode, colors, single: !multi, source: src ? { id: src.id, index: src.index, name: src.name } : null });
 };
 function orcaSendMenu() {
   const src = S.source?.orca;
@@ -3182,6 +3185,8 @@ if (ORCA.on) {
   $("sendPlate").onclick = () => { closeMenus(); later(() => ORCA.send("replace_plate")); };
   $("sendFill").onclick = () => { closeMenus(); later(() => ORCA.send("fill_plate")); };
   $("expBtn").addEventListener("click", orcaSendMenu);
+  try { $("sendMulti").checked = localStorage.getItem("meshsplit:sendMulti") === "1"; } catch {}
+  $("sendMulti").onchange = () => { try { localStorage.setItem("meshsplit:sendMulti", $("sendMulti").checked ? "1" : "0"); } catch {} };
   $("expParts").lastChild.textContent = "Multi-part 3MF to Downloads";
   $("expParts").title = "Save a multi-part 3MF (each part keeps its filament slot) to Downloads, to import in OrcaSlicer with Ctrl+I";
   // Welcome screen: say where it runs, point at the web app instead of the plugin, and copy links

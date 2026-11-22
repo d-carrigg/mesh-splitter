@@ -178,6 +178,14 @@ class Project:
                 raise ValueError(f"The project changed: object {index + 1} is '{meta(o, 'name')}', not '{name}'")
         return got
 
+    def filament_of(self, oid):
+        """The object's filament slot (its own, else its first part's), 1 if it has none."""
+        o = self.cfg.find(f"object[@id='{oid}']")
+        if o is None:
+            return 1
+        ext = meta(o, "extruder") or next((meta(p, "extruder") for p in o.findall("part") if meta(p, "extruder")), None)
+        return int(ext) if ext and ext.isdigit() and int(ext) > 0 else 1
+
     def remove_object(self, oid):
         """Drop an object everywhere OrcaSlicer lists it: resource, build items, settings, plates, assembly."""
         for o in list(self.resources.findall(q("object"))):
@@ -370,10 +378,11 @@ def beside(parts, here, bed, origin, gap=10.0):
     return (*spots[0], here[2])
 
 
-def apply(project_data, split_data, mode, index=None, name=None, object_name=None, colors=None):
+def apply(project_data, split_data, mode, index=None, name=None, object_name=None, colors=None, single=False):
     """Returns (the project with the split in it, summary). index: OrcaSlicer's model index of the object the split
     came from (None for add, when the model didn't come from the plate). colors: {filament slot: "#rrggbb"} for
-    slots the project doesn't have yet."""
+    slots the project doesn't have yet. single: the split is one part (the edited model, not for multi-color
+    printing), and it goes on the source object's filament instead of the slot in the split."""
     if mode not in MODES:
         raise ValueError(f"Unknown mode {mode}")
     proj = Project(project_data)
@@ -384,11 +393,15 @@ def apply(project_data, split_data, mode, index=None, name=None, object_name=Non
         if mode != "add":
             raise ValueError("Open the model from the plate to replace it there")
         plate, gone = 0, []
+        if single:
+            parts = [(p[0], 1, p[2], p[3]) for p in parts]
         bx, by, bw, bd = proj.bed()
         positions = [(bx + bw / 2, by + bd / 2, 0.0)]
     else:
         src = proj.resolve(index, name=object_name)
         plate = proj.plate_of(src)
+        if single:
+            parts = [(p[0], proj.filament_of(src), p[2], p[3]) for p in parts]
         gone = {"add": [], "replace_object": [src]}.get(mode, None)
         if gone is None:
             gone = proj.objects_on_plate(plate)

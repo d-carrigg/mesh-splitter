@@ -7,7 +7,7 @@ Get the parts out as a 3MF or STLs, from OrcaSlicer or the browser.
 
 ## Send to Orca
 
-Inside OrcaSlicer, the main button is **Send to Orca**. It puts the split on the plate as one object, with each part on its own filament slot and the part names kept.
+Inside OrcaSlicer, the main button is **Send to Orca**. It puts the edited model back on the plate as one object.
 
 ![The plugin tab after Send to Orca](img/orca-send.png)
 
@@ -22,7 +22,7 @@ Inside OrcaSlicer, the main button is **Send to Orca**. It puts the split on the
    - **Fill plate:** the original's plate is cleared and filled with as many copies of the split as fit, 6 mm apart.
 4. OrcaSlicer asks how to open the file. Pick **Open as project**. If it offers to save the current project, **No** is fine: your unsaved changes are already in the new one.
 
-Filament slots the split uses that the project doesn't have yet are added, with the parts' colors.
+By default the edited model goes back as **one part on the original object's filament**: the same object, just edited, ready to print. Turn on **Parts on their own filaments** at the top of the menu to keep each part on its own filament slot for multi-color printing. Slots the project doesn't have yet are then added, with the parts' colors.
 
 ![Objects on the plate, in the file menu](img/orca-plate-menu.png)
 

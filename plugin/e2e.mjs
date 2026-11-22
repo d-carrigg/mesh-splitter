@@ -241,12 +241,14 @@ const menu = await page.evaluate(() => ({ replace: document.getElementById("send
 console.log("send menu:", JSON.stringify(menu));
 if (menu.replace !== `Replace ${info.name}` || menu.disabled.some(Boolean)) errors.push("send menu: " + JSON.stringify(menu));
 if (shot) { await page.waitForTimeout(400); await page.screenshot({ path: shot.replace(/\.png$/, "_send.png") }); }
+// Default (Parts on their own filaments off): the edited model goes back as one part on the original's filament
+if (await page.isChecked("#sendMulti")) errors.push("Parts on their own filaments should be off by default");
 await page.click("#sendReplace"); // Send to Orca > Replace <object>: the split goes into the project in its place
 const wait = async (ok) => { const t0 = Date.now(); while (!ok() && !errors.length && Date.now() - t0 < 60000) await new Promise((r) => setTimeout(r, 100)); };
 await wait(() => saved && handoff);
 const sent = saved; saved = null;
 console.log("status:", await page.textContent("#status"));
-if (!errors.length && !(sent?.ask === "Open as project" && handoff?.length === 1 && handoff[0] === sent.path && sent.removed === 1))
+if (!errors.length && !(sent?.ask === "Open as project" && handoff?.length === 1 && handoff[0] === sent.path && sent.removed === 1 && sent.parts === 1 && sent.filaments_added === 0))
   errors.push("Send to Orca did not hand the project to OrcaSlicer: " + JSON.stringify({ sent, handoff }));
 // The page's own multi-part 3MF still saves to Downloads (CI checks it with verify_3mf.py)
 await page.click("#expBtn"); await page.click("#expParts");

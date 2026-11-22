@@ -275,7 +275,9 @@ def send_to_orca(data, msg):
       replace_plate   the original's plate is cleared and the split takes the original's place
       fill_plate      the original's plate is cleared and filled with copies of the split
 
-    The plugin edits a copy of the project (project3mf.py) and hands it to OrcaSlicer, which asks how to open it:
+    msg["single"]: `data` is the edited model as one part, which goes on the original object's filament (the default;
+    otherwise each part keeps its filament slot). The plugin edits a copy of the project (project3mf.py) and hands it
+    to OrcaSlicer, which asks how to open it:
     'Open as project' loads it. Unsaved changes are already in that copy, so 'No' is fine when it offers to save.
     """
     mode, src = msg["mode"], msg.get("source") or {}
@@ -293,7 +295,8 @@ def send_to_orca(data, msg):
         if os.path.exists(tmp):
             os.remove(tmp)
     colors = {int(k): v for k, v in (msg.get("colors") or {}).items() if str(k).isdigit()}
-    edited, info = project3mf.apply(project, data, mode, index, name=name, object_name=src_name, colors=colors)
+    edited, info = project3mf.apply(project, data, mode, index, name=name, object_name=src_name, colors=colors,
+                                    single=bool(msg.get("single")))
     path = write_new(folder, f"{safe_name(stem)} - Mesh Splitter.3mf", edited)
     if not handoff.supported():
         note = (f"Saved {os.path.basename(path)} to {folder}. Sending to OrcaSlicer isn't available on this system: "

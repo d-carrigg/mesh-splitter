@@ -14,6 +14,7 @@ body.inOrca #top { display:none; }
 .caretI { width:14px !important; height:14px !important; opacity:.7; }
 #toast { position:absolute; left:50%; bottom:34px; transform:translateX(-50%); max-width:min(640px, 90%); background:var(--gp); border-left:3px solid #ff5d5d; color:var(--fg); padding:8px 12px; border-radius:3px; z-index:20; cursor:pointer; box-shadow:0 3px 12px #0008; }
 .mh { color:var(--mute); font-size:11px; text-transform:uppercase; letter-spacing:.06em; padding:6px 8px 2px; }
+.mchk { display:flex; align-items:center; gap:6px; padding:4px 8px 6px; color:var(--mute); font-size:12px; cursor:pointer; }
 .msep { height:1px; background:var(--sep); margin:4px 2px; }
 .menu .sub { display:flex; flex-direction:column; }
 .menu .sub:empty { display:none; }

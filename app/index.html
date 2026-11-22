@@ -100,6 +100,7 @@
     <span class="menuWrap needMesh split"><button id="expMain" class="pri" data-icon="download" title="One object, each part a separate part with its filament slot set (opens as parts in OrcaSlicer / Bambu Studio)">Export 3MF</button><button id="expBtn" class="pri caret" title="More export formats"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="m6 9 6 6 6-6"/></svg></button>
       <div id="expMenu" class="menu" hidden>
         <div class="orcaOnly mh" hidden>Send to OrcaSlicer</div>
+        <label class="orcaOnly mchk" hidden title="Off: the edited model goes back as one part on the original object's filament. On: each part keeps its own filament slot (multi-color printing)"><input id="sendMulti" type="checkbox"> Parts on their own filaments</label>
         <button id="sendAdd" class="orcaOnly" hidden data-icon="plus" title="Add the split to the plate as a new object, next to the original. OrcaSlicer asks how to open it: pick Open as project">Add to plate</button>
         <button id="sendReplace" class="orcaOnly needSrc" hidden data-icon="replace" title="The split takes the original object's place on its plate. OrcaSlicer asks how to open it: pick Open as project">Replace object</button>
         <button id="sendPlate" class="orcaOnly needSrc" hidden data-icon="replace" title="Clear the original's plate and put the split where the original was. OrcaSlicer asks how to open it: pick Open as project">Replace plate</button>
