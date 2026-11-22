@@ -32,7 +32,6 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "server"))
 import mock_llm_server  # noqa: E402
 import handoff  # noqa: E402  the programs Send to Orca runs (dbus-send on Linux), which the plugin asks for at load
-PLUGIN_KEY = "mesh_splitter_any"
 
 
 def install(plugins_dir, src, name, permissions):
@@ -76,6 +75,7 @@ def main():
     ap.add_argument("--out", type=Path, default=Path("build/real-orca"))
     ap.add_argument("--timeout", type=int, default=240)
     a = ap.parse_args()
+    plugin_key = a.plugin.stem  # mesh_splitter_any, or mesh_splitter_copy_any for an unofficial build
 
     a.out.mkdir(parents=True, exist_ok=True)
     data = Path(tempfile.mkdtemp(prefix="orca-data-"))
@@ -92,7 +92,8 @@ def main():
     llm = llm_ctx.__enter__()
     stall_ctx = mock_llm_server.running(stall=True)  # never answers: for Cancel
     stall = stall_ctx.__enter__()
-    env = dict(os.environ, MESH_SPLITTER_PROBE_OUT=str(report.resolve()), LIBGL_ALWAYS_SOFTWARE="1",
+    env = dict(os.environ, MESH_SPLITTER_PROBE_OUT=str(report.resolve()), MESH_SPLITTER_PROBE_PACKAGE=plugin_key,
+               LIBGL_ALWAYS_SOFTWARE="1",
                LANG=os.environ.get("LANG", "C.UTF-8"), MESH_SPLITTER_MOCK_LLM=llm.base_url,
                MESH_SPLITTER_MOCK_LLM_STALL=stall.base_url)
     # Without SSL_CERT_FILE, OrcaSlicer on Linux asks "use system SSL certificate ...?" in a modal at startup.
@@ -115,9 +116,9 @@ def main():
     debug = "\n".join(f.read_text(errors="replace") for f in (data / "log").glob("debug_*"))
 
     problems = []
-    if f"[load_plugin_impl] SUCCESS plugin={PLUGIN_KEY}" not in debug:
+    if f"[load_plugin_impl] SUCCESS plugin={plugin_key}" not in debug:
         problems.append("OrcaSlicer did not log a successful load of the plugin")
-    problems += [line.strip() for line in debug.splitlines() if f"FAIL plugin={PLUGIN_KEY}" in line]
+    problems += [line.strip() for line in debug.splitlines() if f"FAIL plugin={plugin_key}" in line]
     if not report.exists():
         problems.append(f"the probe wrote no report within {a.timeout} s (OrcaSlicer exit code {proc.returncode})")
     else:
