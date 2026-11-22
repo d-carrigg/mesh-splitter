@@ -22,6 +22,8 @@
         <div class="msep"></div>
         <button id="saveSess" class="needMesh" data-icon="save" title="Save the split (labels, part names, transforms) as .json">Save session</button>
         <button id="loadSess" class="needMesh" data-icon="load" title="Load a saved .json session for this mesh">Load session…</button>
+        <div class="orcaOnly msep" hidden></div>
+        <label class="orcaOnly chk" hidden title="What to do when OrcaSlicer opens or starts another project while a model from the old one is open here">New Orca project<span style="flex:1"></span><select id="newProjMode"><option value="ask">Ask</option><option value="load">Load its model</option><option value="keep">Keep current</option></select></label>
       </div></span>
   </div>
   <div class="sc"><div id="fileName">Open a model</div><div id="fileInfo"></div>
@@ -63,6 +65,13 @@
 
 <div id="view">
   <div id="toast" hidden title="Click to dismiss"></div>
+  <div id="newProj" class="float card" hidden>
+    <b>OrcaSlicer has a new project</b>
+    <span id="newProjText" class="small"></span>
+    <div id="newProjList"></div>
+    <label class="small"><input id="newProjRemember" type="checkbox"> Don't ask again</label>
+    <div class="row" style="margin:0"><span style="flex:1"></span><button id="newProjKeep">Keep current model</button></div>
+  </div>
   <div id="drop">
     <div id="welcome">
       <h1>Welcome to Mesh Splitter</h1>
