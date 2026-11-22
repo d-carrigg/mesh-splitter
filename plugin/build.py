@@ -67,7 +67,7 @@ def build_page():
     page = html[:m.start()] + '<script type="module">' + js + "</script>" + html[m.end():]
     page = STYLE_RE.sub(lambda _: "<style>\n" + css + "</style>", page)
     page = IMPORTMAP_RE.sub("", page)
-    if "cdn.jsdelivr.net" in page:
+    if re.search(r"cdn\.jsdelivr\.net", page):  # build check, not URL sanitizing
         sys.exit("bundled page still references the CDN")
     return page
 
