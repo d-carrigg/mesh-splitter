@@ -800,6 +800,10 @@ function fillCtx() {
   return Object.assign(ctx, { mat, heal, wpos, hash, tol: 1e-4 * (S.G?.diag || 100) });
 }
 const anchored = (l) => l > 0 && !!S.parts[l]?.anchor && !hasRep(S.parts[l]);
+// Fill and Anchor act only at a part's joint (the cut it turns about, toward the body). Its other cuts (e.g. a hand's
+// grip around a broom) stay Open.
+const atJoint = (l, lp) => bodyJoint(l)?.loopKey === core.loopKey(lp);
+const anchoredAt = (l, lp) => anchored(l) && atJoint(l, lp), filledAt = (l, lp) => filled(l) && atJoint(l, lp);
 const filled = (l) => l > 0 && !!S.parts[l]?.fill && !hasRep(S.parts[l]);
 function partLoops(l, ctx) { // boundary loops of part l (geometry only, cached)
   const key = `${l}|${S.nF}|${ctx.hash}`;
@@ -825,9 +829,10 @@ function loopPlans(loops, ctx) {
       if (!gap) { let g = 0; for (const [a] of lp) if (ctx.wpos(own, a, a3).distanceTo(ctx.wpos(nb, a, b3)) > ctx.tol) g++; gap = g > lp.length / 2; }
       if (gap) {
         const rep = hasRep(S.parts[nb]);
-        if (!rep && anchored(own) && (!anchored(nb) || own < nb)) kind = "bridge";
-        else if (!rep && anchored(nb)) kind = "under";
-        else if (rep || filled(own) || filled(nb)) kind = "patch"; // a replaced neighbor always gets Fill
+        const ao = !rep && anchoredAt(own, lp), an = !rep && anchoredAt(nb, lp);
+        if (ao && (!an || own < nb)) kind = "bridge";
+        else if (an) kind = "under";
+        else if (rep || filledAt(own, lp) || filledAt(nb, lp)) kind = "patch"; // a replaced neighbor always gets Fill
         // else Open (the default): each side keeps a flat cap and the gap stays visible
       }
     }
@@ -1825,7 +1830,7 @@ function partJoint(pi, body = false) {
   const n = new THREE.Vector3(); // sum of cap triangle normals (b, a, J): outward of the part through the cut
   for (const [a, b] of best) { const pb = P(b); n.add(new THREE.Vector3().subVectors(P(a), pb).cross(new THREE.Vector3().subVectors(J, pb))); }
   if (n.lengthSq() < 1e-12) n.subVectors(J, pca.mean);
-  return { J, n: n.normalize(), pca, verts: pm.verts, nv: pm.nFaceVerts, loopLen: bestLen };
+  return { J, n: n.normalize(), pca, verts: pm.verts, nv: pm.nFaceVerts, loopLen: bestLen, loopKey: core.loopKey(best) };
 }
 
 function repJoint(R, rep) {
@@ -2089,10 +2094,13 @@ function syncGizmo() {
 let gzJointOn = false, gzJoint = null;
 try { gzJointOn = localStorage.getItem("meshsplit:gzJoint") === "1"; } catch {}
 const jointCache = new Map();
-function jointFrame(i) {
+function bodyJoint(i) { // partJoint(i, true), cached
   const key = `${i}|${S.nF}|${fullHash()}|${S.parts.map((q) => (q.follow?.to ?? "") + "," + (q.hold ? q.hold.a + q.hold.b : "") + "," + (q.reach?.to ?? "")).join(";")}`;
-  if (!jointCache.has(key)) { jointCache.clear(); jointCache.set(key, partJoint(i, true)); }
-  const pj = jointCache.get(key);
+  if (!jointCache.has(key)) { if (jointCache.size > 40) jointCache.clear(); jointCache.set(key, partJoint(i, true)); }
+  return jointCache.get(key);
+}
+function jointFrame(i) {
+  const pj = bodyJoint(i);
   if (!pj?.loopLen) return null; // no cut: plain world-axis rotation
   const M = xfMatrix(S.parts[i]) || new THREE.Matrix4();
   const J = pj.J.clone().applyMatrix4(M), n = pj.n.clone().applyMatrix3(new THREE.Matrix3().getNormalMatrix(M)).normalize();
