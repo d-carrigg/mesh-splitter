@@ -1,0 +1,18 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "curler.stl",
+ "out": null,
+ "viewport": { "width": 1200, "height": 800 },
+ "deviceScaleFactor": 1.5,
+ "css": "#__cursor { display: none !important } #status { visibility: hidden } #toolbar, .toolbar { visibility: hidden }",
+ "steps": [
+  { "do": "load" },
+  { "do": "eval", "js": "document.getElementById('rightCol').style.visibility = 'hidden'; window.look = () => { const t = [-44.7, -1.4, 74.8], u = [0.9, -0.4, 0.3].map((v) => v / Math.hypot(0.9, 0.4, 0.3)); app.controls.target.set(...t); app.camera.position.set(t[0] + u[0] * 110, t[1] + u[1] * 110, t[2] + u[2] * 110); app.controls.update(); app.render(); }; look()" },
+  { "do": "shot", "name": "_before", "clip": [470, 180, 560, 520] },
+  { "do": "eval", "js": "app.deleteGeometry([10], false); app.S.active = 0; app.refreshUI(); look()" },
+  { "do": "shot", "name": "_open", "clip": [470, 180, 560, 520] },
+  { "do": "eval", "js": "app.closeHoles(-1); app.S.active = 0; app.refreshUI(); look()" },
+  { "do": "shot", "name": "_closed", "clip": [470, 180, 560, 520] },
+  { "do": "compare", "shots": ["_before", "_open", "_closed"], "labels": ["Broom handle through the hand", "Delete geometry, leave holes", "Close holes: the hand is solid"], "name": "delete-geometry" }
+ ]
+}
