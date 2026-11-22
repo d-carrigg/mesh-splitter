@@ -1,4 +1,4 @@
-"""Build the OrcaSlicer plugin: bundle app/index.html into one self-contained page and package it in a wheel.
+"""Build the OrcaSlicer plugin: bundle app/ (index.html, styles.css, main.js) into one self-contained page and package it in a wheel.
 
     cd plugin && npm ci && python build.py      ->  dist/mesh_splitter_any.whl
 
@@ -10,8 +10,8 @@ across updates.
 
 OrcaSlicer loads plugin pages with wxWebView::SetPage (WebView2 NavigateToString on Windows, ~2 MB cap),
 from a file:// base and with no network promise, so the CDN importmap is replaced by an esbuild bundle of
-the page's module script (three, three-mesh-bvh, fflate from node_modules, versions pinned in
-package.json to match the importmap).
+app/main.js (three, three-mesh-bvh, fflate from node_modules, versions pinned in package.json to match the
+importmap), and app/styles.css is inlined, since the page can't load files next to it.
 """
 import argparse
 import base64
@@ -25,11 +25,13 @@ import zipfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-SEGMENT = HERE.parent / "app" / "index.html"
+APP = HERE.parent / "app"
+SEGMENT = APP / "index.html"
 MAX_PAGE = 1_800_000  # bytes; stay clear of WebView2's 2 MB NavigateToString limit
 
 IMPORTMAP_RE = re.compile(r'<script type="importmap">.*?</script>\s*', re.S)
-MODULE_RE = re.compile(r'<script type="module">(.*?)</script>', re.S)
+MODULE_RE = re.compile(r'<script type="module" src="\./main\.js"></script>')
+STYLE_RE = re.compile(r'<link rel="stylesheet" href="\./styles\.css">')
 
 
 def check_versions(html):
@@ -41,16 +43,11 @@ def check_versions(html):
             sys.exit(f"{name}: app/index.html uses {m.group(1)}, package.json pins {pkg[name]}")
 
 
-def bundle(js):
-    entry = HERE / "build" / "entry.js"
-    entry.parent.mkdir(exist_ok=True)
-    # the page imports ./core.js next to app/index.html; core.js imports fflate, resolved from plugin/node_modules
-    core = (SEGMENT.parent / "core.js").as_posix()
-    js = js.replace('from "./core.js"', f'from "{core}"')
-    entry.write_text(js, encoding="utf-8")
+def bundle():
+    # main.js imports ./core.js etc. next to it; bare imports (three, fflate, ...) resolve from plugin/node_modules
     esbuild = HERE / "node_modules" / ".bin" / ("esbuild.cmd" if sys.platform == "win32" else "esbuild")
     out = subprocess.run(
-        [str(esbuild), str(entry), "--bundle", "--minify", "--format=esm", "--target=es2020",
+        [str(esbuild), str(APP / "main.js"), "--bundle", "--minify", "--format=esm", "--target=es2020",
          "--legal-comments=none", "--log-level=warning"],
         cwd=HERE, check=True, capture_output=True, text=True, encoding="utf-8",
         env={**os.environ, "NODE_PATH": str(HERE / "node_modules")})
@@ -62,11 +59,13 @@ def bundle(js):
 def build_page():
     html = SEGMENT.read_text(encoding="utf-8")
     check_versions(html)
-    m = MODULE_RE.search(html)
-    if not m or not IMPORTMAP_RE.search(html):
-        sys.exit("app/index.html: importmap or module script not found")
-    js = bundle(m.group(1)).replace("</script", "<\\/script")
+    m, st = MODULE_RE.search(html), STYLE_RE.search(html)
+    if not m or not st or not IMPORTMAP_RE.search(html):
+        sys.exit("app/index.html: importmap, main.js script or styles.css link not found")
+    js = bundle().replace("</script", "<\\/script")
+    css = (APP / "styles.css").read_text(encoding="utf-8")
     page = html[:m.start()] + '<script type="module">' + js + "</script>" + html[m.end():]
+    page = STYLE_RE.sub(lambda _: "<style>\n" + css + "</style>", page)
     page = IMPORTMAP_RE.sub("", page)
     if "cdn.jsdelivr.net" in page:
         sys.exit("bundled page still references the CDN")
