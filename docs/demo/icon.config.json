@@ -30,7 +30,7 @@
   "dist": 0.74,
   "lift": -0.13
  },
- "css": "#__cursor, #view > :not(canvas), #status { display: none !important }",
+ "css": "#__cursor, #view > :not(canvas), #status { display: none !important } body::after { content: '\\2713  official'; position: fixed; right: 16px; bottom: 16px; z-index: 99; padding: 10px 22px 12px; border-radius: 40px; background: rgba(15,17,22,.78); border: 3px solid #2dd4bf; font: 800 40px/1 system-ui, 'Segoe UI', Arial, sans-serif; color: #fff; pointer-events: none }",
  "steps": [
   {
    "do": "load"
