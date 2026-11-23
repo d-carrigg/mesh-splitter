@@ -722,6 +722,86 @@ class SendToOrcaTests(unittest.TestCase):
         self.assertTrue(m["warn"])
 
 
+class SendSequenceModel(unittest.TestCase):
+    """Every order of Send to Orca (each mode), Open as project and deleting the original in OrcaSlicer, up to DEPTH
+    steps, run on the real plugin.py and project3mf.py under fake_orca, with the page's side as app/main.js
+    orcaSendToPlate does it. Checks that each Send works and that a replace removes only the model that was split.
+    #95 addressed the source by its id and the second Send after Open as project failed (#102); this replays it.
+    See .claude/skills/verify-send-to-orca/SKILL.md."""
+    DEPTH = 4
+    MODES = ("add", "replace_object", "replace_plate")
+
+    def start(self):
+        self.tmp = tempfile.TemporaryDirectory(); self.store = tempfile.TemporaryDirectory()
+        objs = [fake_orca.FakeObject("cube", []), fake_orca.FakeObject("bolt", [])]
+        p = load_plugin(objs)
+        import orca
+        p.output_dir = lambda: self.tmp.name
+        p._storage[:] = [self.store.name]
+        orca._state["project"] = orca_project([("cube", 0, (50, 50)), ("bolt", 0, (150, 50))])
+        orca._state["project_path"] = "/home/d/prints/desk toy.3mf"
+        handed, sent = [], []
+        p.handoff.send = handed.append
+        p.handoff.supported = lambda: True
+        page = {"src": {"id": objs[1].id(), "index": 1, "name": "bolt"}, "pending": False}
+        return p, orca, p.Bridge(sent.append), sent, handed, page
+
+    def step(self, world, action):
+        p, orca, bridge, sent, handed, page = world
+        names = lambda: [o.name for o in orca.host.model().objects()]
+        if action == "open":
+            if not page["pending"]:
+                return "skip"
+            page["pending"] = False
+            data = Path(handed[-1][0]).read_bytes()
+            orca.host.model()._objs[:] = [fake_orca.FakeObject(n, []) for n in read_3mf(data)[0]]
+            orca._state["project"], orca._state["project_path"] = data, handed[-1][0]
+            return None
+        if action == "delete":
+            i = next((k for k, n in enumerate(names()) if n == "bolt"), None)
+            if i is None:
+                return "skip"
+            objs = orca.host.model().objects(); objs.pop(i)
+            orca.host.model()._objs[:] = objs
+            orca._state["project"] = orca_project([(o.name, 0, (50 + 100 * k, 50)) for k, o in enumerate(objs)])
+            return None
+        before = read_3mf(orca._state["project"])[0]
+        data = base64.b64encode(Project3mfTests.SPLIT).decode()
+        bridge.handle({"cmd": "save", "id": len(sent), "name": "bolt_parts.3mf", "part": 0, "of": 1, "data": data,
+                       "mode": action, "source": page["src"], "single": False})
+        m = sent[-1]
+        if m.get("cmd") != "saved":
+            return f"Send ({action}) failed: {m.get('message')}"
+        page["pending"] = True
+        if m.get("source"):
+            page["src"] = {**page["src"], **m["source"], "id": None}
+        after = read_3mf(Path(handed[-1][0]).read_bytes())[0]
+        if action in ("add", "replace_object") and after.count("cube") != before.count("cube"):
+            return f"Send ({action}) removed cube, which was not the model being split: {before} -> {after}"
+        return None
+
+    def test_every_send_order_works(self):
+        actions = (*self.MODES, "open", "delete")
+        frontier, checked = [()], 0
+        for _ in range(self.DEPTH):
+            nxt = []
+            for seq in frontier:
+                for a in actions:
+                    run, world = seq + (a,), self.start()
+                    try:
+                        errs = [self.step(world, x) for x in run]
+                    finally:
+                        self.tmp.cleanup(); self.store.cleanup()
+                    if "skip" in errs:
+                        continue
+                    bad = next((k for k, e in enumerate(errs) if e), None)
+                    if bad is not None:
+                        self.fail(f"After {' -> '.join(run[:bad + 1])}: {errs[bad]}")
+                    checked += 1
+                    nxt.append(run)
+            frontier = nxt
+        self.assertGreaterEqual(checked, 400)
+
 class ReleaseNotesTests(unittest.TestCase):
     def test_release_please_notes_become_plain_lines(self):
         from release_notes import plain_changelog
