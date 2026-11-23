@@ -353,6 +353,14 @@ class BuildTests(unittest.TestCase):
             self.assertLess(len(html.encode()), 1_800_000)
             self.assertIn("Official build by", html)
 
+    def test_build_refuses_what_orcacloud_rates_medium(self):
+        import build
+        page = base64.b64encode(os.urandom(3000)).decode()
+        with self.assertRaisesRegex(SystemExit, "encoded run"):
+            build.review_risks({"pkg/__init__.py": f'PAGE = "{page}"'})
+        with self.assertRaisesRegex(SystemExit, "over 200,000"):
+            build.review_risks({"pkg/__init__.py": "x = 1\n" * 40_000})
+
     def test_build_without_official_flag_is_an_unofficial_copy(self):
         import subprocess, zipfile
         with tempfile.TemporaryDirectory() as d:
