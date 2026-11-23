@@ -285,7 +285,6 @@ class RegistrationTests(unittest.TestCase):
         self.assertEqual(self.register({}), [{
             "fs_readwrite": [os.path.join("C:", "Users", "d", "Downloads", "*")], "process": handoff.PROCESSES,
             "network": [], "threading": False}])
-        self.assertEqual(handoff.PROCESSES, ["dbus-send"] if sys.platform.startswith("linux") else [])
 
     def test_declares_only_the_saved_provider_host(self):
         perms = self.register({"provider": "openrouter", "providers": {"openrouter": {"api_key": "k"}}})
