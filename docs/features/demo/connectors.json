@@ -57,11 +57,11 @@
   },
   {
    "do": "eval",
-   "js": "explode(['Part 2', 'Part 3', 'Part 2 dowel'], { 'Part 2': [2, -34], 'Part 2 dowel': [2, -17] }); cam([C.broom[0] + 140, C.broom[1] - 40, C.broom[2] + 55], [C.broom[0] - 10, C.broom[1] + 30, C.broom[2] + 18])"
+   "js": "explode(['Part 3', 'Part 1'], { 'Part 3': [3, -35] }); const s = C.shoulder, o = C.out, d = C.side, t = [s[0] - o[0] * 17, s[1] - o[1] * 17, s[2] - o[2] * 17]; cam([t[0] + d[0] * 170 - o[0] * 60, t[1] + d[1] * 170 - o[1] * 60, t[2] + 70], t)"
   },
   {
    "do": "shot",
-   "name": "_c-broom",
+   "name": "_c-arm",
    "clip": [
     350,
     120,
@@ -74,12 +74,12 @@
    "shots": [
     "_c-view",
     "_c-foot",
-    "_c-broom"
+    "_c-arm"
    ],
    "labels": [
     "In the view: the peg's ghost at the cut",
     "Exported: hex frustum peg, matching hole",
-    "Dowel: holes in both, a separate peg"
+    "The arm's shoulder: peg on the arm, hole in the body"
    ],
    "name": "connectors"
   }

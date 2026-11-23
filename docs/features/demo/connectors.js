@@ -1,4 +1,4 @@
-// Helpers for connectors.json: connectors on the curler's left foot and broom, and the exported parts (the multi-part
+// Helpers for connectors.json: connectors on the curler's left foot and right arm (shoulder), and the exported parts (the multi-part
 // 3MF's meshes, connectors included) pulled apart along each connector's axis.
 (async () => {
   const THREE = await import("three"), S = app.S;
@@ -6,17 +6,18 @@
   window.cam = (p, t) => { app.camera.position.set(...p); app.controls.target.set(...t); app.camera.up.set(0, 0, 1); app.camera.lookAt(...t); app.controls.update(); app.render(); };
   const set = (i, o) => { S.parts[i].conn = { ...app.connDefaults(i, o.type || "plug"), ...o }; };
   set(8, { shape: "hex", style: "frustum" }); // the left foot: a hexagonal, tapered peg into the base
-  set(2, { type: "dowel", shape: "square" }); // the broom: a square dowel into the hand
+  set(3, {}); // the right arm: a round peg into the body at the shoulder
   S.active = 8; app.afterEdit("");
   const axis = (k) => new THREE.Vector3().setFromMatrixColumn(app.connPlan(k).F, 2);
-  const A = { 8: axis(8), 2: axis(2) }, color = Object.fromEntries(S.parts.map((p) => [p.name, p.color])), ex = {};
+  const A = { 8: axis(8), 3: axis(3) }, color = Object.fromEntries(S.parts.map((p) => [p.name, p.color])), ex = {};
   for (const p of app.buildParts3MF().parts) {
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(p.pos, 3)); g.setIndex([...p.tri]);
     const m = new THREE.Mesh(g.toNonIndexed(), new THREE.MeshStandardMaterial({ color: p.name.endsWith("dowel") ? "#e4e4e4" : color[p.name], roughness: 0.7, flatShading: true }));
     m.geometry.computeVertexNormals(); m.visible = false; m.userData.ex = true; ex[p.name] = m; app.scene.add(m);
   }
   const ctr = (n) => { ex[n].geometry.computeBoundingBox(); return ex[n].geometry.boundingBox.getCenter(new THREE.Vector3()).toArray(); };
-  window.C = { foot: ctr("Part 8"), broom: ctr("Part 2") };
+  const side = new THREE.Vector3(0, 0, 1).cross(A[3]).normalize();
+  window.C = { side: side.toArray(), foot: ctr("Part 8"), shoulder: new THREE.Vector3().setFromMatrixPosition(app.connPlan(3).F).toArray(), out: A[3].toArray() };
   window.explode = (names, moves) => { // show only the exported parts `names`, each moved d mm along connector k's axis
     app.scene.traverse((o) => { if ((o.isMesh || o.isLine || o.isLineSegments || o.isPoints) && !o.userData.ex) o.visible = false; });
     for (const [n, m] of Object.entries(ex)) { m.visible = names.includes(n); m.position.set(0, 0, 0); }

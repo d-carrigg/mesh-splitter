@@ -84,7 +84,7 @@ Swaps a part for another STL or 3MF. The replacement keeps the part's name and f
 
 Adds a peg and a matching hole where two parts meet, like the connectors in OrcaSlicer's Cut tool, so parts you print separately line up and glue together.
 
-![A connector: its ghost in the view, then the exported foot and base, and a dowel between the broom and the hand](img/connectors.png)
+![A connector: its ghost in the view, then the exported foot and base, and the arm pulled off the body at the shoulder](img/connectors.png)
 
 Connectors are placed for you: each sits at the center of the part's cut, points straight through it, and starts at the largest size that fits. You only pick which parts get one, and change any setting you like.
 
