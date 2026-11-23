@@ -40,7 +40,7 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: plugin/package-lock.json
-      - uses: astral-sh/setup-uv@v10.4.0   # setup-uv has no floating major tag, so pin the exact version
+      - uses: astral-sh/setup-uv@v10.4.0
       - run: uv sync
       - run: npm ci
       - name: Build (tag must match pyproject.toml)
