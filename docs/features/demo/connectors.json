@@ -24,7 +24,7 @@
   },
   {
    "do": "eval",
-   "js": "app.S.active = 8; app.refreshUI(); document.getElementById('connBox').scrollIntoView({ block: 'center' }); cam([C.foot[0] - 150, C.foot[1] + 120, C.foot[2] + 70], [C.foot[0] + 10, C.foot[1] - 10, C.foot[2] + 10])"
+   "js": "part('Left foot'); cam([C.foot[0] - 150, C.foot[1] + 120, C.foot[2] + 70], [C.foot[0] + 10, C.foot[1] - 10, C.foot[2] + 10])"
   },
   {
    "do": "shot",
@@ -37,13 +37,32 @@
    ]
   },
   {
+   "do": "eval",
+   "js": "app.S.active = 0; app.refreshUI(); document.getElementById('partsWrap').scrollIntoView({ block: 'center' })"
+  },
+  {
+   "do": "shot",
+   "name": "connectors-list",
+   "clip": {
+    "union": [
+     "#connPrint",
+     "#partsWrap",
+     "#connSec"
+    ]
+   }
+  },
+  {
+   "do": "eval",
+   "js": "part('Left hand'); document.querySelectorAll('#connRows .cRow')[1].click(); document.getElementById('connBox').scrollIntoView({ block: 'center' })"
+  },
+  {
    "do": "shot",
    "name": "connectors-ui",
    "clip": "#connBox"
   },
   {
    "do": "eval",
-   "js": "app.S.active = 0; app.refreshUI(); explode(['Part 8', 'Part 6'], { 'Part 8': [8, -26] }); cam([C.foot[0] - 120, C.foot[1] - 150, C.foot[2] - 30], [C.foot[0] + 12, C.foot[1] + 4, C.foot[2] + 8])"
+   "js": "app.S.active = 0; app.refreshUI(); explode(['Left foot', 'Base'], { 'Left foot': ['foot', -26] }); cam([C.foot[0] - 120, C.foot[1] - 150, C.foot[2] - 30], [C.foot[0] + 12, C.foot[1] + 4, C.foot[2] + 8])"
   },
   {
    "do": "shot",
@@ -57,7 +76,7 @@
   },
   {
    "do": "eval",
-   "js": "explode(['Part 3', 'Part 1'], { 'Part 3': [3, -35] }); const s = C.shoulder, o = C.out, d = C.side, t = [s[0] - o[0] * 17, s[1] - o[1] * 17, s[2] - o[2] * 17]; cam([t[0] + d[0] * 170 - o[0] * 60, t[1] + d[1] * 170 - o[1] * 60, t[2] + 70], t)"
+   "js": "explode(['Right arm', 'Stone'], { 'Right arm': ['arm', -35] }); const s = C.shoulder, o = C.out, d = C.side, t = [s[0] - o[0] * 17, s[1] - o[1] * 17, s[2] - o[2] * 17]; cam([t[0] + d[0] * 170 - o[0] * 60, t[1] + d[1] * 170 - o[1] * 60, t[2] + 70], t)"
   },
   {
    "do": "shot",
@@ -77,7 +96,7 @@
     "_c-arm"
    ],
    "labels": [
-    "In the view: the peg's ghost at the cut",
+    "In the view: the peg's ghost at the seam",
     "Exported: hex frustum peg, matching hole",
     "The arm's shoulder: peg on the arm, hole in the body"
    ],
