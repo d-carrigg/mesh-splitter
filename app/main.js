@@ -1828,12 +1828,15 @@ function editConns(ks, fn, msg) {
 // Ghosts: the peg (its part's color) and the hole's outline, red when it doesn't fit. A hovered seam is drawn on top.
 const connGroup = new THREE.Group(); scene.add(connGroup);
 let seamHover = null; // a seam whose line shows (hovering its row)
+let connShowAll = false;
 function updateConnGhosts() {
   for (const o of [...connGroup.children]) { connGroup.remove(o); o.geometry.dispose(); o.material.dispose(); }
+  const sel = new Set(selected());
   if (S.G) for (const e of connState().list) {
     if (!e.pl || e.pl.why || (e.state !== "ok" && e.state !== "bad")) continue;
     const pl = e.pl, bad = e.state === "bad", own = pl.dowel ? pl.s.a : pl.plugOn, other = pl.dowel ? pl.s.b : pl.holeIn;
     if (S.parts[own]?.visible === false && S.parts[other]?.visible === false) continue;
+    if (!(gzOn && gzMode === "conn") && !sel.has(own) && !sel.has(other)) continue;
     const geo = (v, j) => { const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(xformSoup(v, connWorld(pl, j)), 3)); g.computeVertexNormals(); return g; };
     const peg = new THREE.Mesh(geo(pl.peg, own), new THREE.MeshBasicMaterial({ color: bad ? 0xff3030 : S.parts[own].color, transparent: true, opacity: 0.7, depthTest: false }));
     const hole = new THREE.LineSegments(new THREE.EdgesGeometry(geo(pl.hole, other), 20), new THREE.LineBasicMaterial({ color: bad ? 0xff3030 : 0xffffff, transparent: true, opacity: 0.85, depthTest: false }));
@@ -2857,6 +2860,7 @@ function syncGizmo() {
   const free = S.tool === "orbit" && !placing && !pickingJoint && $("splitPanel").hidden, card = $("xfCard");
   card.hidden = !(gzOn && gzMode !== "conn" && i >= 0 && free); card.dataset.mode = gzMode;
   $("connPanel").hidden = !(gzOn && gzMode === "conn" && free);
+  if (connShowAll !== (gzOn && gzMode === "conn")) { connShowAll = !connShowAll; updateConnGhosts(); }
   fitViewToPanels();
   $("gzCenter").classList.toggle("on", !gzJointOn);
   if (!gzOn || gzMode === "conn" || i < 0 || S.tool !== "orbit" || placing || pickingJoint) { jointAxis.visible = false; if (gizmo.object) { gizmo.detach(); render(); } return; }
