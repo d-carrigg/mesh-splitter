@@ -1,0 +1,79 @@
+name: Web app preview
+
+# Deploys app/ from each pull request to its own Azure Static Web Apps preview environment and posts the link as a PR
+# comment, so the change can be tried in a browser without publishing the OrcaSlicer plugin. The preview is deleted
+# when the PR closes. The Free plan has 3 preview slots: when all 3 are in use the deploy fails, the comment says so,
+# and the check still passes. The preview never blocks a merge.
+# Uses the same AZURE_STATIC_WEB_APPS_API_TOKEN secret as web-app.yml; without it (e.g. fork PRs) the job does nothing.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - app/**
+      - .github/workflows/web-app-preview.yml
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: web-app-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Deploy app/ to a preview environment
+        id: swa
+        continue-on-error: true
+        uses: Azure/static-web-apps-deploy@v1
+        env:
+          SKIP_DEPLOY_ON_MISSING_SECRETS: true
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: upload
+          app_location: app
+          output_location: ""
+          skip_app_build: true
+          skip_api_build: true
+      - name: Post or update the preview link comment
+        continue-on-error: true
+        uses: actions/github-script@v8
+        env:
+          URL: ${{ steps.swa.outputs.static_web_app_url }}
+          OUTCOME: ${{ steps.swa.outcome }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        with:
+          script: |
+            const { URL: url, OUTCOME: outcome, SHA: sha } = process.env;
+            if (outcome === 'success' && !url) return; // secret missing: nothing was deployed
+            const marker = '<!-- web-app-preview -->';
+            const body = url && outcome === 'success'
+              ? `${marker}\n**Web app preview:** ${url}\n\nBuilt from ${sha.slice(0, 7)}. Deleted when this PR closes.`
+              : `${marker}\n**Web app preview:** not available for ${sha.slice(0, 7)}. The Free plan allows 3 previews at once, ` +
+                `so this usually means 3 other open PRs already have one. See the [run log](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}).`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const old = comments.find(c => c.body?.startsWith(marker));
+            if (old) await github.rest.issues.updateComment({ owner, repo, comment_id: old.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body });
+
+  close:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Delete the preview environment
+        continue-on-error: true
+        uses: Azure/static-web-apps-deploy@v1
+        env:
+          SKIP_DEPLOY_ON_MISSING_SECRETS: true
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: close
+          app_location: app
