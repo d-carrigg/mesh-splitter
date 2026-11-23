@@ -5,7 +5,7 @@ import { zlibSync, unzlibSync } from "fflate";
 // v2 zlib-compresses labels so large meshes still fit the browser's localStorage quota; v1 files still load.
 export function b64(b) { let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }
 export function unb64(t) { const bin = atob(t), b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return b; }
-// Labels, parts, replacement meshes and (after boundary smoothing) the cut mesh of a saved session.
+// Labels, parts, connectors, replacement meshes and (after boundary smoothing) the cut mesh of a saved session.
 // nF0: face count of the mesh as loaded; a session only fits the mesh it was made on. coarse (S.coarse): the face
 // count before long edges were split and each face's parent, so a session saved before that refinement still loads.
 export function decodeSession(txt, nF0, coarse = null) {
@@ -23,7 +23,7 @@ export function decodeSession(txt, nF0, coarse = null) {
     labels = Int32Array.from(coarse.parent, (p) => labels[p]);
     parts = parts.map((p) => ({ ...p, seeds: (p.seeds || []).map((f) => child[f] ?? -1).filter((f) => f >= 0) }));
   }
-  return { labels, parts, mesh, reps };
+  return { labels, parts, mesh, reps, conns: j.conns || [] };
 }
 
 // reps: { id: { name, pos } } replacement meshes the parts use. cache: reused between calls so an autosave does not
@@ -34,5 +34,6 @@ export function encodeSession(S, reps = {}, cache = {}) {
   for (const [id, r] of Object.entries(reps)) R[id] = { name: r.name, pos: z(r.pos) };
   const cut = S.tri !== S.mesh0[1];
   if (cut && cache.tri !== S.tri) { cache.tri = S.tri; cache.mesh = { pos: z(S.pos), tri: z(S.tri) }; }
-  return JSON.stringify({ version: 2, file: S.name, faces: S.mesh0[1].length / 3, parts: S.parts, labels: z(S.labels), reps: R, mesh: cut ? cache.mesh : undefined });
+  return JSON.stringify({ version: 2, file: S.name, faces: S.mesh0[1].length / 3, parts: S.parts, labels: z(S.labels), reps: R, mesh: cut ? cache.mesh : undefined,
+    conns: S.conns?.length ? S.conns : undefined });
 }

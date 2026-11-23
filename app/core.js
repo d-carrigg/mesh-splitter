@@ -14,5 +14,5 @@ export { DEFAULTS, buildGraph, components, Heap, computeBarrier, ensureBarrier }
 export { grow, segmentFromSeeds, autoSplit, splitShells } from "./segment.js";
 export { PALETTE, UNASSIGNED_COLOR, newPart, dropEmptyParts, partCounts } from "./parts.js";
 export { snapCreases, smoothCut } from "./boundary.js";
-export { safeName, paintCode, painted3MF, meshOf, loopKey, soupVolume, pocketShell, reverseSoup, closedPart, stlBinary, parts3MF } from "./export.js";
+export { safeName, paintCode, painted3MF, meshOf, seamArcs, loopKey, soupVolume, pocketShell, reverseSoup, closedPart, stlBinary, parts3MF } from "./export.js";
 export { b64, unb64, decodeSession, encodeSession } from "./session.js";

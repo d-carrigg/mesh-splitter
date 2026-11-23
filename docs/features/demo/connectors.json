@@ -1,0 +1,119 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "curler.stl",
+ "out": null,
+ "viewport": {
+  "width": 1200,
+  "height": 800
+ },
+ "deviceScaleFactor": 1.5,
+ "camera": {
+  "az": -20,
+  "el": 18,
+  "dist": 1.0,
+  "lift": 0.12
+ },
+ "css": "#__cursor { display: none !important } #info, #xfCard { visibility: hidden !important }",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "script",
+   "file": "connectors.js"
+  },
+  {
+   "do": "click",
+   "target": "[data-gz=conn]"
+  },
+  {
+   "do": "click",
+   "target": "#connAll"
+  },
+  {
+   "do": "eval",
+   "js": "prepare()"
+  },
+  {
+   "do": "shot",
+   "name": "connectors-tool"
+  },
+  {
+   "do": "click",
+   "target": "#partsBody tr:has-text('Left hand')"
+  },
+  {
+   "do": "click",
+   "target": "#connRows .cRow:has-text('Broom stick')"
+  },
+  {
+   "do": "eval",
+   "js": "document.getElementById('connBox').scrollIntoView({ block: 'center' })"
+  },
+  {
+   "do": "shot",
+   "name": "connectors-part",
+   "clip": "#connBox"
+  },
+  {
+   "do": "click",
+   "target": "#connDone"
+  },
+  {
+   "do": "eval",
+   "js": "part('Left foot'); cam([C.foot[0] - 150, C.foot[1] + 120, C.foot[2] + 70], [C.foot[0] + 10, C.foot[1] - 10, C.foot[2] + 10])"
+  },
+  {
+   "do": "shot",
+   "name": "_c-view",
+   "clip": [
+    350,
+    120,
+    760,
+    600
+   ]
+  },
+  {
+   "do": "eval",
+   "js": "app.S.active = 0; app.refreshUI(); explode(['Left foot', 'Base'], { 'Left foot': ['foot', -26] }); cam([C.foot[0] - 120, C.foot[1] - 150, C.foot[2] - 30], [C.foot[0] + 12, C.foot[1] + 4, C.foot[2] + 8])"
+  },
+  {
+   "do": "shot",
+   "name": "_c-foot",
+   "clip": [
+    350,
+    120,
+    760,
+    600
+   ]
+  },
+  {
+   "do": "eval",
+   "js": "explode(['Right arm', 'Stone'], { 'Right arm': ['arm', -35] }); const s = C.shoulder, o = C.out, d = C.side, t = [s[0] - o[0] * 17, s[1] - o[1] * 17, s[2] - o[2] * 17]; cam([t[0] + d[0] * 170 - o[0] * 60, t[1] + d[1] * 170 - o[1] * 60, t[2] + 70], t)"
+  },
+  {
+   "do": "shot",
+   "name": "_c-arm",
+   "clip": [
+    350,
+    120,
+    760,
+    600
+   ]
+  },
+  {
+   "do": "compare",
+   "shots": [
+    "_c-view",
+    "_c-foot",
+    "_c-arm"
+   ],
+   "labels": [
+    "In the view: the peg's ghost at the seam",
+    "Exported: hex frustum peg, matching hole",
+    "The arm's shoulder: peg on the arm, hole in the body"
+   ],
+   "name": "connectors"
+  }
+ ]
+}

@@ -109,6 +109,35 @@ export function meshOf(S, inSet) {
   return { verts: verts.concat(caps), loops, loopList, triLab, nFaceVerts: verts.length };
 }
 
+// Seams: where two parts touch. A seam is one connected run of cut edges between one pair of parts a < b (both > 0),
+// as [[u, v], ...] with u->v an edge of one of a's faces, so it runs the way a's boundary loop does. closed: the pair's
+// border is a whole loop; otherwise it ends where a third part (or the mesh's edge) meets the cut. Two parts can
+// touch in several seams (a stick through a fist).
+export function seamArcs(S) {
+  const nV = S.nV, lab = new Map();
+  for (let f = 0; f < S.nF; f++) for (let e = 0; e < 3; e++) lab.set(S.tri[3*f+e] * nV + S.tri[3*f+(e+1)%3], S.labels[f]);
+  const pairs = new Map(); // "a|b" -> Map(u -> [v, ...])
+  for (const [k, la] of lab) {
+    const u = Math.floor(k / nV), v = k - u * nV, lb = lab.get(v * nV + u);
+    if (!(la > 0) || lb === undefined || !(lb > la)) continue;
+    const pk = `${la}|${lb}`; if (!pairs.has(pk)) pairs.set(pk, new Map());
+    const m = pairs.get(pk); if (!m.has(u)) m.set(u, []); m.get(u).push(v);
+  }
+  const out = [];
+  for (const [pk, next] of pairs) {
+    const [a, b] = pk.split("|").map(Number), into = new Set();
+    for (const vs of next.values()) for (const v of vs) into.add(v);
+    const walk = (s) => {
+      const edges = []; let u = s;
+      while (next.get(u)?.length) { const v = next.get(u).pop(); edges.push([u, v]); u = v; if (u === s) break; }
+      return edges;
+    };
+    for (const s of [...next.keys()].filter((u) => !into.has(u))) while (next.get(s)?.length) out.push({ a, b, edges: walk(s), closed: false });
+    for (const s of next.keys()) while (next.get(s)?.length) { const e = walk(s); out.push({ a, b, edges: e, closed: e[e.length - 1][1] === s }); }
+  }
+  return out;
+}
+
 // A part that is a recess (a porthole, an eye socket) closes, with a flat cap, into a negative-volume solid: the air
 // in the recess. Instead it gets a skin of material behind its surface: its faces pushed POCKET_T mm (at most 30% of
 // the rim's radius) into the model, joined to the rim by a wall. The neighbor's cap over that rim is the same skin,

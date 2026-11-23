@@ -196,6 +196,56 @@ console.log("fill/anchor:", JSON.stringify(fa));
 if (fa.open.kinds.includes("patch") || fa.open.shown || fa.open.me.open || fa.open.nb.open
   || !fa.fill.kinds.includes("patch") || !fa.fill.shown || fa.fill.me.open || fa.fill.nb.open || !fa.anchor.kinds.includes("bridge") || fa.anchor.me.open
   || fa.anchor.nb.open || !(fa.anchor.me.vol > fa.fill.me.vol + 1) || !fa.anchor.saved || fa.after) errors.push("fill/anchor failed: " + JSON.stringify(fa));
+// Connectors: Add puts a plug, sized to fit, on one of the cap's seams. Made 2 mm deep instead, its peg's part loses
+// the difference's volume and the hole's part gets it back. A 6 mm hex dowel exports as its own part, and making it
+// 2 mm shallower shortens it by 4 mm and fills 2 mm of the hole in each part (compared at one depth and another,
+// since the cut's cap is laid out differently with a hole in it). The Connectors tool's Add to all parts then connects
+// every seam. Every part in the multi-part 3MF stays closed (each edge on exactly two triangles), and the view's files
+// keep no connector.
+const cn = await page.evaluate(() => {
+  const { S } = app, i = S.active, s = app.seams().find((q) => q.a === i || q.b === i);
+  const solid = (P) => { const E = new Map(); let vol = 0; const v = (j) => [P.pos[3*j], P.pos[3*j+1], P.pos[3*j+2]];
+    for (let t = 0; t < P.tri.length; t += 3) { const [a, b, c] = [0, 1, 2].map((e) => P.tri[t+e]);
+      for (const [x, y] of [[a, b], [b, c], [c, a]]) { const kk = x < y ? x + "|" + y : y + "|" + x; E.set(kk, (E.get(kk) || 0) + 1); }
+      const [A, B, C] = [v(a), v(b), v(c)]; vol += (A[0]*(B[1]*C[2]-B[2]*C[1]) - A[1]*(B[0]*C[2]-B[2]*C[0]) + A[2]*(B[0]*C[1]-B[1]*C[0])) / 6; }
+    return { open: [...E.values()].filter((c) => c !== 2).length, vol }; };
+  const byName = (window.__connParts = () => Object.fromEntries(app.buildParts3MF().parts.map((p) => [p.name, solid(p)])));
+  if (!s) return { err: "no seam on the cap" };
+  const merged = app.mergedSoup().v.length, hex = (r) => 2 * Math.sqrt(3) * r * r;
+  app.addConns([s]);
+  const e = app.connState().bySeam.get(s);
+  if (e?.state !== "ok") return { err: "no plug fits", e: e && { state: e.state, why: e.why } };
+  const { d, depth, clr } = e.c, peg = S.parts[e.pl.plugOn].name, hole = S.parts[e.pl.holeIn].name, r = d / 2, plug = byName();
+  app.editConns([e.k], (c) => { c.depth = 2; }, "shallow");
+  const shallow = byName(); app.undo();
+  app.editConns([e.k], (c) => { c.peg = null; c.shape = "hex"; c.d = 6; c.depth = 4; }, "dowel");
+  const dw = app.connState().bySeam.get(s), dowel = byName(), A = S.parts[s.a].name, B = S.parts[s.b].name, D = `${A} – ${B} dowel`;
+  app.editConns([e.k], (c) => { c.depth = 2; }, "shallow dowel");
+  const dowel2 = byName(); app.undo();
+  const mergedSame = merged === app.mergedSoup().v.length;
+  app.undo(); app.undo();
+  return { d, depth, dowel: dw.state, pegVol: plug[peg].vol - shallow[peg].vol, pegWant: Math.PI * r * r * (depth - 2),
+    holeVol: shallow[hole].vol - plug[hole].vol, holeWant: Math.PI * (r + clr) ** 2 * (depth - 2),
+    open: [...Object.values(plug), ...Object.values(shallow), ...Object.values(dowel), ...Object.values(dowel2)].reduce((t, q) => t + q.open, 0),
+    dowelVol: dowel[D] && dowel[D].vol - dowel2[D].vol, dowelWant: hex(3) * 4, holeA: dowel2[A].vol - dowel[A].vol, holeB: dowel2[B].vol - dowel[B].vol,
+    dowelHoleWant: hex(3 + clr) * 2, mergedSame, after: S.conns.length };
+});
+await page.evaluate(() => { document.getElementById("status").textContent = ""; });
+await page.click('[data-gz="conn"]');
+await page.click("#connAll");
+await page.waitForFunction(() => /^Added/.test(document.getElementById("status").textContent));
+Object.assign(cn, await page.evaluate(() => {
+  const out = { status: document.getElementById("status").textContent, all: app.connState().list.filter((q) => q.state === "ok").length,
+    allOpen: Object.values(window.__connParts()).reduce((t, q) => t + q.open, 0) };
+  app.undo(); out.afterAll = app.S.conns.length;
+  return out;
+}));
+await page.click("#connDone");
+console.log("connectors:", JSON.stringify(cn));
+const near = (a, b) => Math.abs(a - b) < 0.02 * b;
+if (cn.err || cn.dowel !== "ok" || cn.open || !near(cn.pegVol, cn.pegWant) || !near(cn.holeVol, cn.holeWant) || !near(cn.dowelVol, cn.dowelWant)
+  || !near(cn.holeA, cn.dowelHoleWant) || !near(cn.holeB, cn.dowelHoleWant) || !cn.mergedSame || cn.after
+  || !cn.all || cn.allOpen || cn.afterAll) errors.push("connectors failed: " + JSON.stringify(cn));
 await page.evaluate(() => app.setGizmoJoint(false));
 if (shot) await page.screenshot({ path: shot });
 // AI part naming from inside OrcaSlicer: set up a local OpenAI-compatible server (no key), as with LM Studio,

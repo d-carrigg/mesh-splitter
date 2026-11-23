@@ -7,6 +7,7 @@ Fix, swap, view and name parts after a split. Every edit can be undone with Ctrl
 - [Merge](#merge)
 - [Delete geometry](#delete-geometry)
 - [Replace with…](#replace-with)
+- [Connectors](#connectors)
 - [Show only this part](#show-only-this-part)
 - [Rename](#rename)
 
@@ -78,6 +79,42 @@ Swaps a part for another STL or 3MF. The replacement keeps the part's name and f
 - **in place:** switch between in place and on the joint.
 - The move / rotate / scale handles work on the replacement too.
 - The trash button next to **Replace…** removes the replacement and brings the old part back.
+
+## Connectors
+
+Adds a peg and a matching hole where two parts touch, so parts you print separately line up and glue together.
+
+![A connector's ghost in the view, the exported foot and base, and the arm pulled off the body at the shoulder](img/connectors.png)
+
+### Add connectors
+
+1. Click **Connectors** in the toolbar, next to Move, Rotate and Scale.
+2. Set the type and the other settings in its panel.
+3. Click **Add to all parts**. To connect only some parts, Ctrl+click two or more touching parts and click **Add to selected parts**. It connects only the seams between them.
+
+![The Connectors tool after Add to all parts](img/connectors-tool.png)
+
+The status bar says what was added, for example "Added 11 connectors; 1 seam too small". Each connector sits where its seam has the most room and is the largest that fits, up to 12 mm. Adding again replaces the connectors on those seams. **Remove all** takes every connector off.
+
+| Setting | What it does |
+| --- | --- |
+| **Type** | **Plug** puts a peg on one part and a hole in the other. **Dowel** puts a hole in both parts and makes a separate peg that exports as its own part. |
+| **Shape** | Circle, square, hexagon or triangle. Only a round peg can turn in its hole. |
+| **Style** | **Prism** has straight sides. **Frustum** tapers to 60% at the tip, which eases fitting. |
+| **Clearance** | The gap added to the hole on every side, in mm. 0.1 to 0.2 mm suits most PLA and PETG prints. |
+| **Smallest pin** | A seam whose largest pin is smaller than this, in mm, gets no connector. |
+
+### Change a part's connectors
+
+Click a part. Its connectors are listed at the bottom of its **Part** section, by the part on the other side. Click one to change its **Type** (**None** removes it), **Shape**, **Style**, **Size**, **Depth**, **Clearance** or which part gets the peg (**Peg on**). With several parts selected, a change applies to all of their connectors. Clicking a connector's ghost in the view also opens it here.
+
+![Left hand's connectors, with the one to the broom stick open](img/connectors-part.png)
+
+A connector that doesn't fit turns red and says why, for example that its hole breaks out of the part. It's left out of the files until it fits. In the parts list, a pin icon counts each part's connectors, and a bracket in the left margin joins each pair of connected parts.
+
+### Where they print
+
+Connectors are built into **Part STLs** and the multi-part 3MF (**Print as** **Parts**, including Send to Orca). **One part**, **Painted** and the merged STL print the model as one piece, so they leave connectors out. Under **Print as**, a note says so and offers a **Print as Parts** button.
 
 ## Show only this part
 
