@@ -36,14 +36,6 @@
     <button id="aiToggle" data-icon="sparkle" title="Name parts with AI, and check parts">AI names</button>
   </div>
   <div id="partsWrap"><svg id="partsLinks" aria-hidden="true"></svg><table class="parts"><tbody id="partsBody"></tbody></table></div>
-  <div class="sh needMesh"><svg class="i" viewBox="0 0 24 24"><path d="M9 14V4h6v10"/><path d="M4 14h16v6H4z"/></svg>Connectors<span class="spacer"></span>
-    <button id="connAll" title="Put a plug on every seam where two parts touch, placed and sized to fit. Seams that already have a connector keep it.">Connect all seams</button>
-    <button id="connNone" title="Remove every connector">Remove all</button>
-  </div>
-  <div class="sc needMesh" id="connSec">
-    <div id="connSum" class="small"></div>
-    <label class="pr" title="Only affects automatic pins: a seam whose best pin is smaller than this gets none. Pins you've edited stay."><span class="lbl">Skip pins under</span><input id="connMin" type="range" min="1" max="10" step="0.5"><output id="connMinOut" class="small"></output></label>
-  </div>
   <div id="partCard" hidden>
     <div class="sh">Part<span class="spacer"></span>
       <button id="soloBtn" data-icon="solo" title="Show only this part">Solo</button>
@@ -67,21 +59,6 @@
         <label class="small" title="Keep the replacement where it sits in its file (for a part edited from this same model) instead of lining it up on the joint"><input id="repKeep" type="checkbox"> in place</label>
         <label id="repFitL" class="small" title="Scale the replacement so its longest dimension matches the old part's"><input id="repFit" type="checkbox"> fit</label>
         <label id="repEmbedL" class="small" title="How far the replacement sinks into the rest so the slicer fuses them">embed <input id="repEmbed" type="number" step="0.5" min="0" style="width:48px"> mm</label>
-      </div>
-      <div id="connBox">
-        <div class="pr"><span class="lbl">Connectors</span><button id="connPart" class="link" title="Put a plug on each of these seams that has none"></button></div>
-        <button id="connSel" class="pri" title="Put a plug on each of these seams that has none"></button>
-        <div id="connRows"></div>
-        <div id="connEd">
-          <div class="pr"><span class="lbl">Type</span><span class="seg" id="connType"><button data-ct="" title="No connector">None</button><button data-ct="plug" title="Plug: a peg on one part and a matching hole in the other">Plug</button><button data-ct="dowel" title="Dowel: a hole in both parts and a separate peg that prints on its own">Dowel</button></span></div>
-          <div class="pr connOpt"><span class="lbl">Shape</span><select id="connShape" title="Cross-section of the peg"><option value="mixed" disabled hidden>Mixed</option><option value="circle">Circle</option><option value="square">Square</option><option value="hex">Hexagon</option><option value="triangle">Triangle</option></select>
-            <span class="seg" id="connStyle"><button data-cs="prism" title="Prism: straight sides">Prism</button><button data-cs="frustum" title="Frustum: tapers to 60% at the tip, which eases fitting and overhangs">Frustum</button></span></div>
-          <div class="pr connOpt"><span class="lbl" title="Width across flats (a circle's diameter)">Size</span><input id="connD" type="number" min="1" step="0.5"><span class="small">mm</span>
-            <span class="lbl" style="flex:0" title="How far the peg goes into the other part (a dowel goes this far into each part)">Depth</span><input id="connDepth" type="number" min="1" step="0.5"><span class="small">mm</span></div>
-          <div class="pr connOpt"><span class="lbl" title="Gap added to the hole on every side (and at its bottom) so the peg slides in. 0.1 to 0.2 mm suits most PLA and PETG prints">Clearance</span><input id="connClr" type="number" min="0" max="2" step="0.05"><span class="small">mm</span></div>
-          <div class="pr connOpt" id="connOnRow"><span class="lbl">Peg on</span><span class="seg" id="connOn"></span></div>
-          <div id="connNote" class="small"></div>
-        </div>
       </div>
     </div>
   </div>

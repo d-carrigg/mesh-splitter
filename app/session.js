@@ -23,7 +23,7 @@ export function decodeSession(txt, nF0, coarse = null) {
     labels = Int32Array.from(coarse.parent, (p) => labels[p]);
     parts = parts.map((p) => ({ ...p, seeds: (p.seeds || []).map((f) => child[f] ?? -1).filter((f) => f >= 0) }));
   }
-  return { labels, parts, mesh, reps, conns: j.conns || [], connMin: j.connMin };
+  return { labels, parts, mesh, reps, conns: j.conns || [] };
 }
 
 // reps: { id: { name, pos } } replacement meshes the parts use. cache: reused between calls so an autosave does not
@@ -35,5 +35,5 @@ export function encodeSession(S, reps = {}, cache = {}) {
   const cut = S.tri !== S.mesh0[1];
   if (cut && cache.tri !== S.tri) { cache.tri = S.tri; cache.mesh = { pos: z(S.pos), tri: z(S.tri) }; }
   return JSON.stringify({ version: 2, file: S.name, faces: S.mesh0[1].length / 3, parts: S.parts, labels: z(S.labels), reps: R, mesh: cut ? cache.mesh : undefined,
-    conns: S.conns?.length ? S.conns : undefined, connMin: S.connMin });
+    conns: S.conns?.length ? S.conns : undefined });
 }

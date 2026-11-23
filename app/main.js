@@ -109,7 +109,7 @@ async function loadArrayBuffer(name, buf) {
 }
 // raw = { pos, tri, source }: also the entry point for meshes handed over by the OrcaSlicer plugin
 function loadRaw(name, raw) {
-  Object.assign(S, core.newSplit(name, raw), { hist: { past: [], future: [] }, conns: [], connMin: undefined });
+  Object.assign(S, core.newSplit(name, raw), { hist: { past: [], future: [] }, conns: [] });
   buildMesh();
   updatePlate();
   frame();
@@ -1354,24 +1354,21 @@ function setTrim(js, on) {
   afterEdit(on ? `Trim: ${names} ${js.length > 1 ? "are" : "is"} cut where ${js.length > 1 ? "they overlap" : "it overlaps"} other parts (after a move)` : `Trim off on ${names}`);
 }
 // ---------------------------------------------------------------- connectors
-// S.conns = [{ a, b, p, peg, shape, style, d, depth, clr, auto }]: a connector joins parts a and b (uids) across one
+// S.conns = [{ a, b, p, peg, shape, style, d, depth, clr }]: a connector joins parts a and b (uids) across one
 // seam (core.seamArcs), like the Cut tool's connectors in OrcaSlicer. p (original coordinates) picks the seam: of the
 // seams between a and b, the one nearest p, so it follows the cut when the split changes, and two parts that touch
 // twice (a stick through a fist) can have one at each. With no seam left between them it does nothing until there is.
 // peg: the uid of the part the peg sticks out of (a plug: the matching hole is in the other part), or null for a
 // dowel (a hole in both and a separate peg that prints on its own). Sizes in mm: d is the width across flats (a
 // circle's diameter), depth how far the peg goes into the other part, clr the clearance added to the hole on every
-// side (and at its bottom). auto: placed and sized by Connect: d and depth follow the seam (the largest that fits),
-// and auto pins under S.connMin are skipped. Setting a size or depth fixes it (auto false).
+// side (and at its bottom).
 // They go only into the files whose parts print apart: Part STLs and the multi-part 3MF (and Send to Orca as Parts).
 // The geometry is built into the cut's cap (connLoopTris), not by CSG, so the parts stay closed and manifold.
 const CONN_SIDES = { circle: 48, square: 4, hex: 6, triangle: 3 };
 const CONN_TAPER = 0.6; // frustum: the tip is this fraction of the base
 const CONN_WALL = 0.8; // mm of material the fit check wants around a hole
-const CONN_MAX = 12; // largest automatic pin, mm
-const CONN_MIN = 3; // default "Skip pins under", mm
+const CONN_MAX = 12; // largest pin Add gives a seam, mm
 let connOn = false; // true while building files whose parts print apart
-const connMin = () => S.connMin ?? CONN_MIN;
 const V3 = THREE.Vector3;
 
 function newell(P) {
@@ -1498,7 +1495,6 @@ function seams() {
   }
   return seamCache.list;
 }
-const seamsOf = (i) => seams().filter((s) => s.a === i || s.b === i);
 const seamName = (s, from = -1) => { const o = from === s.a ? s.b : from === s.b ? s.a : -1, t = o > 0 ? S.parts[o].name : `${S.parts[s.a].name} and ${S.parts[s.b].name}`; return s.of > 1 ? `${t} (${s.at})` : t; };
 // Which points of part l's boundary loop lp its surface joins by an edge: (i, j) => bool, i and j indexes into lp.
 const linkCache = new Map();
@@ -1649,7 +1645,7 @@ function connFitCached(c, s, d, depth) { // connFitWhy, cached on the seam
   if (!s.fits.has(k)) s.fits.set(k, connFitWhy(connPlan(c, s, d, depth)));
   return s.fits.get(k);
 }
-// An automatic connector's size: the largest d (0.5 mm steps, at most CONN_MAX and the distance from the pin to the
+// The size Add gives a connector: the largest d (0.5 mm steps, at most CONN_MAX and the distance from the pin to the
 // cut's edge) that fits, as deep as it is wide or else 0.6 of that, before trying a smaller d. { d, depth, why }; d 0:
 // none fits, and why says why the smallest didn't.
 function connAutoSize(c, s) {
@@ -1684,20 +1680,19 @@ function connGate(s) {
   }
   return "";
 }
-// Every connector resolved on the current split: { list: [{ c, k (index in S.conns), s (seam), d, depth, pl, state,
-// why }], bySeam (seam -> its entry), gated (seam without one -> why it can't take one) }.
-// state: "ok" (it's built), "bad" (it doesn't fit: left out of files, red), "small" (automatic and under Skip pins
-// under: left out), "lost" (no seam between its parts).
+// Every connector resolved on the current split: { list: [{ c, k (index in S.conns), ia, ib (its parts' indexes), s
+// (seam), pl, state, why }], bySeam (seam -> its entry) }.
+// state: "ok" (it's built), "bad" (it doesn't fit: left out of files, red), "lost" (no seam between its parts).
 let connStateCache = { key: null, v: null };
 function connState() {
-  const ss = seams(), key = `${seamCache.key}|${S.parts.length}|${connMin()}|${xfKey}|${JSON.stringify(S.conns || [])}|${S.parts.map((p) => `${p.uid || ""}:${p.rep?.id || ""}${p.trim ? "t" : ""}${p.fill ? "f" : ""}${p.anchor ? "a" : ""}`).join(",")}`;
+  const ss = seams(), key = `${seamCache.key}|${S.parts.length}|${xfKey}|${JSON.stringify(S.conns || [])}|${S.parts.map((p) => `${p.uid || ""}:${p.rep?.id || ""}${p.trim ? "t" : ""}${p.fill ? "f" : ""}${p.anchor ? "a" : ""}`).join(",")}`;
   if (connStateCache.key === key) return connStateCache.v;
   const at = new Map(); S.parts.forEach((p, i) => { if (i > 0 && p.uid) at.set(p.uid, i); });
   const list = [], bySeam = new Map(), placed = [];
   (S.conns || []).forEach((c, k) => {
-    const e = { c, k, s: null, d: c.d, depth: c.depth, pl: null, state: "lost", why: "Its parts no longer touch." };
+    const ia = at.get(c.a), ib = at.get(c.b), e = { c, k, ia, ib, s: null, pl: null, state: "lost", why: "Its parts no longer touch." };
     list.push(e);
-    const ia = at.get(c.a), ib = at.get(c.b); if (!(ia > 0) || !(ib > 0) || ia === ib) return;
+    if (!(ia > 0) || !(ib > 0) || ia === ib) return;
     const P = new V3(...c.p); let bd = Infinity;
     for (const s of ss) {
       if (!((s.a === ia && s.b === ib) || (s.a === ib && s.b === ia))) continue;
@@ -1706,10 +1701,8 @@ function connState() {
     const s = e.s; if (!s) return;
     if (bySeam.has(s)) { e.state = "bad"; e.why = "This seam already has a connector."; return; }
     bySeam.set(s, e);
-    if (c.auto) Object.assign(e, connAutoSize(c, s));
-    if (c.auto && e.d < connMin()) { e.state = "small"; e.why = e.d ? `${e.d} mm is under Skip pins under (${connMin()} mm).` : `No pin fits this seam. ${e.why}`; return; }
-    e.pl = connPlan(c, s, e.d, e.depth);
-    e.why = connGate(s) || connFitCached(c, s, e.d, e.depth);
+    e.pl = connPlan(c, s, c.d, c.depth);
+    e.why = connGate(s) || connFitCached(c, s, c.d, c.depth);
     for (const [j, sp] of e.pl.spec) { // with others in the same cut: apart by CONN_WALL, and the cut still lays out with all of them
       const cut = e.pl.cut.get(j), near = placed.filter((o) => o.pl.spec.has(j) && o.pl.cut.get(j).key === cut.key); if (e.why || !near.length) continue;
       const R = (q) => q.r0 / Math.cos(Math.PI / (CONN_SIDES[q.shape] || 48)), at = (pl) => new V3().setFromMatrixPosition(pl.F);
@@ -1720,8 +1713,7 @@ function connState() {
     e.state = e.why ? "bad" : "ok";
     if (e.state === "ok") placed.push(e);
   });
-  const gated = new Map(); for (const s of ss) { const why = !bySeam.has(s) && connGate(s); if (why) gated.set(s, why); }
-  connStateCache = { key, v: { list, bySeam, gated } };
+  connStateCache = { key, v: { list, bySeam } };
   return connStateCache.v;
 }
 // The connectors built into part i's cuts, by loop: loopKey -> (cut key -> { cut, list: [{ pl, sp, Fw }], F }). Fw: the
@@ -1791,42 +1783,12 @@ function connExtras(built) {
   }
   return out;
 }
-// Where the peg goes on a new plug: the hole in the side with more room for it (the bigger pin that fits), the peg
-// on the other; a tie puts the peg on the smaller part.
-function connPegSide(s) {
-  const cnt = partCounts(), base = { shape: "circle", style: "prism", clr: 0.15 };
-  const fit = (j) => connAutoSize({ ...base, peg: S.parts[j].uid }, s), A = fit(s.a), B = fit(s.b);
-  const better = A.d !== B.d ? (A.d > B.d ? s.a : s.b) : A.depth !== B.depth ? (A.depth > B.depth ? s.a : s.b) : cnt[s.a] <= cnt[s.b] ? s.a : s.b;
-  return S.parts[better].uid;
-}
-// A new automatic plug on seam s (its parts get uids).
-function connNew(s, type = "plug") {
-  uidOf(s.a); uidOf(s.b);
-  const pin = seamPin(s), [u] = s.edges[Math.floor(s.edges.length / 2)];
-  const c = { a: S.parts[s.a].uid, b: S.parts[s.b].uid, p: (pin.C || new V3(S.pos[3*u], S.pos[3*u+1], S.pos[3*u+2])).toArray().map((v) => +v.toFixed(3)),
-    peg: null, shape: "circle", style: "prism", d: 0, depth: 0, clr: 0.15, auto: true };
-  if (type === "plug") c.peg = connPegSide(s);
-  return Object.assign(c, connAutoSize(c, s));
-}
 function setConns(next, msg) { pushUndo(); S.conns = next; afterEdit(msg); }
-// Connectors on seams ss that have none and can take one. Says how many were too small.
-function connectSeams(ss, what = "") {
-  if (!S.G) return;
-  const st = connState(), add = ss.filter((s) => !st.bySeam.has(s) && !st.gated.has(s)), skip = ss.filter((s) => st.gated.has(s));
-  if (!add.length) { status(skip.length === 1 ? st.gated.get(skip[0]) : skip.length ? `${plural(skip.length, "seam")} can't take a connector` : ss.length ? "Every one of those seams already has a connector" : "No seams to connect"); return; }
-  pushUndo();
-  S.conns = [...(S.conns || []), ...add.map((s) => connNew(s))];
-  const small = connState().list.filter((e) => e.state === "small" && add.includes(e.s)).length;
-  afterEdit(`Added ${add.length - small} connector${add.length - small === 1 ? "" : "s"}${what}` +
-    (small ? `; ${small} seam${small > 1 ? "s" : ""} too small for a ${connMin()} mm pin (Skip pins under)` : "") +
-    (skip.length ? `; ${skip.length} seam${skip.length > 1 ? "s" : ""} can't take one` : ""));
-}
-// Edit connectors ks (indexes in S.conns) with fn(c). sized: the edit sets a size, so it's no longer automatic; other
-// edits (type, shape, which side) keep an automatic connector sized to fit.
-function editConns(ks, fn, msg, sized = false) {
+// Edit connectors ks (indexes in S.conns): fn(c, e) changes a copy of each (e: its connState entry).
+function editConns(ks, fn, msg) {
   if (!ks.length) return;
   const st = connState(), next = S.conns.map((c) => ({ ...c }));
-  for (const k of ks) { const e = st.list[k], c = next[k]; if (sized && c.auto) { c.d = e.d || c.d || 3; c.depth = e.depth || c.depth || 3; c.auto = false; } fn(c, e); }
+  for (const k of ks) fn(next[k], st.list[k]);
   setConns(next, msg);
 }
 
@@ -1853,14 +1815,6 @@ function updateConnGhosts() {
     line.renderOrder = 7; connGroup.add(line);
   }
   render();
-}
-// The connector whose ghost is under the pointer (index in S.conns), or -1.
-function connGhostAt(ev) {
-  const pegs = connGroup.children.filter((o) => o.userData.conn !== undefined); if (!pegs.length) return -1;
-  const r = renderer.domElement.getBoundingClientRect(), rc = new THREE.Raycaster();
-  rc.setFromCamera(new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1), camera);
-  const h = rc.intersectObjects(pegs, false)[0];
-  return h ? h.object.userData.conn : -1;
 }
 
 // The original face of part i nearest a world point (clicks on a trimmed part select / act on that part).
@@ -2057,7 +2011,6 @@ window.addEventListener("pointerup", (ev) => {
   if (moved || ev.target !== canvas) return;
   if (pickingJoint) { pickJointAt(ev); return; }
   if (placing) { const h = hit(ev); if (h) placeAt(h); return; }
-  if (S.tool === "orbit") { const k = connGhostAt(ev); if (k >= 0) { connPick(k); return; } }
   const h = hit(ev);
   if (!h) { if (S.tool === "orbit" && S.active) selectPart(0); return; }
   if ((ev.shiftKey && S.tool === "orbit") || (ev.ctrlKey && ev.shiftKey)) { toggleSel(S.labels[h.face]); return; }
@@ -3022,20 +2975,7 @@ $("repIn").onchange = async () => {
 };
 $("repDel").onclick = () => { const p = S.parts[S.active]; if (!p?.rep) return; pushUndo(); delete p.rep; afterEdit(`${p.name}: replacement removed`); };
 // ---------------------------------------------------------------- connectors: panel, part card, parts list
-// The part card lists seams: one part's, or with several parts selected those between them (all of theirs when they
-// don't touch). A row's checkbox adds or removes its connector; with one part selected, clicking a row opens its
-// settings under it; with several, the settings apply to every connector listed ("Mixed" where they differ).
-let connOpen = ""; // seamKey of the open row
-const seamKey = (s) => `${s.a}|${s.b}|${s.at}`;
-function connScope() {
-  const sel = selected();
-  if (sel.length < 2) return { list: sel.length ? seamsOf(sel[0]) : [], multi: false, from: sel[0] ?? -1 };
-  const set = new Set(sel), all = seams().filter((s) => set.has(s.a) || set.has(s.b)), between = all.filter((s) => set.has(s.a) && set.has(s.b));
-  return { list: between.length ? between : all, multi: true, between: between.length > 0, from: -1 };
-}
-const connWhat = (e) => (!e || e.state === "lost" ? "" : e.state === "small" ? (e.d ? `Too small (${e.d} mm)` : "Too small") : `${e.c.peg ? "Plug" : "Dowel"} ${e.d} mm`);
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-function connLostName(c) { const nm = (u) => S.parts.find((q, j) => j > 0 && q.uid === u)?.name || "a deleted part"; return `${nm(c.a)} and ${nm(c.b)}`; }
 // Brackets in the parts list's left gutter, one per connector: [{ a, b (part indexes), bad }].
 function partLinks() {
   return connState().list.filter((e) => e.state === "ok" || e.state === "bad").map((e) => ({ a: e.s.a, b: e.s.b, bad: e.state === "bad" }));
@@ -3058,103 +2998,11 @@ function drawPartLinks() {
 }
 function refreshConnUI() {
   if (!S.G) return;
-  const st = connState(), by = (k) => st.list.filter((e) => e.state === k), ok = by("ok"), bad = by("bad"), small = by("small"), lost = by("lost");
-  const names = (es) => es.map((e) => (e.s ? seamName(e.s) : connLostName(e.c))).join("\n"), n = seams().length;
-  const seg = (es, t, tip = names(es)) => (es.length ? ` · <span title="${esc(tip)}">${t}</span>` : ""), gated = [...st.gated];
-  const cant = seg(gated, `${gated.length} can't take one`, gated.map(([s, why]) => `${seamName(s)}: ${why}`).join("\n"));
-  $("connSum").innerHTML = S.conns?.length ? `<span title="${esc(names(ok))}">${ok.length} of ${plural(n, "seam")}</span>${seg(small, `${small.length} too small`)}${seg(bad, `${bad.length} don't fit`)}${seg(lost, `${lost.length} lost ${lost.length > 1 ? "their seams" : "its seam"}`)}${cant}`
-    : n ? `${plural(n, "seam")} where parts touch, no connectors yet${cant ? `${cant}.` : "."}` : "No seams: no two parts touch.";
-  $("connAll").disabled = !n; $("connNone").disabled = !S.conns?.length;
-  if (document.activeElement !== $("connMin")) $("connMin").value = connMin();
-  $("connMinOut").textContent = `${connMin()} mm`;
-  const left = S.printAs !== "parts" && ok.length;
+  const ok = connState().list.filter((e) => e.state === "ok").length, left = S.printAs !== "parts" && ok;
   $("connPrint").hidden = !left;
-  if (left) $("connPrintText").textContent = `${PRINT_AS[S.printAs]} prints the model as one piece, so your ${plural(ok.length, "connector")} ${ok.length > 1 ? "are" : "is"} left out.`;
-  refreshConnCard(st);
+  if (left) $("connPrintText").textContent = `${PRINT_AS[S.printAs]} prints the model as one piece, so your ${plural(ok, "connector")} ${ok > 1 ? "are" : "is"} left out.`;
 }
-function refreshConnCard(st) {
-  const sc = connScope(), box = $("connBox"), ed = $("connEd"), rows = $("connRows");
-  box.appendChild(ed); box.hidden = !sc.list.length;
-  if (!sc.list.length) return;
-  const missing = sc.list.filter((s) => !st.bySeam.has(s) && !st.gated.has(s));
-  $("connPart").hidden = sc.multi || !missing.length; $("connPart").textContent = `Connect all ${missing.length}`;
-  $("connSel").hidden = !sc.multi || !missing.length;
-  $("connSel").textContent = sc.between ? `Connect ${plural(missing.length, "seam")} between these parts` : `Connect all ${plural(missing.length, "seam")} of these parts`;
-  if (!sc.list.some((s) => seamKey(s) === connOpen)) connOpen = "";
-  rows.innerHTML = "";
-  for (const s of sc.list) {
-    const e = st.bySeam.get(s), gate = st.gated.get(s), open = !sc.multi && !gate && seamKey(s) === connOpen, row = document.createElement("div");
-    row.className = `cRow${e?.state === "bad" ? " bad" : ""}${e?.state === "small" || gate ? " dim" : ""}${open ? " open" : ""}`;
-    row.title = gate || (e?.why && e.state !== "ok" ? e.why : sc.multi ? "" : "Click for its settings");
-    row.innerHTML = `<input type="checkbox"${e ? " checked" : ""}${gate ? " disabled" : ""} title="${e ? "Remove this connector" : "Add a plug here"}"><span class="nm">${esc(seamName(s, sc.from))}</span><span class="what">${gate ? "Can't" : esc(connWhat(e))}</span>`;
-    row.querySelector("input").onchange = (ev) => (ev.target.checked ? later(() => connectSeams([s], ` between ${seamName(s)}`)) : setConns(S.conns.filter((_, k) => k !== e.k), `Connector removed between ${seamName(s)}`));
-    row.querySelector("input").onclick = (ev) => ev.stopPropagation();
-    if (!sc.multi && !gate) row.onclick = () => { connOpen = open ? "" : seamKey(s); refreshConnCard(connState()); };
-    row.onmouseenter = () => { seamHover = s; updateConnGhosts(); };
-    row.onmouseleave = () => { if (seamHover === s) { seamHover = null; updateConnGhosts(); } };
-    rows.appendChild(row);
-    if (e?.state === "bad" || gate) rows.insertAdjacentHTML("beforeend", `<div class="cWhy${gate ? " note" : ""}">${esc(gate || e.why)}</div>`);
-    if (open) rows.appendChild(ed);
-  }
-  const T = sc.multi ? sc.list.map((s) => st.bySeam.get(s)).filter(Boolean) : [st.bySeam.get(sc.list.find((s) => seamKey(s) === connOpen))].filter(Boolean);
-  if (sc.multi && T.length) rows.appendChild(ed);
-  ed.hidden = sc.multi ? !T.length : !connOpen;
-  if (ed.hidden) return;
-  const same = (f) => { const v = T.map(f); return v.every((x) => x === v[0]) ? v[0] : undefined; }, type = T.length ? same((e) => (e.c.peg ? "plug" : "dowel")) : "";
-  for (const b of $("connType").children) b.classList.toggle("on", type === b.dataset.ct);
-  for (const o of ed.querySelectorAll(".connOpt")) o.hidden = !T.length;
-  if (!T.length) { $("connNote").textContent = ""; return; }
-  $("connShape").value = same((e) => e.c.shape) ?? "mixed";
-  const style = same((e) => e.c.style);
-  for (const b of $("connStyle").children) b.classList.toggle("on", style === b.dataset.cs);
-  $("connStyle").style.visibility = type === "dowel" ? "hidden" : "";
-  for (const [id, f] of [["connD", (e) => e.d], ["connDepth", (e) => e.depth], ["connClr", (e) => e.c.clr]]) {
-    const v = same(f); $(id).placeholder = v === undefined ? "Mixed" : "";
-    if (document.activeElement !== $(id)) $(id).value = v ?? "";
-  }
-  const plugs = T.filter((e) => e.c.peg), on = $("connOn");
-  $("connOnRow").hidden = !plugs.length;
-  if (sc.multi) on.innerHTML = `<button data-swap="1" title="Put each peg on the other part, and its hole in this one">Swap sides</button>`;
-  else if (plugs.length) { const e = plugs[0]; on.innerHTML = [e.s.a, e.s.b].map((j) => `<button data-on="${j}" class="${S.parts[j].uid === e.c.peg ? "on" : ""}" title="The peg sticks out of ${esc(S.parts[j].name)}">${esc(S.parts[j].name)}</button>`).join(""); }
-  const e = T[0];
-  $("connNote").textContent = sc.multi ? `Changes apply to these ${plural(T.length, "connector")}.`
-    : e.state === "small" ? e.why
-    : e.c.peg ? `${e.c.auto ? "Sized to fit. " : ""}The hole is in ${S.parts[e.pl.holeIn].name}.` : `${e.c.auto ? "Sized to fit. " : ""}Holes in both parts; the dowel exports as its own part.`;
-}
-// The connectors the settings act on: the open row's, or every one listed when several parts are selected.
-function connTargets() {
-  const sc = connScope(), st = connState();
-  return sc.multi ? sc.list.map((s) => st.bySeam.get(s)).filter(Boolean) : [st.bySeam.get(sc.list.find((s) => seamKey(s) === connOpen))].filter(Boolean);
-}
-const connEdit = (fn, what, sized) => { const T = connTargets(); if (T.length) editConns(T.map((e) => e.k), fn, T.length > 1 ? `${what} on ${T.length} connectors` : `${what}: ${seamName(T[0]?.s)}`, sized); };
-for (const b of $("connType").children) b.onclick = () => {
-  const t = b.dataset.ct, T = connTargets();
-  if (!t) { if (T.length) setConns(S.conns.filter((_, k) => !T.some((e) => e.k === k)), `${plural(T.length, "connector")} removed`); return; }
-  if (!T.length) { const s = connScope().list.find((q) => seamKey(q) === connOpen); if (s) setConns([...S.conns, connNew(s, t)], `${t === "plug" ? "Plug" : "Dowel"} between ${seamName(s)}`); return; }
-  editConns(T.map((e) => e.k), (c, e) => { if (t === "dowel") c.peg = null; else if (!c.peg) c.peg = connPegSide(e.s); }, t === "plug" ? "Plug" : "Dowel");
-};
-$("connShape").onchange = () => connEdit((c) => { c.shape = $("connShape").value; }, "Shape");
-for (const b of $("connStyle").children) b.onclick = () => connEdit((c) => { if (c.peg) c.style = b.dataset.cs; }, b.dataset.cs === "prism" ? "Prism" : "Frustum");
-$("connD").onchange = () => { const v = +$("connD").value; if ($("connD").value !== "" && v > 0) connEdit((c) => { c.d = Math.max(0.5, v); }, `Size ${v} mm`, true); };
-$("connDepth").onchange = () => { const v = +$("connDepth").value; if ($("connDepth").value !== "" && v > 0) connEdit((c) => { c.depth = Math.max(0.5, v); }, `Depth ${v} mm`, true); };
-$("connClr").onchange = () => { const v = +$("connClr").value; if ($("connClr").value !== "") connEdit((c) => { c.clr = Math.max(0, Math.min(2, v)); }, `Clearance ${v} mm`); };
-$("connOn").onclick = (ev) => {
-  const b = ev.target.closest("button"); if (!b) return;
-  if (b.dataset.swap) connEdit((c) => { if (c.peg) c.peg = c.peg === c.a ? c.b : c.a; }, "Swapped peg and hole");
-  else connEdit((c) => { c.peg = S.parts[+b.dataset.on].uid; }, `Peg on ${S.parts[+b.dataset.on].name}`);
-};
-$("connPart").onclick = () => { const sc = connScope(), st = connState(); later(() => connectSeams(sc.list.filter((s) => !st.bySeam.has(s)), ` to ${S.parts[S.active].name}`)); };
-$("connSel").onclick = () => { const sc = connScope(), st = connState(); later(() => connectSeams(sc.list.filter((s) => !st.bySeam.has(s)), sc.between ? " between the selected parts" : " to the selected parts")); };
-$("connAll").onclick = () => later(() => connectSeams(seams()));
-$("connNone").onclick = () => { const n = S.conns?.length; if (n) setConns([], `Removed ${plural(n, "connector")}`); };
-$("connMin").oninput = () => { S.connMin = +$("connMin").value; refreshUI(); };
-$("connMin").onchange = () => { autosave(); const sm = connState().list.filter((e) => e.state === "small").length; status(`Skip pins under ${connMin()} mm${sm ? `: ${plural(sm, "seam")} too small` : ""}`); };
 $("connPrintParts").onclick = () => { setPrintAs("parts"); status(`Print as: ${PRINT_AS.parts}`); };
-// Clicking a connector's ghost opens its seam in the part card.
-function connPick(k) {
-  const e = connState().list[k]; if (!e?.s) return;
-  connOpen = seamKey(e.s); selectPart(e.pl?.plugOn > 0 ? e.pl.plugOn : e.s.a);
-}
 // One part / Painted / Merged STL leave connectors out: said with the export.
 const connLeftOut = () => { const n = connState().list.filter((e) => e.state === "ok").length; return n ? ` Your ${plural(n, "connector")} ${n > 1 ? "are" : "is"} left out: Print as Parts includes them.` : ""; };
 $("repFlip").onclick = () => repEdit((r) => { if (r.joint) r.joint = null; else r.flip = !r.flip; }, "Flipped joint end");
@@ -3774,7 +3622,7 @@ function encodeSession() {
 }
 function applySession(txt) {
   const d = core.decodeSession(txt, S.mesh0[1].length / 3, S.coarse);
-  S.labels = d.labels; S.parts = d.parts; S.conns = d.conns; S.connMin = d.connMin; S.active = 0;
+  S.labels = d.labels; S.parts = d.parts; S.conns = d.conns; S.active = 0;
   if (d.mesh) setMesh(d.mesh.pos, d.mesh.tri);
   else if (S.tri !== S.mesh0[1]) setMesh(...S.mesh0);
   for (const r of d.reps) if (!REPS.has(r.id)) addRep(r.name, r.pos, r.id);
@@ -3991,4 +3839,4 @@ if (ORCA.on) {
   window.addEventListener("focus", () => orcaSend({ cmd: "objects" }));
   orcaSend({ cmd: "objects", auto: true });
 }
-window.app = { S, seams, connState, connectSeams, editConns, buildOne3MF, buildPainted3MF, setPrintAs, deleteGeometry, closeHoles, meshHoles, setAnchor, setGap, setTrim, trimResult, trimMeshes, setSlide, updateTrim, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, seams, connState, editConns, buildOne3MF, buildPainted3MF, setPrintAs, deleteGeometry, closeHoles, meshHoles, setAnchor, setGap, setTrim, trimResult, trimMeshes, setSlide, updateTrim, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
