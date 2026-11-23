@@ -1490,6 +1490,8 @@ function insideOf(j) { // point-in-part test on part j's closed original mesh, c
 // the cut must take it (connCapTris), and each hole, with CONN_WALL of material around it, must stay inside its part.
 function connFit(k, c = S.parts[k]?.conn) {
   const pl = connPlan(k, c); if (!pl) return "";
+  const twin = S.parts.findIndex((q, j) => j > 0 && j < k && q.conn && !hasRep(q) && bodyJoint(j)?.loopKey === pl.loopKey);
+  if (twin > 0) return `${S.parts[twin].name} already has a connector on this cut.`;
   const bad = [];
   for (const [j, sp] of pl.spec) {
     const io = insideOf(j); if (!io) continue;
@@ -1509,16 +1511,37 @@ function connFit(k, c = S.parts[k]?.conn) {
 }
 const connFitCache = new Map();
 function connFitCached(k) {
-  const p = S.parts[k], fk = `${k}|${S.nF}|${JSON.stringify(p?.conn)}|${fullHash()}|${S.parts.map((q) => (q.fill ? 1 : 0) + (q.anchor ? 2 : 0)).join("")}`;
+  const fk = `${k}|${S.nF}|${JSON.stringify(S.parts.map((q) => q.conn || 0))}|${fullHash()}|${S.parts.map((q) => (q.fill ? 1 : 0) + (q.anchor ? 2 : 0)).join("")}`;
   if (!connFitCache.has(fk)) { if (connFitCache.size > 40) connFitCache.clear(); connFitCache.set(fk, connFit(k)); }
   return connFitCache.get(fk);
 }
 function setConn(k, c) {
-  if (k <= 0 || !S.parts[k]) return;
+  const pj = k > 0 && S.parts[k] ? bodyJoint(k) : null, nb = pj?.nb > 0 ? S.parts[pj.nb]?.name : "";
+  setConns([[k, c]], c ? `${c.type === "plug" ? "Plug" : "Dowel"} connector: ${S.parts[k]?.name} to ${nb}` : `Connector removed from ${S.parts[k]?.name}`);
+}
+function setConns(list, msg) { // [[part, conn or null], ...] as one undo step
+  list = list.filter(([k]) => k > 0 && S.parts[k]);
+  if (!list.length) return;
   pushUndo();
-  if (c) S.parts[k].conn = c; else delete S.parts[k].conn;
-  const pj = bodyJoint(k), nb = pj?.nb > 0 ? S.parts[pj.nb]?.name : "";
-  afterEdit(c ? `${c.type === "plug" ? "Plug" : "Dowel"} connector: ${S.parts[k].name} to ${nb}` : `Connector removed from ${S.parts[k].name}`);
+  for (const [k, c] of list) { if (c) S.parts[k].conn = c; else delete S.parts[k].conn; }
+  afterEdit(msg);
+}
+// A connector, automatically placed and sized, on every part's main cut that has none yet (smallest parts first, one
+// connector per cut, only where one fits). type null removes them all.
+function connectAll(type = "plug") {
+  if (!S.G) return;
+  if (!type) { const has = S.parts.map((q, k) => (q?.conn ? k : -1)).filter((k) => k > 0); setConns(has.map((k) => [k, null]), `Removed ${has.length} connector(s)`); return; }
+  const cnt = partCounts(), taken = new Set(), list = [];
+  S.parts.forEach((q, k) => { if (k > 0 && q.conn) { const pj = bodyJoint(k); if (pj?.loopKey) taken.add(pj.loopKey); } });
+  const order = S.parts.map((_, k) => k).filter((k) => k > 0 && !S.parts[k].conn && !hasRep(S.parts[k]) && cnt[k]).sort((a, b) => cnt[a] - cnt[b]);
+  let skipped = 0;
+  for (const k of order) {
+    const pj = bodyJoint(k); if (!pj?.loopLen || pj.nb <= 0 || taken.has(pj.loopKey)) continue;
+    const c = connDefaults(k, type); if (!c || connFit(k, c)) { skipped++; continue; }
+    taken.add(pj.loopKey); list.push([k, c]);
+  }
+  if (!list.length) { status(skipped ? `No connector fits the remaining cuts (${skipped} too small)` : "Every cut already has a connector"); return; }
+  setConns(list, `Added ${list.length} connector(s)${skipped ? `; ${skipped} cut(s) too small for one` : ""}. Select a part to change or remove its connector.`);
 }
 // Ghosts: the peg (its part's color) and the hole's outline, red when it doesn't fit.
 const connGroup = new THREE.Group(); scene.add(connGroup);
@@ -1960,6 +1983,7 @@ function openPartMenu(ev, i) {
   items.push("-");
   if (i > 0) it("replace", p.rep ? "Replace with another…" : "Replace with…", () => replaceWith(i));
   if (holesIn(i)) it("fill", "Close holes in this part", () => closeHoles(i));
+  it("plus", "Connectors on all parts", () => later(() => connectAll("plug")));
   it("trash", "Delete (merge into neighbor)", () => deletePart(i), "danger");
   it("trash", "Delete geometry, close holes", () => deleteGeometry([i], true), "danger");
   it("trash", "Delete geometry, leave holes", () => deleteGeometry([i], false), "danger");
@@ -2694,6 +2718,8 @@ $("repDel").onclick = () => { const p = S.parts[S.active]; if (!p?.rep) return; 
 function refreshConnRow(i) {
   const p = S.parts[i], pj = S.G && i > 0 && p && !hasRep(p) ? bodyJoint(i) : null, nb = pj?.loopLen && pj.nb > 0 ? pj.nb : -1;
   $("connBox").classList.toggle("hide", nb <= 0 || hasRep(S.parts[nb]));
+  $("connNone").disabled = !S.parts.some((q) => q?.conn);
+  const nSel = selected().length; $("connSel").textContent = nSel > 1 ? `Applies to the ${nSel} selected parts.` : "";
   if (nb <= 0) return;
   const c = p.conn;
   for (const b of $("connType").children) b.classList.toggle("on", (c?.type || "") === b.dataset.ct);
@@ -2710,14 +2736,21 @@ function refreshConnRow(i) {
   $("connNote").textContent = c.type === "dowel" ? `Holes in ${p.name} and ${S.parts[nb].name}; the dowel exports as its own part.`
     : `Joins ${p.name} to ${S.parts[nb].name}. In Part STLs and the multi-part 3MF.`;
 }
-const connEdit = (fn) => { const i = S.active, p = S.parts[i]; if (!S.G || i <= 0 || !p?.conn) return; const c = { ...p.conn }; fn(c); setConn(i, c); };
-for (const b of $("connType").children) b.onclick = () => {
-  const i = S.active, p = S.parts[i]; if (!S.G || i <= 0 || !p) return;
-  const t = b.dataset.ct;
-  if (!t) { if (p.conn) setConn(i, null); return; }
-  const c = p.conn ? { ...p.conn } : connDefaults(i); if (!c) return;
-  c.type = t; setConn(i, c);
+// Connector edits apply to every selected part (Ctrl/Shift+click selects more).
+const connEdit = (fn) => {
+  if (!S.G || S.active <= 0) return;
+  const js = selected().filter((j) => S.parts[j]?.conn);
+  setConns(js.map((j) => { const c = { ...S.parts[j].conn }; fn(c); return [j, c]; }), js.length > 1 ? `Connector changed on ${js.length} parts` : `Connector changed on ${S.parts[js[0]]?.name}`);
 };
+for (const b of $("connType").children) b.onclick = () => {
+  if (!S.G || S.active <= 0) return;
+  const t = b.dataset.ct, js = selected().filter((j) => !hasRep(S.parts[j]));
+  const list = js.map((j) => [j, t ? (S.parts[j].conn ? { ...S.parts[j].conn, type: t } : connDefaults(j, t)) : null]).filter(([, c]) => c !== undefined && (c || !t));
+  if (js.length === 1) { setConn(js[0], list[0]?.[1] ?? null); return; }
+  setConns(list, t ? `${t === "plug" ? "Plug" : "Dowel"} connectors on ${list.length} parts` : `Connectors removed from ${list.length} parts`);
+};
+$("connAll").onclick = () => later(() => connectAll("plug"));
+$("connNone").onclick = () => connectAll(null);
 for (const b of $("connStyle").children) b.onclick = () => connEdit((c) => { c.style = b.dataset.cs; });
 $("connShape").onchange = () => connEdit((c) => { c.shape = $("connShape").value; });
 $("connD").onchange = () => connEdit((c) => { c.d = Math.max(0.5, +$("connD").value || c.d); });
@@ -3555,4 +3588,4 @@ if (ORCA.on) {
   window.addEventListener("focus", () => orcaSend({ cmd: "objects" }));
   orcaSend({ cmd: "objects", auto: true });
 }
-window.app = { S, setConn, connPlan, connFit, connExtras, connDefaults, buildOne3MF, buildPainted3MF, setPrintAs, deleteGeometry, closeHoles, meshHoles, setAnchor, setGap, setTrim, trimResult, trimMeshes, setSlide, updateTrim, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, setConn, connectAll, connPlan, connFit, connExtras, connDefaults, buildOne3MF, buildPainted3MF, setPrintAs, deleteGeometry, closeHoles, meshHoles, setAnchor, setGap, setTrim, trimResult, trimMeshes, setSlide, updateTrim, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };

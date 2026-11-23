@@ -62,6 +62,7 @@
       <div id="connBox" title="Connector: a peg and a matching hole where this part joins the part across its cut, so printed pieces line up and glue together. Added to Part STLs and the multi-part 3MF.">
         <div class="pr"><span class="lbl">Connector</span>
           <span class="seg" id="connType"><button data-ct="" title="No connector">None</button><button data-ct="plug" title="Plug: a peg on one part and a matching hole in the other">Plug</button><button data-ct="dowel" title="Dowel: a hole in both parts and a separate peg that prints on its own">Dowel</button></span></div>
+        <div class="pr"><span class="lbl small" id="connSel"></span><button id="connAll" data-icon="plus" title="Add an automatically placed and sized plug to every part's main cut that has none yet (one per cut, only where it fits). Then select a part to change or remove its connector.">All parts</button><button id="connNone" title="Remove every connector">Remove all</button></div>
         <div id="connOpts">
           <div class="pr"><span class="lbl">Shape</span><select id="connShape" title="Cross-section of the peg"><option value="circle">Circle</option><option value="square">Square</option><option value="hex">Hexagon</option><option value="triangle">Triangle</option></select>
             <span class="seg" id="connStyle"><button data-cs="prism" title="Prism: straight sides">Prism</button><button data-cs="frustum" title="Frustum: tapers to 60% at the tip, which eases fitting and overhangs">Frustum</button></span></div>

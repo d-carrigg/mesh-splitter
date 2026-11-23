@@ -86,7 +86,13 @@ Adds a peg and a matching hole where two parts meet, like the connectors in Orca
 
 ![A connector: its ghost in the view, then the exported foot and base, and a dowel between the broom and the hand](img/connectors.png)
 
+Connectors are placed for you: each sits at the center of the part's cut, points straight through it, and starts at the largest size that fits. You only pick which parts get one, and change any setting you like.
+
 ### How to use it
+
+- **Every part at once:** click **All parts** under **Connector** (or right-click a part > **Connectors on all parts**). Each part's main cut that doesn't have a connector yet gets a plug, one per cut, where one fits. Then select any part to change its connector or set it to **None**. **Remove all** takes them all off.
+- **Several parts:** Ctrl+click or Shift+click parts in the list. A connector change then applies to all the selected parts.
+- **One part:**
 
 1. Select the part. The connector goes on its main cut: the one toward the bigger part it joins, such as a foot's cut to the base.
 2. Under **Connector**, pick **Plug** or **Dowel**.

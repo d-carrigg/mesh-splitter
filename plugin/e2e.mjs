@@ -215,14 +215,17 @@ const cn = await page.evaluate(() => {
   const dowel = byName(), dfit = app.connFit(i);
   const merged = app.mergedSoup().v.length;
   app.undo(); app.undo();
+  app.connectAll("plug"); // every part's cut that takes one, one per cut
+  const all = S.parts.filter((q) => q.conn).length, allOpen = Object.values(byName()).reduce((s, q) => s + q.open, 0), allFit = S.parts.every((q, k) => !q.conn || !app.connFit(k));
+  app.undo();
   return { d: c.d, depth: c.depth, fit, dfit, dowelD: dc.d, peg: plug[me].vol - base[me].vol, pegWant: Math.PI * r * r * c.depth,
     hole: base[other].vol - plug[other].vol, holeWant: Math.PI * (r + c.clr) ** 2 * (c.depth + c.clr + 0.2),
     open: [...Object.values(plug), ...Object.values(dowel)].reduce((s, q) => s + q.open, 0), dowelPart: !!dowel[`${me} dowel`],
-    dowelHoles: base[me].vol - dowel[me].vol > 0 && base[other].vol - dowel[other].vol > 0, mergedSame: merged === app.mergedSoup().v.length, after: !!S.parts[i].conn };
+    dowelHoles: base[me].vol - dowel[me].vol > 0 && base[other].vol - dowel[other].vol > 0, mergedSame: merged === app.mergedSoup().v.length, all, allOpen, allFit, after: S.parts.some((q) => q.conn) };
 });
 console.log("connectors:", JSON.stringify(cn));
 const near = (a, b) => Math.abs(a - b) < 0.12 * b;
-if (cn.err || cn.fit || cn.dfit || cn.open || !near(cn.peg, cn.pegWant) || !near(cn.hole, cn.holeWant) || !cn.dowelPart || !cn.dowelHoles || !cn.mergedSame || cn.after)
+if (cn.err || cn.fit || cn.dfit || cn.open || !near(cn.peg, cn.pegWant) || !near(cn.hole, cn.holeWant) || !cn.dowelPart || !cn.dowelHoles || !cn.mergedSame || !cn.all || cn.allOpen || !cn.allFit || cn.after)
   errors.push("connectors failed: " + JSON.stringify(cn));
 await page.evaluate(() => app.setGizmoJoint(false));
 if (shot) await page.screenshot({ path: shot });
