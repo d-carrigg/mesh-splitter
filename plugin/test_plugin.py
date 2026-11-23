@@ -310,12 +310,12 @@ class RegistrationTests(unittest.TestCase):
 
 
 class BuildTests(unittest.TestCase):
-    @unittest.skipUnless((HERE / "node_modules" / "three").is_dir(), "run npm ci in plugin/ first")
     def test_build_writes_plain_wheel_with_self_contained_page(self):
         with tempfile.TemporaryDirectory() as d:
             out = Path(d) / "mesh_splitter_any.whl"
             import subprocess, zipfile
-            subprocess.run([sys.executable, str(HERE / "build.py"), "--version", "9.9.9", "--name", "meshsplitter", "--out", str(out)],
+            subprocess.run([sys.executable, str(HERE / "build.py"), "--version", "9.9.9", "--name", "meshsplitter", "--out", str(out),
+                            "--page-out", str(Path(d) / "not" / "made" / "yet" / "page.html")],
                            check=True, capture_output=True)
             z = zipfile.ZipFile(out)
             info = "mesh_splitter_any-9.9.9.dist-info/"
@@ -344,7 +344,6 @@ class BuildTests(unittest.TestCase):
             self.assertLess(len(html.encode()), 1_800_000)
             self.assertIn("Official build by", html)
 
-    @unittest.skipUnless((HERE / "node_modules" / "three").is_dir(), "run npm ci in plugin/ first")
     def test_build_without_official_flag_is_an_unofficial_copy(self):
         import subprocess, zipfile
         with tempfile.TemporaryDirectory() as d:

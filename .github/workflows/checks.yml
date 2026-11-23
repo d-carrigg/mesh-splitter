@@ -1,0 +1,35 @@
+name: Checks
+
+# The fast checks: `npm run check`, the same command you run locally. No OrcaSlicer, no browser.
+# The slow ones (end-to-end, real OrcaSlicer, command line binaries) stay on the Release Please PR.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            plugin/package-lock.json
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          enable-cache: true
+      - run: npm ci
+      - run: npm ci
+        working-directory: plugin
+      - run: npm run check
