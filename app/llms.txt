@@ -1,0 +1,38 @@
+# Mesh Splitter
+
+> Mesh Splitter splits one solid mesh (STL or 3MF) into separate, color-coded parts to edit, color, or print in several filaments. It runs in OrcaSlicer as a plugin, in any browser at https://splitmesh.carrigg.dev, from the command line, and as a Claude Code plugin. All of them run the same splitting code, so the same settings give the same parts. MIT licensed.
+
+Ways to get started:
+
+- Browser: open https://splitmesh.carrigg.dev. Nothing to install, and the model is split in the browser, never uploaded.
+- OrcaSlicer 2.5 plugin: install "Mesh Splitter" from the OrcaCloud Plugin Hub, or download `mesh_splitter_any.whl` from the latest GitHub release and use Plugins > Browse plugins (arrow) > Install local plugin. A "Mesh Splitter" tab appears next to Prepare / Preview.
+- Command line (no install): download the binary for your computer from the latest release (`mesh-splitter-windows-x64.exe`, `mesh-splitter-macos-arm64`, `mesh-splitter-macos-x64`, `mesh-splitter-linux-x64`, `mesh-splitter-linux-arm64`) and run `mesh-splitter-windows-x64.exe figure.stl --auto 6 -o figure.3mf`. With Node.js 20+: `npx github:d-carrigg/mesh-splitter figure.stl --auto 6 -o figure.3mf`.
+- Claude Code plugin (needs Node.js 20+): run `/plugin marketplace add d-carrigg/mesh-splitter`, then `/plugin install mesh-splitter@mesh-splitter`, then ask, for example, "split figure.stl into head, body and base and give me a 3MF for OrcaSlicer".
+- Local web app: with uv installed, run `uv run mesh-splitter` in the repo folder; it opens at http://127.0.0.1:8766/app/.
+
+Official releases are published only by @dcarrigg, on the OrcaCloud Plugin Hub and on GitHub. The official app shows "Official build by @dcarrigg" on its start screen.
+
+## Get started
+
+- [GitHub repository](https://github.com/d-carrigg/mesh-splitter): source code, README with install steps for every option, and issues
+- [Latest release](https://github.com/d-carrigg/mesh-splitter/releases/latest): OrcaSlicer plugin (`mesh_splitter_any.whl`) and command line binaries
+- [OrcaCloud Plugin Hub](https://cloud.orcaslicer.com/app/plugins/plugin-hub): official OrcaSlicer plugin listing (search for "Mesh Splitter")
+- [Web app](https://splitmesh.carrigg.dev): the hosted browser version
+- [Docs home](https://d-carrigg.github.io/mesh-splitter/): every feature, with pictures
+
+## Docs
+
+- [Command line](https://d-carrigg.github.io/mesh-splitter/features/command-line/): setup, examples, split methods (`--auto`, `--shells`, `--seeds`, `--session`), outputs (3MF, painted 3MF, per-part STL) and all settings
+- [Claude Code plugin](https://d-carrigg.github.io/mesh-splitter/features/claude-code/): install, example prompts and what the skill does
+- [Splitting](https://d-carrigg.github.io/mesh-splitter/features/splitting/): auto split, split by shells, and seeds
+- [Editing parts](https://d-carrigg.github.io/mesh-splitter/features/editing-parts/): rename, fill, brush, merge, and replace a part with another STL
+- [Move, rotate, scale and heal](https://d-carrigg.github.io/mesh-splitter/features/transforms/): transform handles, rotate on joint, heal joint, fill and anchor
+- [Exporting](https://d-carrigg.github.io/mesh-splitter/features/exporting/): Send to Orca, Print as modes, painted 3MF, merged and per-part STL
+- [Examples](https://d-carrigg.github.io/mesh-splitter/examples/): example models and the splits they give
+
+## Optional
+
+- [How it works](https://d-carrigg.github.io/mesh-splitter/how-it-works/): the splitting algorithm (seed growth stopped at concave creases, crease snapping, smoothing)
+- [AI part naming](https://d-carrigg.github.io/mesh-splitter/features/ai-naming/): optional part names and cut checks from OpenAI, OpenRouter, Claude, or a local model
+- [Changelog](https://github.com/d-carrigg/mesh-splitter/blob/main/CHANGELOG.md): release history
+- [License (MIT)](https://github.com/d-carrigg/mesh-splitter/blob/main/LICENSE)
