@@ -23,6 +23,7 @@ export function decodeSession(txt, nF0, coarse = null) {
     labels = Int32Array.from(coarse.parent, (p) => labels[p]);
     parts = parts.map((p) => ({ ...p, seeds: (p.seeds || []).map((f) => child[f] ?? -1).filter((f) => f >= 0) }));
   }
+  parts = parts.map(({ fill, anchor, ...p }) => anchor || fill ? { ...p, gap: anchor ? "anchor" : "fill" } : p); // before part.gap
   return { labels, parts, mesh, reps, conns: j.conns || [] };
 }
 
