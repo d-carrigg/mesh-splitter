@@ -5,8 +5,8 @@
 
 Needs an X display (CI runs it under xvfb-run). Uses a fresh OrcaSlicer data folder, installs
 PLUGIN.whl the way Plugins > Install local plugin does (orca_plugins/<file>/<file> + .install_state.json),
-with the permissions it asks for at load already granted (~/Downloads write, and the programs Send to Orca
-runs: handoff.PROCESSES), since a modal "Plugin permissions" prompt would block a headless run, plus the CI-only
+with the permissions it asks for at load already granted (read from its register_capabilities), since a modal
+"Plugin permissions" prompt would block a headless run, plus the CI-only
 real_orca_probe.py. OrcaSlicer opens MESH.stl and SPLIT.3mf from its command line; the probe drives the
 plugin's Bridge with the real `orca` bindings and reports back.
 
@@ -31,7 +31,27 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "server"))
 import mock_llm_server  # noqa: E402
-import handoff  # noqa: E402  the programs Send to Orca runs (dbus-send on Linux), which the plugin asks for at load
+import fake_orca  # noqa: E402
+
+
+GRANT_KEYS = {"fs_readwrite": "fs_readwrite", "process": "process", "network": "network_http", "threading": "threading"}
+
+
+def requested_permissions():
+    """The install_state grants for what plugin.py asks orca.request_permissions for at load."""
+    import importlib.util
+    fake_orca.install([])
+    import orca
+    spec = importlib.util.spec_from_file_location("mesh_splitter_plugin", HERE / "plugin.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod.MeshSplitterPlugin().register_capabilities()
+    (asked,) = orca._state["permissions"]
+    unknown = set(asked) - set(GRANT_KEYS)
+    if unknown:
+        raise KeyError(f"plugin.py requests {sorted(unknown)} at load: add the matching .install_state.json key to "
+                       "GRANT_KEYS in real_orca_test.py, or the real OrcaSlicer check stalls on the permissions prompt")
+    return {GRANT_KEYS[k]: v for k, v in asked.items()}
 
 
 def install(plugins_dir, src, name, permissions):
@@ -82,8 +102,7 @@ def main():
     plugins = data / "orca_plugins"
     downloads = Path.home() / "Downloads"
     downloads.mkdir(exist_ok=True)
-    install(plugins, a.plugin.resolve(), "Mesh Splitter", {"fs_readwrite": [str(downloads / "*")],
-                                                           "process": handoff.PROCESSES})
+    install(plugins, a.plugin.resolve(), "Mesh Splitter", requested_permissions())
     install(plugins, HERE / "real_orca_probe.py", "Mesh Splitter CI probe", {"full_access": True})
 
     report = a.out / "probe.json"

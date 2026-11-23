@@ -294,6 +294,15 @@ class RegistrationTests(unittest.TestCase):
         custom = self.register({"provider": "custom", "providers": {"custom": {"base_url": "http://localhost:1234/v1"}}})
         self.assertEqual(custom[0]["network"], ["http://localhost"])
 
+    def test_real_orca_check_can_grant_everything_the_plugin_requests(self):
+        import real_orca_test
+        for settings in ({}, {"provider": "openrouter", "providers": {"openrouter": {"api_key": "k"}}}):
+            unknown = set(self.register(settings)[0]) - set(real_orca_test.GRANT_KEYS)
+            self.assertFalse(unknown, f"add {sorted(unknown)} to GRANT_KEYS in real_orca_test.py, "
+                                      "or the real OrcaSlicer check stalls on the permissions prompt")
+        import handoff
+        self.assertEqual(real_orca_test.requested_permissions()["process"], handoff.PROCESSES)
+
     def test_window_and_page_share_bridge(self):
         p = load_plugin([fake_orca.FakeObject("cube", [fake_orca.FakeVolume(TET_V, TET_F)])])
         p.page_html = lambda: "<html></html>"
