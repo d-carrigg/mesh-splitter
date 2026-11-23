@@ -13,6 +13,7 @@ THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
 const $ = (id) => document.getElementById(id);
 const ICONS = {
+  connector: '<path d="M8.5 15.4 2 18l10 4 10-4-6.5-2.6"/><path d="M8.5 4.5v12.5a3.5 1.6 0 0 0 7 0V4.5"/><ellipse cx="12" cy="4.5" rx="3.5" ry="1.6"/>',
   pin: '<path d="M9 14V4h6v10"/><path d="M4 14h16v6H4z"/>',
   orbit: '<path d="M16.5 7.5C15.6 4.2 14 2 12 2 9.2 2 7 6.5 7 12s2.2 10 5 10c.3 0 .7-.1 1-.2"/><path d="m15.2 13.7 3.8 1.9-1.9 3.8"/><path d="M19 15.6c-1.8.9-4.3 1.4-7 1.4-5.5 0-10-2.2-10-5s4.5-5 10-5c4.8 0 8.9 1.7 9.8 4"/>',
   seed: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
@@ -1783,7 +1784,39 @@ function connExtras(built) {
   }
   return out;
 }
+// The Connectors tool's settings: what Add gives each seam (kept on this computer). A seam whose largest pin is
+// under min mm gets none.
+const connAdd = { type: "plug", shape: "circle", style: "prism", clr: 0.15, min: 3 };
+try { Object.assign(connAdd, JSON.parse(localStorage.getItem("meshsplit:connAdd"))); } catch {}
+// Where plug c's peg goes on seam s: the hole in the side with more room for it (the bigger pin that fits), the peg
+// on the other; a tie puts the peg on the smaller part.
+function connPegSide(c, s) {
+  const cnt = partCounts(), fit = (j) => connAutoSize({ ...c, peg: S.parts[j].uid }, s), A = fit(s.a), B = fit(s.b);
+  const better = A.d !== B.d ? (A.d > B.d ? s.a : s.b) : A.depth !== B.depth ? (A.depth > B.depth ? s.a : s.b) : cnt[s.a] <= cnt[s.b] ? s.a : s.b;
+  return S.parts[better].uid;
+}
+// A connector on seam s with connAdd's settings, the largest that fits (connAutoSize); null when that's under
+// connAdd.min. Its parts get uids.
+function connNew(s) {
+  const pin = seamPin(s); if (pin.why) return null;
+  const c = { a: uidOf(s.a), b: uidOf(s.b), p: pin.C.toArray().map((v) => +v.toFixed(3)), peg: null, shape: connAdd.shape, style: connAdd.style, d: 0, depth: 0, clr: connAdd.clr };
+  if (connAdd.type === "plug") c.peg = connPegSide(c, s);
+  const { d, depth } = connAutoSize(c, s);
+  return d && d >= connAdd.min ? Object.assign(c, { d, depth }) : null;
+}
 function setConns(next, msg) { pushUndo(); S.conns = next; afterEdit(msg); }
+// Add: a connector with connAdd's settings on each of seams ss, in place of any connector they had.
+function addConns(ss, what = "") {
+  if (!ss.length) { status("No two parts touch, so there's nowhere for a connector"); return; }
+  const st = connState(), on = new Set(ss), add = [], cant = [];
+  let small = 0;
+  for (const s of ss) {
+    const why = connGate(s); if (why) { cant.push(why); continue; }
+    const c = connNew(s); if (c) add.push(c); else small++;
+  }
+  setConns([...S.conns.filter((_, k) => !on.has(st.list[k].s)), ...add], `Added ${plural(add.length, "connector")}${what}` +
+    (small ? `; ${plural(small, "seam")} too small` : "") + (cant.length ? `; ${cant.length > 1 ? `${cant.length} seams can't take one` : cant[0]}` : ""));
+}
 // Edit connectors ks (indexes in S.conns): fn(c, e) changes a copy of each (e: its connState entry).
 function editConns(ks, fn, msg) {
   if (!ks.length) return;
@@ -2812,11 +2845,12 @@ function syncGizmo() {
   const i = gizmoTarget();
   document.querySelectorAll("#gzModes [data-gz]").forEach((b) => b.classList.toggle("on", gzOn && b.dataset.gz === gzMode));
   $("gzJoint").classList.toggle("on", gzJointOn);
-  const card = $("xfCard"), show = gzOn && i >= 0 && S.tool === "orbit" && !placing && !pickingJoint && $("splitPanel").hidden;
-  card.hidden = !show; card.dataset.mode = gzMode;
+  const free = S.tool === "orbit" && !placing && !pickingJoint && $("splitPanel").hidden, card = $("xfCard");
+  card.hidden = !(gzOn && gzMode !== "conn" && i >= 0 && free); card.dataset.mode = gzMode;
+  $("connPanel").hidden = !(gzOn && gzMode === "conn" && free);
   fitViewToPanels();
   $("gzCenter").classList.toggle("on", !gzJointOn);
-  if (!gzOn || i < 0 || S.tool !== "orbit" || placing || pickingJoint) { jointAxis.visible = false; if (gizmo.object) { gizmo.detach(); render(); } return; }
+  if (!gzOn || gzMode === "conn" || i < 0 || S.tool !== "orbit" || placing || pickingJoint) { jointAxis.visible = false; if (gizmo.object) { gizmo.detach(); render(); } return; }
   if (gizmo.dragging) return;
   const x = S.parts[i].xf || { s: [1, 1, 1], r: [0, 0, 0], t: [0, 0, 0], c: (() => { const b = partBox(i); return [0, 1, 2].map((k) => (b[k] + b[k+3]) / 2); })() };
   gzSync = true;
@@ -2890,7 +2924,7 @@ $("gzCenter").onclick = () => setGizmoJoint(false);
 $("xfDone").onclick = () => setGizmo("off");
 function setGizmo(mode) {
   if (mode === "off" || (mode === gzMode && gzOn)) gzOn = false; else { gzOn = true; gzMode = mode; }
-  try { localStorage.setItem("meshsplit:gizmo", gzOn ? gzMode : "off"); } catch {}
+  if (gzMode !== "conn") try { localStorage.setItem("meshsplit:gizmo", gzOn ? gzMode : "off"); } catch {}
   if (gzOn && S.tool !== "orbit") setTool("orbit");
   syncGizmo();
 }
@@ -3001,7 +3035,28 @@ function refreshConnUI() {
   const ok = connState().list.filter((e) => e.state === "ok").length, left = S.printAs !== "parts" && ok;
   $("connPrint").hidden = !left;
   if (left) $("connPrintText").textContent = `${PRINT_AS[S.printAs]} prints the model as one piece, so your ${plural(ok, "connector")} ${ok > 1 ? "are" : "is"} left out.`;
+  for (const b of $("caType").children) b.classList.toggle("on", b.dataset.v === connAdd.type);
+  for (const b of $("caStyle").children) b.classList.toggle("on", b.dataset.v === connAdd.style);
+  $("caStyleRow").hidden = connAdd.type === "dowel";
+  $("caShape").value = connAdd.shape;
+  if (document.activeElement !== $("caClr")) $("caClr").value = connAdd.clr;
+  if (document.activeElement !== $("caMin")) $("caMin").value = connAdd.min;
+  const sel = selSeams().length;
+  $("connSel").disabled = !sel; $("connSelHint").hidden = !!sel;
+  $("connAll").disabled = !seams().length; $("connNone").disabled = !S.conns.length;
 }
+// Seams between the selected parts (Add to selected parts).
+const selSeams = () => { const set = new Set(selected()); return set.size > 1 ? seams().filter((s) => set.has(s.a) && set.has(s.b)) : []; };
+const setConnAdd = (o) => { Object.assign(connAdd, o); try { localStorage.setItem("meshsplit:connAdd", JSON.stringify(connAdd)); } catch {} refreshConnUI(); };
+for (const b of $("caType").children) b.onclick = () => setConnAdd({ type: b.dataset.v });
+for (const b of $("caStyle").children) b.onclick = () => setConnAdd({ style: b.dataset.v });
+$("caShape").onchange = () => setConnAdd({ shape: $("caShape").value });
+$("caClr").onchange = () => setConnAdd({ clr: Math.max(0, Math.min(2, +$("caClr").value || 0)) });
+$("caMin").onchange = () => setConnAdd({ min: Math.max(1, Math.min(CONN_MAX, +$("caMin").value || 1)) });
+$("connAll").onclick = () => later(() => addConns(seams()));
+$("connSel").onclick = () => later(() => addConns(selSeams(), " between the selected parts"));
+$("connNone").onclick = () => setConns([], `Removed ${plural(S.conns.length, "connector")}`);
+$("connDone").onclick = () => setGizmo("off");
 $("connPrintParts").onclick = () => { setPrintAs("parts"); status(`Print as: ${PRINT_AS.parts}`); };
 // One part / Painted / Merged STL leave connectors out: said with the export.
 const connLeftOut = () => { const n = connState().list.filter((e) => e.state === "ok").length; return n ? ` Your ${plural(n, "connector")} ${n > 1 ? "are" : "is"} left out: Print as Parts includes them.` : ""; };
@@ -3839,4 +3894,4 @@ if (ORCA.on) {
   window.addEventListener("focus", () => orcaSend({ cmd: "objects" }));
   orcaSend({ cmd: "objects", auto: true });
 }
-window.app = { S, seams, connState, editConns, buildOne3MF, buildPainted3MF, setPrintAs, deleteGeometry, closeHoles, meshHoles, setAnchor, setGap, setTrim, trimResult, trimMeshes, setSlide, updateTrim, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, seams, connState, addConns, editConns, connAdd, buildOne3MF, buildPainted3MF, setPrintAs, deleteGeometry, closeHoles, meshHoles, setAnchor, setGap, setTrim, trimResult, trimMeshes, setSlide, updateTrim, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };

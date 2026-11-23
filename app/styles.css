@@ -130,6 +130,9 @@ table.parts td.pins svg.i { width:12px; height:12px; vertical-align:-2px; margin
 html .seg button { background:transparent; border:none; border-radius:10px; color:var(--lbl); padding:2px 11px; min-height:22px; }
 html .seg button:hover { background:#4D4D54; color:var(--fg); }
 html .seg button.on { background:var(--acc) !important; color:#fff; font-weight:400; }
+#connPanel .row { margin:0; justify-content:space-between; }
+#connPanel .acts button { flex:1; }
+.gp select { background:var(--in); color:var(--fg); border:1px solid var(--line); border-radius:3px; font:inherit; padding:2px 4px; }
 #splitPanel [data-m] { display:none; flex-direction:column; gap:8px; }
 #splitPanel [data-m].show { display:flex; }
 #paintSw { display:flex; flex-wrap:wrap; gap:5px; }

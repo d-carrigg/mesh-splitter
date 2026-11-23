@@ -100,6 +100,7 @@
       <button data-gz="translate" data-icon="move" title="Move (W). Shift snaps to 1 mm"></button>
       <button data-gz="rotate" data-icon="rotate" title="Rotate (E). Shift snaps to 15°"></button>
       <button data-gz="scale" data-icon="scale" title="Scale (R): corner box = all axes, arrows = one axis. Shift snaps to 5%"></button>
+      <button data-gz="conn" data-icon="connector" title="Connectors: a peg and a matching hole where two parts meet, for parts printed separately"></button>
     </span>
     <span class="sep"></span>
     <button id="aiChk" data-icon="check" title="Check parts: fragments, slivers, unassigned faces"></button>
@@ -181,6 +182,19 @@
       <span class="small">Stretches the part near its cut so it stays flush with its neighbor.</span>
     </div>
     <div class="ft"><span class="spacer"></span><button id="xfReset" data-icon="reset" title="Reset this part's transform">Reset</button><button id="xfDone">Done</button></div>
+  </div>
+
+  <div id="connPanel" class="float gp" hidden>
+    <h3>Connectors</h3>
+    <div class="row"><span class="lbl">Type</span><span class="seg" id="caType"><button data-v="plug" title="Plug: a peg on one part and a matching hole in the other">Plug</button><button data-v="dowel" title="Dowel: a hole in both parts and a separate peg that prints on its own">Dowel</button></span></div>
+    <div class="row"><span class="lbl">Shape</span><select id="caShape" title="Cross-section of the peg"><option value="circle">Circle</option><option value="square">Square</option><option value="hex">Hexagon</option><option value="triangle">Triangle</option></select></div>
+    <div class="row" id="caStyleRow"><span class="lbl">Style</span><span class="seg" id="caStyle"><button data-v="prism" title="Prism: straight sides">Prism</button><button data-v="frustum" title="Frustum: tapers to 60% at the tip, which eases fitting and overhangs">Frustum</button></span></div>
+    <div class="row"><span class="lbl" title="Gap added to the hole on every side (and at its bottom) so the peg slides in. 0.1 to 0.2 mm suits most PLA and PETG prints">Clearance</span><span><input id="caClr" type="number" min="0" max="2" step="0.05"> <span class="small">mm</span></span></div>
+    <div class="row"><span class="lbl" title="Each seam gets the largest pin that fits it. A seam where that's smaller than this gets none">Smallest pin</span><span><input id="caMin" type="number" min="1" max="12" step="0.5"> <span class="small">mm</span></span></div>
+    <span class="small">Each connector is sized to fit its seam.</span>
+    <div class="row acts"><button id="connAll" class="pri" title="A connector on every seam where two parts touch, in place of any already there">Add to all parts</button><button id="connSel" title="A connector on each seam between the selected parts, in place of any already there">Add to selected parts</button></div>
+    <span id="connSelHint" class="small">Select two or more touching parts (Ctrl+click).</span>
+    <div class="ft"><button id="connNone" data-icon="trash" title="Remove every connector">Remove all</button><span class="spacer"></span><button id="connDone">Done</button></div>
   </div>
 
   <div id="rightCol">
