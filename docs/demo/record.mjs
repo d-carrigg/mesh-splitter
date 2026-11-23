@@ -305,9 +305,8 @@ const steps = {
       await snap();
     }
   },
-  // Save a PNG of the page (or a region) to shotsDir/<name>.png. clip: a CSS selector, [x, y, w, h],
-  // {around: target, w, h} (a box centered on a target point, kept inside the page) or {union: [selectors]} (the box
-  // around them all).
+  // Save a PNG of the page (or a region) to shotsDir/<name>.png. clip: a CSS selector, [x, y, w, h], or
+  // {around: target, w, h} (a box centered on a target point, kept inside the page).
   async shot(s) {
     if (s.wait !== false) await idle();
     await finishAnimations();
@@ -318,10 +317,6 @@ const steps = {
     else if (s.clip?.around) {
       const p = await locate(s.clip.around), w = Math.min(s.clip.w, vp.width), h = Math.min(s.clip.h, vp.height);
       clip = { x: Math.max(0, Math.min(vp.width - w, p.x - w / 2)), y: Math.max(0, Math.min(vp.height - h, p.y - h / 2)), width: w, height: h };
-    } else if (s.clip?.union) {
-      const bs = (await Promise.all(s.clip.union.map((q) => page.locator(q).first().boundingBox()))).filter(Boolean);
-      const x = Math.min(...bs.map((b) => b.x)), y = Math.min(...bs.map((b) => b.y));
-      clip = { x, y, width: Math.max(...bs.map((b) => b.x + b.width)) - x, height: Math.max(...bs.map((b) => b.y + b.height)) - y };
     }
     const dir = s.name.startsWith("_") ? path.join(here, "build", "shots") : shotsDir; // "_name": a scratch shot for compare
     mkdirSync(dir, { recursive: true });

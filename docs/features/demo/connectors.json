@@ -13,7 +13,7 @@
   "dist": 1.0,
   "lift": 0.12
  },
- "css": "#__cursor { display: none !important } #status, #info, #xfCard { visibility: hidden !important }",
+ "css": "#__cursor { display: none !important } #info, #xfCard { visibility: hidden !important }",
  "steps": [
   {
    "do": "load"
@@ -21,6 +21,43 @@
   {
    "do": "script",
    "file": "connectors.js"
+  },
+  {
+   "do": "click",
+   "target": "[data-gz=conn]"
+  },
+  {
+   "do": "click",
+   "target": "#connAll"
+  },
+  {
+   "do": "eval",
+   "js": "prepare()"
+  },
+  {
+   "do": "shot",
+   "name": "connectors-tool"
+  },
+  {
+   "do": "click",
+   "target": "#partsBody tr:has-text('Left hand')"
+  },
+  {
+   "do": "click",
+   "target": "#connRows .cRow:has-text('Broom stick')"
+  },
+  {
+   "do": "eval",
+   "js": "document.getElementById('connBox').scrollIntoView({ block: 'center' })"
+  },
+  {
+   "do": "shot",
+   "name": "connectors-part",
+   "clip": "#connBox"
+  },
+  {
+   "do": "click",
+   "target": "#connDone"
   },
   {
    "do": "eval",
@@ -35,30 +72,6 @@
     760,
     600
    ]
-  },
-  {
-   "do": "eval",
-   "js": "app.S.active = 0; app.refreshUI(); document.getElementById('partsWrap').scrollIntoView({ block: 'center' })"
-  },
-  {
-   "do": "shot",
-   "name": "connectors-list",
-   "clip": {
-    "union": [
-     "#connPrint",
-     "#partsWrap",
-     "#connSec"
-    ]
-   }
-  },
-  {
-   "do": "eval",
-   "js": "part('Left hand'); document.querySelectorAll('#connRows .cRow')[1].click(); document.getElementById('connBox').scrollIntoView({ block: 'center' })"
-  },
-  {
-   "do": "shot",
-   "name": "connectors-ui",
-   "clip": "#connBox"
   },
   {
    "do": "eval",

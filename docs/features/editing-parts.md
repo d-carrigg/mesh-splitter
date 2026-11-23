@@ -82,52 +82,39 @@ Swaps a part for another STL or 3MF. The replacement keeps the part's name and f
 
 ## Connectors
 
-Adds a peg and a matching hole where two parts meet, like the connectors in OrcaSlicer's Cut tool, so parts you print separately line up and glue together.
+Adds a peg and a matching hole where two parts touch, so parts you print separately line up and glue together.
 
-![A connector: its ghost in the view, then the exported foot and base, and the arm pulled off the body at the shoulder](img/connectors.png)
+![A connector's ghost in the view, the exported foot and base, and the arm pulled off the body at the shoulder](img/connectors.png)
 
-Connectors go on **seams**: the places where two parts touch. A part has one seam for each part it touches, so a hand gets one to the arm and one to the stick it holds, and each seam can have its own connector. Where three parts meet, like a robot's hips, each pair's seam is its own flat face, so the parts' seams there can all take a connector.
+### Add connectors
 
-Connectors are placed for you: each sits at the point of its seam farthest from the edge, points straight through it, and is the largest size that fits (up to 12 mm, as deep as it is wide or, if that doesn't fit, a bit shallower). The hole goes in whichever part has room for the bigger one (on a tie, the peg goes on the smaller part).
+1. Click **Connectors** in the toolbar, next to Move, Rotate and Scale.
+2. Set the type and the other settings in its panel.
+3. Click **Add to all parts**. To connect only some parts, Ctrl+click two or more touching parts and click **Add to selected parts**. It connects only the seams between them.
 
-### How to use it
+![The Connectors tool after Add to all parts](img/connectors-tool.png)
 
-- **Every seam at once:** click **Connect all seams** under **Connectors**. Each seam without a connector gets a plug where one fits. **Remove all** takes them all off.
-- **One part's seams:** select the part. Its card lists its seams under **Connectors**: tick a seam to give it a plug, or click **Connect all** to do them all.
-- **A few parts:** Ctrl+click or Shift+click parts in the list, then click **Connect N seams between these parts** (the seams where the selected parts touch each other). When they don't touch each other, the button connects all of their seams instead.
-
-The line under **Connectors** counts them: "11 of 14 seams · 3 too small". Point at a count to see which seams it means.
-
-![The parts list with brackets for connected parts, and the Connectors section](img/connectors-list.png)
-
-- In the parts list, a pin icon shows how many connectors a part has (red when one doesn't fit). A bracket in the left margin joins each pair of connected parts; it's highlighted while you point at or select one of them.
-- **Skip pins under** (1 to 10 mm, 3 mm to start): a seam whose best pin is smaller than this gets none, and its row says **Too small**. Moving the slider updates the automatic connectors right away. Connectors whose size you've set stay as they are.
-
-### Change a connector
-
-Click a seam in the part card to open its settings under it. With several parts selected, the settings apply to every connector listed, and a field shows **Mixed** where they differ.
-
-![A part's seams, with one open](img/connectors-ui.png)
+The status bar says what was added, for example "Added 11 connectors; 1 seam too small". Each connector sits where its seam has the most room and is the largest that fits, up to 12 mm. Adding again replaces the connectors on those seams. **Remove all** takes every connector off.
 
 | Setting | What it does |
 | --- | --- |
-| **Type** | **None**, **Plug** (a peg on one part and a hole in the other) or **Dowel** (a hole in both parts, plus a separate peg that exports as its own part, named "*part A* – *part B* dowel"). |
-| **Shape** | Circle, square, hexagon or triangle cross-section. Square, hexagon and triangle pegs can't turn in their holes. |
-| **Prism / Frustum** | Straight sides, or tapered to 60% at the tip, which eases fitting and avoids a flat overhang at the tip. |
-| **Size** | Width across flats (a circle's diameter), in mm. Setting it (or **Depth**) fixes the size; until then it follows the seam. |
-| **Depth** | How far the peg goes into the other part, in mm. A dowel goes this far into each part. |
-| **Clearance** | Gap added to the hole on every side, in mm (the hole is also 0.2 mm plus the clearance deeper than the peg). 0.1 to 0.2 mm suits most PLA and PETG prints. |
-| **Peg on** | Which part gets the peg. With several parts selected, **Swap sides** flips each one. |
+| **Type** | **Plug** puts a peg on one part and a hole in the other. **Dowel** puts a hole in both parts and makes a separate peg that exports as its own part. |
+| **Shape** | Circle, square, hexagon or triangle. Only a round peg can turn in its hole. |
+| **Style** | **Prism** has straight sides. **Frustum** tapers to 60% at the tip, which eases fitting. |
+| **Clearance** | The gap added to the hole on every side, in mm. 0.1 to 0.2 mm suits most PLA and PETG prints. |
+| **Smallest pin** | A seam whose largest pin is smaller than this, in mm, gets no connector. |
 
-### Where it goes
+### Change a part's connectors
 
-- Connectors are built into **Part STLs** and the **multi-part 3MF** (Print as **Parts**, including Send to Orca). In OrcaSlicer, right-click the object > **Split** > **To objects** to print the parts apart.
-- One part, Painted and the Merged STL print the model as one piece, so they have no connectors. Under **Print as**, a note says so, with a **Print as Parts** button.
-- In the view, each peg shows as a see-through ghost at its seam, in its part's color, with the hole's outline in white. Both turn red when it doesn't fit. Pointing at a seam in the card outlines it in the view; clicking a ghost opens its seam in the card.
-- A seam's row says in red why its connector doesn't fit, for example the hole breaks out of its part (it wants 0.8 mm of wall around it) or the seam is too slanted. The connector is left out of the files until it fits.
-- Some seams can't take a connector, and their rows say why: a part replaced with a file or with **Trim overlap** on, a recess, or **At the cut** set to Fill or Anchor (the parts print joined).
-- When the parts change so that two parts no longer touch, their connector is kept but left out, and the line under **Connectors** says how many lost their seam.
-- Undo (Ctrl+Z) works on every change, and sessions save connectors. The command line doesn't add connectors yet.
+Click a part. Its connectors are listed at the bottom of its **Part** section, by the part on the other side. Click one to change its **Type** (**None** removes it), **Shape**, **Style**, **Size**, **Depth**, **Clearance** or which part gets the peg (**Peg on**). With several parts selected, a change applies to all of their connectors. Clicking a connector's ghost in the view also opens it here.
+
+![Left hand's connectors, with the one to the broom stick open](img/connectors-part.png)
+
+A connector that doesn't fit turns red and says why, for example that its hole breaks out of the part. It's left out of the files until it fits. In the parts list, a pin icon counts each part's connectors, and a bracket in the left margin joins each pair of connected parts.
+
+### Where they print
+
+Connectors are built into **Part STLs** and the multi-part 3MF (**Print as** **Parts**, including Send to Orca). **One part**, **Painted** and the merged STL print the model as one piece, so they leave connectors out. Under **Print as**, a note says so and offers a **Print as Parts** button.
 
 ## Show only this part
 
