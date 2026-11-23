@@ -738,5 +738,59 @@ class ReleaseNotesTests(unittest.TestCase):
         self.assertEqual(plain_changelog("- Faster splitting\n- Fix crash"), "- Faster splitting\n- Fix crash")
 
 
+
+class PublishTests(unittest.TestCase):
+    """publish.sh, the step publish-orcacloud.yml runs, against a local stand-in for GitHub OIDC and OrcaCloud."""
+
+    def publish(self, changelog, status=201):
+        import email.parser, http.server, subprocess, threading
+        got = {}
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a): pass
+
+            def do_GET(self):
+                got["oidc_auth"] = self.headers["Authorization"]
+                self.send_response(200); self.end_headers(); self.wfile.write(b'{"value": "oidc-jwt"}')
+
+            def do_POST(self):
+                body = self.rfile.read(int(self.headers["Content-Length"]))
+                msg = email.parser.BytesParser().parsebytes(f"Content-Type: {self.headers['Content-Type']}\r\n\r\n".encode() + body)
+                got["auth"] = self.headers["Authorization"]
+                got["parts"] = {p.get_param("name", header="content-disposition"): (p.get_filename(), p.get_payload(decode=True)) for p in msg.get_payload()}
+                self.send_response(status); self.end_headers(); self.wfile.write(b'{"ok": true}')
+
+        srv = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        url = f"http://127.0.0.1:{srv.server_port}"
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                whl, notes = Path(d) / "mesh_splitter_any.whl", Path(d) / "changelog.txt"
+                whl.write_bytes(b"PK wheel bytes")
+                notes.write_text(changelog, encoding="utf-8")
+                r = subprocess.run(["bash", str(HERE / "publish.sh"), "v0.3.6", str(whl), str(notes)], cwd=d, capture_output=True, text=True,
+                                   env={**os.environ, "ACTIONS_ID_TOKEN_REQUEST_URL": f"{url}/oidc?v=1", "ACTIONS_ID_TOKEN_REQUEST_TOKEN": "gh-req",
+                                        "ORCACLOUD_API": f"{url}/releases"})
+        finally:
+            srv.shutdown()
+        return r, got
+
+    def test_sends_version_changelog_and_wheel_exactly(self):
+        changelog = '- Fix: Send to Orca; works after "Open as project"\n- New: 100% <plain> & `text`'
+        r, got = self.publish(changelog)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(got["oidc_auth"], "Bearer gh-req")
+        self.assertEqual(got["auth"], "Bearer oidc-jwt")
+        self.assertEqual(json.loads(got["parts"]["metadata"][1]), {"version": "0.3.6", "changelog": changelog})
+        self.assertEqual(got["parts"]["files"], ("mesh_splitter_any.whl", b"PK wheel bytes"))
+
+    def test_empty_changelog_sends_version_only(self):
+        r, got = self.publish("")
+        self.assertEqual(json.loads(got["parts"]["metadata"][1]), {"version": "0.3.6"})
+
+    def test_fails_unless_orcacloud_answers_created(self):
+        r, _ = self.publish("- Fix: x", status=400)
+        self.assertNotEqual(r.returncode, 0)
+
 if __name__ == "__main__":
     unittest.main()

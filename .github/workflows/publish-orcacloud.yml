@@ -59,18 +59,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$TAG" "$WHL" --clobber
       - name: Publish release to OrcaCloud
-        run: |
-          set -euo pipefail
-          oidc_token="$(curl -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=orcacloud" | jq -r .value)"
-          version="${TAG#v}"
-          changelog="$(cat ../changelog.txt)"
-          metadata="$(jq -cn --arg version "$version" --arg changelog "$changelog" \
-            '{version: $version} + (if $changelog == "" then {} else {changelog: $changelog} end)')"
-          status="$(curl -sS -o response.json -w '%{http_code}' \
-            -H "Authorization: Bearer $oidc_token" \
-            --form-string "metadata=$metadata" -F "files=@$WHL" \
-            https://api.orcaslicer.com/api/v1/plugin-publish/releases)"
-          cat response.json
-          echo
-          [ "$status" = "201" ]
+        run: ./publish.sh "$TAG" "$WHL" ../changelog.txt
