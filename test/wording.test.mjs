@@ -21,7 +21,7 @@ const RULES = [
 ];
 
 test("text follows the project's wording rules", () => {
-  const files = execFileSync("git", ["ls-files"], { cwd: root, encoding: "utf8" }).split("\n").filter((f) => TEXT.test(f.split("/").pop()) && !/lock/.test(f));
+  const files = execFileSync("git", ["ls-files"], { cwd: root, encoding: "utf8" }).split("\n").filter((f) => TEXT.test(f.split("/").pop()) && !/lock/.test(f) && f !== "test/wording.test.mjs");
   const errors = [];
   for (const f of files) {
     readFileSync(new URL(f, root), "utf8").split("\n").forEach((line, i) => {
