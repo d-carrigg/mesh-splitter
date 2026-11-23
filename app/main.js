@@ -2175,8 +2175,6 @@ function refreshUI() {
       openPartMenu(ev, i);
     };
     tr.querySelector(".eye").onclick = () => { p.visible = !p.visible; updateVisibility(); drawSeeds(); refreshUI(); };
-    tr.onmouseenter = () => { linkHover = i; drawPartLinks(); };
-    tr.onmouseleave = () => { if (linkHover === i) { linkHover = -1; drawPartLinks(); } };
     if (i) tr.querySelector(".nm").ondblclick = (ev) => { ev.stopPropagation(); startRename(i); };
     tr.dataset.part = i; tr.dataset.k = key;
     body.appendChild(tr); // appending a reused row moves it into its new place
@@ -3038,11 +3036,9 @@ function connScope() {
 const connWhat = (e) => (!e || e.state === "lost" ? "" : e.state === "small" ? (e.d ? `Too small (${e.d} mm)` : "Too small") : `${e.c.peg ? "Plug" : "Dowel"} ${e.d} mm`);
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 function connLostName(c) { const nm = (u) => S.parts.find((q, j) => j > 0 && q.uid === u)?.name || "a deleted part"; return `${nm(c.a)} and ${nm(c.b)}`; }
-// Links drawn in the parts list's left gutter: [{ a, b (part indexes), kind, bad }]. Each kind has its color.
-const LINK_COLORS = { conn: "var(--acch)" };
-let linkHover = -1;
+// Brackets in the parts list's left gutter, one per connector: [{ a, b (part indexes), bad }].
 function partLinks() {
-  return connState().list.filter((e) => e.state === "ok" || e.state === "bad").map((e) => ({ a: e.s.a, b: e.s.b, kind: "conn", bad: e.state === "bad" }));
+  return connState().list.filter((e) => e.state === "ok" || e.state === "bad").map((e) => ({ a: e.s.a, b: e.s.b, bad: e.state === "bad" }));
 }
 function drawPartLinks() {
   const svg = $("partsLinks"), wrap = $("partsWrap"), rows = new Map();
@@ -3054,11 +3050,11 @@ function drawPartLinks() {
     let k = 0; while (lanes[k]?.some(([y1, y2]) => l.y1 <= y2 && y1 <= l.y2)) k++;
     (lanes[k] ||= []).push([l.y1, l.y2]); l.lane = k;
   }
-  const gut = Math.max(12, 8 + 4 * lanes.length), hi = new Set([...selected(), linkHover]);
+  const gut = Math.max(12, 8 + 4 * lanes.length), hi = new Set(selected());
   wrap.style.setProperty("--gut", `${gut}px`);
   svg.setAttribute("width", gut); svg.setAttribute("height", wrap.offsetHeight);
   svg.innerHTML = links.map((l) => { const x = gut - 5 - 4 * l.lane, xe = gut - 1;
-    return `<path class="${l.bad ? "bad" : ""}${hi.has(l.a) || hi.has(l.b) ? " hi" : ""}" style="stroke:${l.bad ? "" : LINK_COLORS[l.kind]}" d="M${xe} ${l.y1}H${x}V${l.y2}H${xe}"/>`; }).join("");
+    return `<path class="${l.bad ? "bad" : ""}${hi.has(l.a) || hi.has(l.b) ? " hi" : ""}" d="M${xe} ${l.y1}H${x}V${l.y2}H${xe}"/>`; }).join("");
 }
 function refreshConnUI() {
   if (!S.G) return;

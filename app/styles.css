@@ -83,7 +83,7 @@ table.parts button:hover { color:var(--fg); background:none; }
 /* connectors: the parts list's left gutter links connected parts (brackets, one lane each where they'd overlap) */
 #partsWrap { position:relative; --gut:12px; }
 #partsLinks { position:absolute; left:0; top:0; pointer-events:none; overflow:visible; }
-#partsLinks path { fill:none; stroke-width:1; opacity:.5; }
+#partsLinks path { fill:none; stroke:var(--acch); stroke-width:1; opacity:.5; }
 #partsLinks path.bad { stroke:#f06060; }
 #partsLinks path.hi { stroke-width:2; opacity:1; }
 #partsWrap table.parts td:first-child { padding-left:var(--gut); }
