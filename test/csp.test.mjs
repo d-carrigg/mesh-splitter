@@ -14,8 +14,8 @@ const HOST_INJECTED = ["https://static.cloudflareinsights.com/beacon.min.js"];
 
 function allows(directive, url) {
   const list = csp[directive] ?? csp["default-src"], u = new URL(url, "https://splitmesh.carrigg.dev/");
-  return list.some((s) => s === "'self'" ? u.origin === "https://splitmesh.carrigg.dev" : s === `${u.protocol}`
-    || (s.includes("://") && new RegExp(`^${s.replace(/[.]/g, "\\.").replace(":*", "(:\\d+)?").replace("*.", "[^/]+\\.")}(/|$)`).test(u.origin + "/")));
+  return list.some((s) => s === "'self'" ? u.origin === "https://splitmesh.carrigg.dev"
+    : s === u.protocol || s === u.origin || (s.endsWith(":*") && `${u.protocol}//${u.hostname}` === s.slice(0, -2)));
 }
 
 test("the site's CSP allows every script, style and request the page makes", () => {
