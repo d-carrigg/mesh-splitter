@@ -38,7 +38,6 @@ GRANT_KEYS = {"fs_readwrite": "fs_readwrite", "process": "process", "network": "
 
 
 def requested_permissions():
-    """The install_state grants for what plugin.py asks orca.request_permissions for at load."""
     import importlib.util
     fake_orca.install([])
     import orca

@@ -722,10 +722,7 @@ class SendToOrcaTests(unittest.TestCase):
 
 
 class SendSequenceModel(unittest.TestCase):
-    """Every order of Send to Orca (each mode), Open as project and deleting the original in OrcaSlicer, up to DEPTH
-    steps, run on the real plugin.py and project3mf.py under fake_orca, with the page's side as app/main.js
-    orcaSendToPlate does it. Checks that each Send works and that a replace removes only the model that was split.
-    #95 addressed the source by its id and the second Send after Open as project failed (#102); this replays it.
+    """The page side of step() copies ORCA.save in app/main.js. #95 broke the second Send after Open as project (#102).
     See .claude/skills/verify-send-to-orca/SKILL.md."""
     DEPTH = 4
     MODES = ("add", "replace_object", "replace_plate")
@@ -819,8 +816,6 @@ class ReleaseNotesTests(unittest.TestCase):
 
 
 class PublishTests(unittest.TestCase):
-    """publish.sh, the step publish-orcacloud.yml runs, against a local stand-in for GitHub OIDC and OrcaCloud."""
-
     def publish(self, changelog, status=201):
         import email.parser, http.server, subprocess, threading
         got = {}

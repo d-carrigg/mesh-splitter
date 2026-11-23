@@ -863,8 +863,9 @@ function healSoup(i, orig, out) {
 // ---------------------------------------------------------------- fill / anchor
 // When a part moves away from a neighbor, the cut between them opens and each side shows a hole. part.gap says what
 // happens there: unset (Open, the default) shows the gap. "fill" closes each side with a patch that follows the
-// surrounding surface, so the body stays smooth where a hand used to rest. "anchor" keeps the part joined instead: new material sweeps from the neighbor's rim to the part's
-// moved cut, along the same turn, so an arm turned at the shoulder stays attached to the body.
+// surrounding surface, so the body stays smooth where a hand used to rest. "anchor" keeps the part joined instead:
+// new material sweeps from the neighbor's rim to the part's moved cut, along the same turn, so an arm turned at the
+// shoulder stays attached to the body.
 let twinCache = { key: null, map: null }, loopCache = new Map();
 function twinLabels(hash) { // directed edge a->b (key a*nV+b) -> label of the face that has it
   const key = `${S.nF}|${hash}`;

@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Publishes WHL to OrcaCloud as version TAG (vX.Y.Z) with CHANGELOG (plain text) as its changelog.
-# Runs in publish-orcacloud.yml; test_plugin.py PublishTests runs it against a local server.
 #   publish.sh TAG WHL CHANGELOG
 set -euo pipefail
 tag="$1" whl="$2" changelog="$(cat "$3")"

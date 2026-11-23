@@ -1,7 +1,5 @@
 name: Checks
 
-# The fast checks: `npm run check`, the same command you run locally. No OrcaSlicer, no browser.
-# The slow ones (end-to-end, real OrcaSlicer, command line binaries) stay on the Release Please PR.
 on:
   pull_request:
   workflow_dispatch:
