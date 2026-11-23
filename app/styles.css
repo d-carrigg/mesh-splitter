@@ -79,11 +79,39 @@ table.parts button:hover { color:var(--fg); background:none; }
 #partCard .pr > .lbl { flex:1; }
 #partCard input[type=text] { border-color:var(--line); background:var(--bg); width:190px; }
 #repName { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-#repOpts.hide, #healRow.hide, #anchorRow.hide, #connBox.hide, #connOpts.hide, #connOnRow.hide { display:none; }
-#connBox { display:flex; flex-direction:column; gap:6px; border-top:1px solid var(--sep); padding-top:9px; margin-top:4px; }
-#connOpts { display:flex; flex-direction:column; gap:6px; }
-#connWarn { color:#f06060; }
-#connWarn:empty, #connNote:empty { display:none; }
+#repOpts.hide, #healRow.hide, #anchorRow.hide { display:none; }
+/* connectors: the parts list's left gutter links connected parts (brackets, one lane each where they'd overlap) */
+#partsWrap { position:relative; --gut:12px; }
+#partsLinks { position:absolute; left:0; top:0; pointer-events:none; overflow:visible; }
+#partsLinks path { fill:none; stroke-width:1; opacity:.5; }
+#partsLinks path.bad { stroke:#f06060; }
+#partsLinks path.hi { stroke-width:2; opacity:1; }
+#partsWrap table.parts td:first-child { padding-left:var(--gut); }
+table.parts td.pins { color:var(--acch); font-size:11px; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+table.parts td.pins.bad { color:#f06060; }
+table.parts td.pins svg.i { width:12px; height:12px; vertical-align:-2px; margin-right:1px; }
+#connSum span[title] { text-decoration:underline dotted; text-underline-offset:2px; cursor:help; }
+#connSec .pr { display:flex; align-items:center; gap:8px; }
+#connSec .pr .lbl { flex:1; }
+#connMin { width:120px; accent-color:var(--acc); }
+#connMinOut { width:40px; text-align:right; font-variant-numeric:tabular-nums; }
+#connPrint { display:flex; align-items:center; gap:8px; color:#f5a623; }
+#connPrint button { flex:none; }
+#connBox { display:flex; flex-direction:column; gap:4px; border-top:1px solid var(--sep); padding-top:9px; margin-top:4px; }
+html button.link { background:none; border:none; color:var(--acch); padding:0; min-height:0; }
+html button.link:hover { background:none; text-decoration:underline; }
+.cRow { display:flex; align-items:center; gap:6px; min-height:24px; padding:1px 6px 1px 2px; border-radius:3px; cursor:pointer; }
+.cRow:hover { background:var(--hov); }
+.cRow.open { background:var(--sel); }
+.cRow input { margin:0 2px; accent-color:var(--acc); }
+.cRow .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cRow .what { color:var(--mute); font-size:11px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.cRow.dim .what { font-style:italic; }
+.cRow.bad .what, .cWhy { color:#f06060; }
+.cWhy { font-size:11px; padding:0 6px 3px 26px; }
+.cWhy.note { color:var(--mute); }
+#connEd { display:flex; flex-direction:column; gap:6px; margin:2px 0 6px 10px; padding:4px 0 4px 10px; border-left:2px solid var(--acc); }
+#connNote:empty { display:none; }
 #partCard select { background:var(--in); color:var(--fg); border:1px solid var(--line); border-radius:3px; font:inherit; padding:1px 4px; }
 
 /* canvas */

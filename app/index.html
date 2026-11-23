@@ -27,14 +27,23 @@
       </div></span>
   </div>
   <div class="sc"><div id="fileName">Open a model</div><div id="fileInfo"></div>
-    <div class="row needMesh" style="margin:0"><span class="lbl" style="flex:1">Print as</span><span class="seg" id="printAs"><button data-mode="one" title="One part on one filament: edit the model and print it. Part colors only tell the parts apart">One part</button><button data-mode="paint" title="One part, painted: each part's faces are painted with its filament (OrcaSlicer color painting)">Painted</button><button data-mode="parts" title="Separate parts: each part is its own part on its own filament (multi-material)">Parts</button></span></div></div>
+    <div class="row needMesh" style="margin:0"><span class="lbl" style="flex:1">Print as</span><span class="seg" id="printAs"><button data-mode="one" title="One part on one filament: edit the model and print it. Part colors only tell the parts apart">One part</button><button data-mode="paint" title="One part, painted: each part's faces are painted with its filament (OrcaSlicer color painting)">Painted</button><button data-mode="parts" title="Separate parts: each part is its own part on its own filament (multi-material)">Parts</button></span></div>
+    <div id="connPrint" class="small" hidden><span id="connPrintText"></span> <button id="connPrintParts" title="Print each part on its own, with its connectors">Print as Parts</button></div></div>
   <div class="sh"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>Parts<span class="spacer"></span>
     <button id="mergeBtn" data-icon="merge" title="Merge the selected parts" hidden>Merge</button>
     <button id="showAll" data-icon="eye" title="Show all parts"></button>
     <button id="addPart" data-icon="plus" title="New part: click it on the model">Add</button>
     <button id="aiToggle" data-icon="sparkle" title="Name parts with AI, and check parts">AI names</button>
   </div>
-  <table class="parts"><tbody id="partsBody"></tbody></table>
+  <div id="partsWrap"><svg id="partsLinks" aria-hidden="true"></svg><table class="parts"><tbody id="partsBody"></tbody></table></div>
+  <div class="sh needMesh"><svg class="i" viewBox="0 0 24 24"><path d="M9 14V4h6v10"/><path d="M4 14h16v6H4z"/></svg>Connectors<span class="spacer"></span>
+    <button id="connAll" title="Put a plug on every seam where two parts touch, placed and sized to fit. Seams that already have a connector keep it.">Connect all seams</button>
+    <button id="connNone" title="Remove every connector">Remove all</button>
+  </div>
+  <div class="sc needMesh" id="connSec">
+    <div id="connSum" class="small"></div>
+    <label class="pr" title="Only affects automatic pins: a seam whose best pin is smaller than this gets none. Pins you've edited stay."><span class="lbl">Skip pins under</span><input id="connMin" type="range" min="1" max="10" step="0.5"><output id="connMinOut" class="small"></output></label>
+  </div>
   <div id="partCard" hidden>
     <div class="sh">Part<span class="spacer"></span>
       <button id="soloBtn" data-icon="solo" title="Show only this part">Solo</button>
@@ -59,18 +68,18 @@
         <label id="repFitL" class="small" title="Scale the replacement so its longest dimension matches the old part's"><input id="repFit" type="checkbox"> fit</label>
         <label id="repEmbedL" class="small" title="How far the replacement sinks into the rest so the slicer fuses them">embed <input id="repEmbed" type="number" step="0.5" min="0" style="width:48px"> mm</label>
       </div>
-      <div id="connBox" title="Connector: a peg and a matching hole where this part joins the part across its cut, so printed pieces line up and glue together. Added to Part STLs and the multi-part 3MF.">
-        <div class="pr"><span class="lbl">Connector</span>
-          <span class="seg" id="connType"><button data-ct="" title="No connector">None</button><button data-ct="plug" title="Plug: a peg on one part and a matching hole in the other">Plug</button><button data-ct="dowel" title="Dowel: a hole in both parts and a separate peg that prints on its own">Dowel</button></span></div>
-        <div class="pr"><span class="lbl small" id="connSel"></span><button id="connAll" data-icon="plus" title="Add an automatically placed and sized plug to every part's main cut that has none yet (one per cut, only where it fits). Then select a part to change or remove its connector.">All parts</button><button id="connNone" title="Remove every connector">Remove all</button></div>
-        <div id="connOpts">
-          <div class="pr"><span class="lbl">Shape</span><select id="connShape" title="Cross-section of the peg"><option value="circle">Circle</option><option value="square">Square</option><option value="hex">Hexagon</option><option value="triangle">Triangle</option></select>
+      <div id="connBox">
+        <div class="pr"><span class="lbl">Connectors</span><button id="connPart" class="link" title="Put a plug on each of these seams that has none"></button></div>
+        <button id="connSel" class="pri" title="Put a plug on each of these seams that has none"></button>
+        <div id="connRows"></div>
+        <div id="connEd">
+          <div class="pr"><span class="lbl">Type</span><span class="seg" id="connType"><button data-ct="" title="No connector">None</button><button data-ct="plug" title="Plug: a peg on one part and a matching hole in the other">Plug</button><button data-ct="dowel" title="Dowel: a hole in both parts and a separate peg that prints on its own">Dowel</button></span></div>
+          <div class="pr connOpt"><span class="lbl">Shape</span><select id="connShape" title="Cross-section of the peg"><option value="mixed" disabled hidden>Mixed</option><option value="circle">Circle</option><option value="square">Square</option><option value="hex">Hexagon</option><option value="triangle">Triangle</option></select>
             <span class="seg" id="connStyle"><button data-cs="prism" title="Prism: straight sides">Prism</button><button data-cs="frustum" title="Frustum: tapers to 60% at the tip, which eases fitting and overhangs">Frustum</button></span></div>
-          <div class="pr"><span class="lbl" title="Width across flats (a circle's diameter)">Size</span><input id="connD" type="number" min="1" step="0.5"><span class="small">mm</span>
+          <div class="pr connOpt"><span class="lbl" title="Width across flats (a circle's diameter)">Size</span><input id="connD" type="number" min="1" step="0.5"><span class="small">mm</span>
             <span class="lbl" style="flex:0" title="How far the peg goes into the other part (a dowel goes this far into each part)">Depth</span><input id="connDepth" type="number" min="1" step="0.5"><span class="small">mm</span></div>
-          <div class="pr"><span class="lbl" title="Gap added to the hole on every side (and at its bottom) so the peg slides in. 0.1 to 0.2 mm suits most PLA and PETG prints">Clearance</span><input id="connClr" type="number" min="0" max="2" step="0.05"><span class="small">mm</span></div>
-          <div class="pr" id="connOnRow"><span class="lbl">Peg on</span><span class="seg"><button id="connOnThis" title="The peg sticks out of this part">This part</button><button id="connOnNb"></button></span></div>
-          <div id="connWarn" class="small"></div>
+          <div class="pr connOpt"><span class="lbl" title="Gap added to the hole on every side (and at its bottom) so the peg slides in. 0.1 to 0.2 mm suits most PLA and PETG prints">Clearance</span><input id="connClr" type="number" min="0" max="2" step="0.05"><span class="small">mm</span></div>
+          <div class="pr connOpt" id="connOnRow"><span class="lbl">Peg on</span><span class="seg" id="connOn"></span></div>
           <div id="connNote" class="small"></div>
         </div>
       </div>
