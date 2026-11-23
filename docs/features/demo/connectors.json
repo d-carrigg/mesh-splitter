@@ -1,0 +1,87 @@
+{
+ "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+ "model": "curler.stl",
+ "out": null,
+ "viewport": {
+  "width": 1200,
+  "height": 800
+ },
+ "deviceScaleFactor": 1.5,
+ "camera": {
+  "az": -20,
+  "el": 18,
+  "dist": 1.0,
+  "lift": 0.12
+ },
+ "css": "#__cursor { display: none !important } #status, #info, #xfCard { visibility: hidden !important }",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "script",
+   "file": "connectors.js"
+  },
+  {
+   "do": "eval",
+   "js": "app.S.active = 8; app.refreshUI(); document.getElementById('connBox').scrollIntoView({ block: 'center' }); cam([C.foot[0] - 150, C.foot[1] + 120, C.foot[2] + 70], [C.foot[0] + 10, C.foot[1] - 10, C.foot[2] + 10])"
+  },
+  {
+   "do": "shot",
+   "name": "_c-view",
+   "clip": [
+    350,
+    120,
+    760,
+    600
+   ]
+  },
+  {
+   "do": "shot",
+   "name": "connectors-ui",
+   "clip": "#connBox"
+  },
+  {
+   "do": "eval",
+   "js": "app.S.active = 0; app.refreshUI(); explode(['Part 8', 'Part 6'], { 'Part 8': [8, -26] }); cam([C.foot[0] - 120, C.foot[1] - 150, C.foot[2] - 30], [C.foot[0] + 12, C.foot[1] + 4, C.foot[2] + 8])"
+  },
+  {
+   "do": "shot",
+   "name": "_c-foot",
+   "clip": [
+    350,
+    120,
+    760,
+    600
+   ]
+  },
+  {
+   "do": "eval",
+   "js": "explode(['Part 2', 'Part 3', 'Part 2 dowel'], { 'Part 2': [2, -34], 'Part 2 dowel': [2, -17] }); cam([C.broom[0] + 140, C.broom[1] - 40, C.broom[2] + 55], [C.broom[0] - 10, C.broom[1] + 30, C.broom[2] + 18])"
+  },
+  {
+   "do": "shot",
+   "name": "_c-broom",
+   "clip": [
+    350,
+    120,
+    760,
+    600
+   ]
+  },
+  {
+   "do": "compare",
+   "shots": [
+    "_c-view",
+    "_c-foot",
+    "_c-broom"
+   ],
+   "labels": [
+    "In the view: the peg's ghost at the cut",
+    "Exported: hex frustum peg, matching hole",
+    "Dowel: holes in both, a separate peg"
+   ],
+   "name": "connectors"
+  }
+ ]
+}

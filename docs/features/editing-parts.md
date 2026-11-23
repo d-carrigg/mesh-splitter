@@ -7,6 +7,7 @@ Fix, swap, view and name parts after a split. Every edit can be undone with Ctrl
 - [Merge](#merge)
 - [Delete geometry](#delete-geometry)
 - [Replace with…](#replace-with)
+- [Connectors](#connectors)
 - [Show only this part](#show-only-this-part)
 - [Rename](#rename)
 
@@ -78,6 +79,39 @@ Swaps a part for another STL or 3MF. The replacement keeps the part's name and f
 - **in place:** switch between in place and on the joint.
 - The move / rotate / scale handles work on the replacement too.
 - The trash button next to **Replace…** removes the replacement and brings the old part back.
+
+## Connectors
+
+Adds a peg and a matching hole where two parts meet, like the connectors in OrcaSlicer's Cut tool, so parts you print separately line up and glue together.
+
+![A connector: its ghost in the view, then the exported foot and base, and a dowel between the broom and the hand](img/connectors.png)
+
+### How to use it
+
+1. Select the part. The connector goes on its main cut: the one toward the bigger part it joins, such as a foot's cut to the base.
+2. Under **Connector**, pick **Plug** or **Dowel**.
+   - **Plug:** a peg on one part and a hole in the other. **Peg on** picks which part gets the peg.
+   - **Dowel:** a hole in both parts, plus a separate peg that exports as its own part (named "*part* dowel").
+3. Adjust it if you need to. It starts at the largest size that fits the cut.
+
+![The Connector settings in the Part section](img/connectors-ui.png)
+
+| Setting | What it does |
+| --- | --- |
+| **Shape** | Circle, square, hexagon or triangle cross-section. Square, hexagon and triangle pegs can't turn in their holes. |
+| **Prism / Frustum** | Straight sides, or tapered to 60% at the tip, which eases fitting and avoids a flat overhang at the tip. |
+| **Size** | Width across flats (a circle's diameter), in mm. |
+| **Depth** | How far the peg goes into the other part, in mm. A dowel goes this far into each part. |
+| **Clearance** | Gap added to the hole on every side, in mm (the hole is also 0.2 mm plus the clearance deeper than the peg). 0.1 to 0.2 mm suits most PLA and PETG prints. |
+
+### Where it goes
+
+- The connector is built into **Part STLs** and the **multi-part 3MF** (Print as **Parts**, including Send to Orca). In OrcaSlicer, right-click the object > **Split** > **To objects** to print the parts apart.
+- One part, Painted and the Merged STL print the model as one piece, so they have no connectors.
+- In the view, the peg shows as a see-through ghost at the cut, in its part's color, with the hole's outline in white. Both turn red when it doesn't fit.
+- The part card says why a connector doesn't fit: the hole breaks out of its part (it wants 0.8 mm of wall around it), or the cut doesn't go around the connector's axis. The connector is left out of the files until it fits.
+- With **At the cut** set to Fill or Anchor, the parts print joined, so there's no connector.
+- Undo (Ctrl+Z) works on every change. The command line doesn't add connectors yet.
 
 ## Show only this part
 

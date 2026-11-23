@@ -79,7 +79,12 @@ table.parts button:hover { color:var(--fg); background:none; }
 #partCard .pr > .lbl { flex:1; }
 #partCard input[type=text] { border-color:var(--line); background:var(--bg); width:190px; }
 #repName { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-#repOpts.hide, #healRow.hide, #anchorRow.hide { display:none; }
+#repOpts.hide, #healRow.hide, #anchorRow.hide, #connBox.hide, #connOpts.hide, #connOnRow.hide { display:none; }
+#connBox { display:flex; flex-direction:column; gap:6px; border-top:1px solid var(--sep); padding-top:9px; margin-top:4px; }
+#connOpts { display:flex; flex-direction:column; gap:6px; }
+#connWarn { color:#f06060; }
+#connWarn:empty, #connNote:empty { display:none; }
+#partCard select { background:var(--in); color:var(--fg); border:1px solid var(--line); border-radius:3px; font:inherit; padding:1px 4px; }
 
 /* canvas */
 #view { position:relative; min-width:0; min-height:0; overflow:hidden; background:var(--canvas); }

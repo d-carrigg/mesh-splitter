@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
-import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
+import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast, MeshBVH } from "three-mesh-bvh";
 import { Brush, Evaluator, SUBTRACTION } from "three-bvh-csg";
 import { zipSync } from "fflate";
 import * as core from "./core.js";
@@ -444,7 +444,7 @@ function applyXf() {
   geo.disposeBoundsTree?.(); geo.computeBoundsTree();
   clearTrimMeshes(); // stale until the trim is redone; the part shows untrimmed meanwhile
   updateFillMesh();
-  render();
+  updateConnGhosts();
   scheduleHits();
   scheduleTrim();
 }
@@ -1049,6 +1049,10 @@ function planTris(pl, ctx, out = []) {
   lp.forEach(([a], j) => ctx.wpos(own, a, t3).toArray(ring0, 3 * j));
   const cen = (R) => { const c = [0, 0, 0]; for (let j = 0; j < n; j++) for (let k = 0; k < 3; k++) c[k] += R[3*j+k] / n; return c; };
   if (kind === "pocket") { for (const x of pl.tris) out.push(x); return out; }
+  if (kind === "fan" && own === ctx.fixL && ctx.conn?.size) { // a connector at this cut
+    const cn = ctx.conn.get(core.loopKey(lp));
+    if (cn && connCapTris(ring0, cen(ring0), flip, cn.Fw, cn.sp, out)) return out;
+  }
   if (kind === "fan" || kind === "under") { ringTris([ring0], cen(ring0), flip, out); return out; }
   if (kind === "patch") {
     const cntF = (l) => (l > 0 ? partCountsCached(ctx)[l] : 0);
@@ -1348,6 +1352,192 @@ function setTrim(js, on) {
   const names = js.map((j) => S.parts[j].name).join(", ");
   afterEdit(on ? `Trim: ${names} ${js.length > 1 ? "are" : "is"} cut where ${js.length > 1 ? "they overlap" : "it overlaps"} other parts (after a move)` : `Trim off on ${names}`);
 }
+// ---------------------------------------------------------------- connectors
+// part.conn = { type: "plug" | "dowel", shape, style, d, depth, clr, flip } joins part k to the part across its main
+// cut (bodyJoint: an arm's shoulder), like the Cut tool's connectors in OrcaSlicer. Plug: a peg on one part (part k, or
+// the neighbor with flip) and a matching hole in the other. Dowel: a hole in both and a separate peg that prints on its
+// own. The connector's axis is the cut's normal through the cut's center. Sizes in mm: d is the width across flats (a
+// circle's diameter), depth how far the peg goes into the other part, clr the clearance added to the hole on every
+// side (and at its bottom). They go only into the files whose parts print apart: Part STLs and the multi-part 3MF
+// (and Send to Orca as Parts). In the view a connector shows as a see-through ghost at the cut.
+// The geometry is built into the cut's cap (see connCapTris), not by CSG, so the parts stay closed and manifold.
+const CONN_SIDES = { circle: 48, square: 4, hex: 6, triangle: 3 };
+const CONN_TAPER = 0.6; // frustum: the tip is this fraction of the base
+const CONN_WALL = 0.8; // mm of material the fit check wants around a hole
+let connOn = false; // true while building files whose parts print apart
+function connDefaults(i, type = "plug") { // sized to the cut: up to half its inscribed width, as deep as it is wide,
+  const pj = bodyJoint(i); if (!pj?.loopLen) return null; // shrunk until it fits
+  const top = Math.max(1, Math.min(12, Math.floor(connInradius(pj) * 2 * 0.5 * 2) / 2));
+  const mk = (d, f) => ({ type, shape: "circle", style: "prism", d, depth: Math.max(2, Math.min(15, Math.round(d * f * 2) / 2)), clr: 0.15, flip: false });
+  for (const f of [1, 0.6]) for (let d = top; d >= 2; d -= 0.5) { const c = mk(d, f); if (!connFit(i, c)) return c; }
+  return mk(Math.min(top, 3), 0.6); // nothing fits: small, and the card says why
+}
+function connInradius(pj) { // distance from the cut's center to its nearest edge point, in the cut's plane
+  let m = Infinity; const t = new THREE.Vector3();
+  for (const q of pj.ring) { t.subVectors(q, pj.J); t.addScaledVector(pj.n, -t.dot(pj.n)); m = Math.min(m, t.length()); }
+  return m;
+}
+const connPoly = (shape, r) => { // convex cross-section, counterclockwise, r = across-flats radius
+  const n = CONN_SIDES[shape] || 48, a0 = shape === "square" ? Math.PI / 4 : shape === "triangle" ? Math.PI / 2 : 0, rc = r / Math.cos(Math.PI / n);
+  return Array.from({ length: n }, (_, k) => { const a = a0 + 2 * Math.PI * k / n; return [rc * Math.cos(a), rc * Math.sin(a)]; });
+};
+// Closed solid along local +Z through rings [[across-flats radius, z], ...] (bottom to top): the ghosts and dowels.
+function ringSolid(shape, rings) {
+  const out = [], R = rings.map(([r, z]) => connPoly(shape, r).map(([x, y]) => [x, y, z])), n = R[0].length;
+  for (let j = 0; j + 1 < R.length; j++) for (let k = 0; k < n; k++) {
+    const b0 = R[j][k], b1 = R[j][(k+1) % n], t0 = R[j+1][k], t1 = R[j+1][(k+1) % n];
+    out.push(...b0, ...b1, ...t1, ...b0, ...t1, ...t0);
+  }
+  const B = R[0], T = R[R.length - 1], cb = [0, 0, rings[0][1]], ct = [0, 0, rings[rings.length - 1][1]];
+  for (let k = 0; k < n; k++) { out.push(...cb, ...B[(k+1) % n], ...B[k]); out.push(...ct, ...T[k], ...T[(k+1) % n]); }
+  return Float32Array.from(out);
+}
+// The connector of part k: frame F (original coordinates; +Z = the way the peg points, from the plug's part into the
+// hole's part, origin = the cut's center), what each of the two parts gets at the cut (spec), and ghost solids.
+function connPlan(k, c = S.parts[k]?.conn) {
+  const p = S.parts[k]; if (!c || !p || hasRep(p)) return null;
+  const pj = bodyJoint(k); if (!pj?.loopLen || pj.nb <= 0 || !S.parts[pj.nb] || hasRep(S.parts[pj.nb])) return null;
+  const nb = pj.nb, plug = c.type === "plug", plugOn = plug ? (c.flip ? nb : k) : -1, holeIn = plug ? (c.flip ? k : nb) : -1;
+  const z = plug && c.flip ? pj.n.clone().negate() : pj.n.clone();
+  const helper = Math.abs(z.z) < 0.9 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0);
+  const x = new THREE.Vector3().crossVectors(helper, z).normalize(), y = new THREE.Vector3().crossVectors(z, x);
+  const F = new THREE.Matrix4().makeBasis(x, y, z).setPosition(pj.J);
+  const r = c.d / 2, h = c.depth, cl = Math.max(0, c.clr), dz = cl + 0.2, tip = plug && c.style === "frustum" ? CONN_TAPER : 1;
+  const hole = (z1) => ({ hole: true, shape: c.shape, r0: r + cl, r1: r * (1 + (tip - 1) * Math.abs(z1) / h) + cl, z1 });
+  const spec = new Map(), base = { k, nb, F, loopKey: pj.loopKey, spec, plugOn, holeIn, dowel: !plug };
+  if (plug) {
+    spec.set(plugOn, { hole: false, shape: c.shape, r0: r, r1: r * tip, z1: h });
+    spec.set(holeIn, hole(h + dz));
+    return { ...base, peg: ringSolid(c.shape, [[r, 0], [r * tip, h]]), hole: ringSolid(c.shape, [[r + cl, 0], [spec.get(holeIn).r1, h + dz]]) };
+  }
+  spec.set(k, hole(-h - dz)); spec.set(nb, hole(h + dz));
+  return { ...base, peg: ringSolid(c.shape, [[r, -h], [r, h]]), hole: ringSolid(c.shape, [[r + cl, -h - dz], [r + cl, h + dz]]) };
+}
+// World matrix of part j's copy of a connector (it moves with that part).
+const connWorld = (pl, j) => partMat(j).clone().multiply(pl.F);
+// Connectors at part i's cuts: loopKey -> { Fw, sp } (Fw: the connector's frame in world coordinates for part i).
+function connAt(i) {
+  const m = new Map();
+  S.parts.forEach((q, k) => {
+    if (!q?.conn) return;
+    const pl = connPlan(k); const sp = pl?.spec.get(i); if (!sp || connFitCached(k)) return; // left out until it fits
+    m.set(pl.loopKey, { Fw: connWorld(pl, i), sp });
+  });
+  return m;
+}
+// The cap over a cut (ring R, world, n points; c = the fan's apex) of a part with a connector there. Where ringTris
+// fans the ring to its center, this zips the ring to the connector's cross-section, flat in the plane through the
+// cut's center (both parts get the same surface), then adds the peg's walls and tip or the hole's walls and bottom.
+// The ring itself is unchanged and every edge pairs up, so the part stays closed and manifold. Whether it's a peg or
+// a hole follows from which side of the cut sp.z1 is on. Pushes world triangles into out; false when the cut doesn't
+// go once around the connector's axis (then nothing is pushed).
+function connCapTris(R, c, flip, Fw, sp, out) {
+  const n = R.length / 3, inv = Fw.clone().invert(), V3 = THREE.Vector3;
+  const ring = Array.from({ length: n }, (_, a) => { const w = new V3(R[3*a], R[3*a+1], R[3*a+2]); return { w, l: w.clone().applyMatrix4(inv) }; });
+  const wrap = (x) => { while (x > Math.PI) x -= 2 * Math.PI; while (x <= -Math.PI) x += 2 * Math.PI; return x; };
+  const th = ring.map((p) => Math.atan2(p.l.y, p.l.x));
+  let tot = 0; const cum = [0];
+  for (let a = 0; a < n; a++) { tot += wrap(th[(a+1) % n] - th[a]); cum.push(tot); }
+  const dir = Math.sign(tot); if (!dir || Math.abs(Math.abs(tot) - 2 * Math.PI) > 0.5) return false;
+  // outer: angle around the axis (never going back), inner: the cross-section from the same start angle, same way round
+  const po = []; let mx = 0; for (let a = 0; a < n; a++) { mx = Math.max(mx, cum[a] * dir); po.push(mx / (2 * Math.PI)); }
+  const V = connPoly(sp.shape, sp.r0), nv = V.length, per = Math.max(1, Math.ceil(48 / nv)), dense = [];
+  for (let k = 0; k < nv; k++) for (let t = 0; t < per; t++) { const [x0, y0] = V[k], [x1, y1] = V[(k+1) % nv]; dense.push([x0 + (x1 - x0) * t / per, y0 + (y1 - y0) * t / per]); }
+  const rel = (x, y) => { let r = wrap(Math.atan2(y, x) - th[0]) * dir; if (r < 0) r += 2 * Math.PI; return r; };
+  const inner = dense.map(([x, y]) => ({ r: rel(x, y), x, y })).sort((p, q) => p.r - q.r);
+  const pin = inner.map((p) => p.r / (2 * Math.PI)), lp = (l) => ({ l, w: l.clone().applyMatrix4(Fw) });
+  const I = inner.map((p) => lp(new V3(p.x, p.y, 0))), ni = I.length, s = sp.r1 / sp.r0;
+  const E = I.map((q) => lp(new V3(q.l.x * s, q.l.y * s, sp.z1))), ctr = lp(new V3(0, 0, sp.z1));
+  const tri = (p, q, r) => { if (flip) [q, r] = [r, q]; out.push(p.w.x, p.w.y, p.w.z, q.w.x, q.w.y, q.w.z, r.w.x, r.w.y, r.w.z); };
+  for (let i = 0, j = 0; i < n || j < ni;) { // zip, as ringTris does
+    const on = i + 1 < n ? po[i+1] : 1, jn = j + 1 < ni ? pin[j+1] : 1;
+    if (j >= ni || (i < n && on <= jn)) { tri(ring[(i+1) % n], ring[i % n], I[j % ni]); i++; }
+    else { tri(ring[i % n], I[j], I[(j+1) % ni]); j++; }
+  }
+  for (let j = 0; j < ni; j++) { // walls, then the tip or bottom: each edge runs opposite to its twin
+    const k = (j + 1) % ni;
+    tri(I[k], I[j], E[j]); tri(I[k], E[j], E[k]); tri(ctr, E[k], E[j]);
+  }
+  return true;
+}
+// Dowels print as their own pieces: [{ name, filament, soup }].
+function connExtras() {
+  const out = [];
+  S.parts.forEach((q, k) => {
+    if (q?.conn?.type !== "dowel" || connFitCached(k)) return;
+    const pl = connPlan(k); if (!pl) return;
+    out.push({ name: `${q.name} dowel`, filament: q.filament, soup: xformSoup(pl.peg, connWorld(pl, k)) });
+  });
+  return out;
+}
+// Point-in-solid test for a closed triangle soup (ray parity, three directions, majority vote).
+function solidTest(v) {
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(v, 3));
+  const bvh = new MeshBVH(g), dirs = [new THREE.Vector3(1, 0.13, 0.07), new THREE.Vector3(-0.11, 1, 0.05), new THREE.Vector3(0.09, -0.06, 1)].map((d) => d.normalize());
+  const ray = new THREE.Ray();
+  return (p) => dirs.reduce((s, d) => { ray.set(p, d); return s + (bvh.raycast(ray, THREE.DoubleSide).length % 2); }, 0) >= 2;
+}
+const insideCache = new Map();
+function insideOf(j) { // point-in-part test on part j's closed original mesh, cached
+  const key = `${j}|${S.nF}|${fullHash()}`;
+  if (!insideCache.has(key)) {
+    if (insideCache.size > 12) insideCache.clear();
+    const m = partMesh(j); insideCache.set(key, m ? { test: solidTest(Float32Array.from(m.verts)), m } : null); // faces + fan caps: closed
+  }
+  return insideCache.get(key);
+}
+// What's wrong with a connector, as a sentence for the part card ("" = fine). Checked on the original geometry:
+// the cut must take it (connCapTris), and each hole, with CONN_WALL of material around it, must stay inside its part.
+function connFit(k, c = S.parts[k]?.conn) {
+  const pl = connPlan(k, c); if (!pl) return "";
+  const bad = [];
+  for (const [j, sp] of pl.spec) {
+    const io = insideOf(j); if (!io) continue;
+    const lp = io.m.loopList.find((l) => core.loopKey(l) === pl.loopKey); if (!lp) return "This cut can't take a connector.";
+    const R = new Float32Array(3 * lp.length), cen = [0, 0, 0];
+    lp.forEach(([a], t) => { for (let q = 0; q < 3; q++) { R[3*t+q] = S.pos[3*a+q]; cen[q] += S.pos[3*a+q] / lp.length; } });
+    if (!connCapTris(R, cen, false, pl.F, sp, [])) return "This cut doesn't go around the connector's axis, so it can't take a connector.";
+    if (!sp.hole) continue;
+    const sg = Math.sign(sp.z1), z1 = Math.abs(sp.z1), pts = [];
+    for (const [r, z] of [[sp.r0 + CONN_WALL, 0.3], [(sp.r0 + sp.r1) / 2 + CONN_WALL, z1 / 2], [sp.r1 + CONN_WALL, z1], [0, z1 + CONN_WALL]])
+      for (let a = 0; a < 8; a++) { const t = a * Math.PI / 4; pts.push(new THREE.Vector3(r * Math.cos(t), r * Math.sin(t), sg * z).applyMatrix4(pl.F)); if (!r) break; }
+    if (pts.some((q) => !io.test(q))) bad.push(S.parts[j].name);
+  }
+  if (bad.length) return `The ${bad.length > 1 ? "holes break" : "hole breaks"} out of ${bad.join(" and ")} (or leave less than ${CONN_WALL} mm of wall): make it smaller or shallower.`;
+  const gapMode = [k, pl.nb].some((j) => S.parts[j]?.fill || S.parts[j]?.anchor);
+  return gapMode ? `Set At the cut to Open on ${S.parts[k].name} and ${S.parts[pl.nb].name}: with Fill or Anchor the parts print joined, so there's no connector.` : "";
+}
+const connFitCache = new Map();
+function connFitCached(k) {
+  const p = S.parts[k], fk = `${k}|${S.nF}|${JSON.stringify(p?.conn)}|${fullHash()}|${S.parts.map((q) => (q.fill ? 1 : 0) + (q.anchor ? 2 : 0)).join("")}`;
+  if (!connFitCache.has(fk)) { if (connFitCache.size > 40) connFitCache.clear(); connFitCache.set(fk, connFit(k)); }
+  return connFitCache.get(fk);
+}
+function setConn(k, c) {
+  if (k <= 0 || !S.parts[k]) return;
+  pushUndo();
+  if (c) S.parts[k].conn = c; else delete S.parts[k].conn;
+  const pj = bodyJoint(k), nb = pj?.nb > 0 ? S.parts[pj.nb]?.name : "";
+  afterEdit(c ? `${c.type === "plug" ? "Plug" : "Dowel"} connector: ${S.parts[k].name} to ${nb}` : `Connector removed from ${S.parts[k].name}`);
+}
+// Ghosts: the peg (its part's color) and the hole's outline, red when it doesn't fit.
+const connGroup = new THREE.Group(); scene.add(connGroup);
+function updateConnGhosts() {
+  for (const o of [...connGroup.children]) { connGroup.remove(o); o.geometry.dispose(); o.material.dispose(); }
+  if (S.G) S.parts.forEach((q, k) => {
+    if (!q?.conn) return;
+    const pl = connPlan(k); if (!pl) return;
+    const bad = !!connFitCached(k), own = pl.dowel ? k : pl.plugOn, other = pl.dowel ? pl.nb : pl.holeIn;
+    if (S.parts[own]?.visible === false && S.parts[other]?.visible === false) return;
+    const geo = (v, j) => { const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(xformSoup(v, connWorld(pl, j)), 3)); g.computeVertexNormals(); return g; };
+    const peg = new THREE.Mesh(geo(pl.peg, own), new THREE.MeshBasicMaterial({ color: bad ? 0xff3030 : S.parts[own].color, transparent: true, opacity: 0.7, depthTest: false }));
+    const hole = new THREE.LineSegments(new THREE.EdgesGeometry(geo(pl.hole, other), 20), new THREE.LineBasicMaterial({ color: bad ? 0xff3030 : 0xffffff, transparent: true, opacity: 0.85, depthTest: false }));
+    peg.renderOrder = hole.renderOrder = 6;
+    connGroup.add(peg, hole);
+  });
+  render();
+}
+
 // The original face of part i nearest a world point (clicks on a trimmed part select / act on that part).
 function nearestFace(i, w) {
   const M = xfMatrix(S.parts[i]), p = M ? w.clone().applyMatrix4(M.clone().invert()) : w;
@@ -1631,7 +1821,7 @@ function refreshUI() {
   }
   if (!S.G) body.innerHTML = "";
   document.body.classList.toggle("empty", !S.G);
-  if (!S.G) return;
+  if (!S.G) { updateConnGhosts(); return; }
   const solo = isSolo(S.active);
   $("soloBtn").classList.toggle("on", solo); $("soloBtn").title = solo ? "Show all parts again" : "Show only this part";
   const cnt = partCounts();
@@ -1667,6 +1857,7 @@ function refreshUI() {
   $("mergeBtn").hidden = !mergeSel.size;
   $("mergeBtn").title = `Merge ${mergeSel.size} part(s) into ${S.parts[S.active].name}`;
   refreshXfPanel();
+  updateConnGhosts();
   $("undoBtn").disabled = !S.hist.past.length;
   $("redoBtn").disabled = !S.hist.future.length;
 }
@@ -2070,12 +2261,13 @@ function partJoint(pi, body = false) {
   if (!pm) return null;
   const P = (v) => new THREE.Vector3(S.pos[3*v], S.pos[3*v+1], S.pos[3*v+2]);
   let best = null, bestLen = -1, loops = pm.loopList;
+  const tw = twinLabels(fullHash()), nV = S.nV;
+  const nbOf = (lp) => { const m = new Map(); for (const [a, b] of lp) { const n = tw.get(b * nV + a); if (n !== undefined) m.set(n, (m.get(n) || 0) + 1); } return [...m].sort((x, y) => y[1] - x[1])[0]?.[0] ?? -1; };
   if (body && loops.length > 1) {
-    const tw = twinLabels(fullHash()), nV = S.nV, cnt = partCounts(), u = S.parts[pi].uid;
+    const cnt = partCounts(), u = S.parts[pi].uid;
     const skip = new Set([pi, 0, ...followersOf(pi)]);
     if (u) S.parts.forEach((q, j) => { if (j > 0 && (q.hold?.a === u || q.hold?.b === u)) skip.add(j); });
     if (reachOf(pi) > 0) skip.add(reachOf(pi));
-    const nbOf = (lp) => { const m = new Map(); for (const [a, b] of lp) { const n = tw.get(b * nV + a); if (n !== undefined) m.set(n, (m.get(n) || 0) + 1); } return [...m].sort((x, y) => y[1] - x[1])[0]?.[0] ?? -1; };
     const ok = loops.map((lp) => [lp, nbOf(lp)]).filter(([, n]) => n >= 0 && !skip.has(n));
     const big = ok.filter(([, n]) => (cnt[n] || 0) > (cnt[pi] || 0)); // toward the body: a neighbor bigger than this part
     if (big.length) { const top = Math.max(...big.map(([, n]) => cnt[n])); loops = big.filter(([, n]) => cnt[n] === top).map(([lp]) => lp); }
@@ -2094,7 +2286,9 @@ function partJoint(pi, body = false) {
   const n = new THREE.Vector3(); // sum of cap triangle normals (b, a, J): outward of the part through the cut
   for (const [a, b] of best) { const pb = P(b); n.add(new THREE.Vector3().subVectors(P(a), pb).cross(new THREE.Vector3().subVectors(J, pb))); }
   if (n.lengthSq() < 1e-12) n.subVectors(J, pca.mean);
-  return { J, n: n.normalize(), pca, verts: pm.verts, nv: pm.nFaceVerts, loopLen: bestLen, loopKey: core.loopKey(best) };
+  // the cut's points (to size a connector) and the part across it
+  const ring = best.map(([a]) => P(a));
+  return { J, n: n.normalize(), pca, verts: pm.verts, nv: pm.nFaceVerts, loopLen: bestLen, loopKey: core.loopKey(best), ring, nb: nbOf(best) };
 }
 
 function repJoint(R, rep) {
@@ -2258,6 +2452,7 @@ function refreshXfPanel() {
   if (r) { $("repKeep").checked = !!r.inPlace; for (const id of ["repFlip", "repRoll", "repPick", "repFitL", "repEmbedL"]) $(id).style.display = r.inPlace ? "none" : "";
     $("repFit").checked = !!r.fit; $("repEmbed").value = r.embed; $("repFlip").classList.toggle("on", !!r.flip && !r.joint); $("repPick").classList.toggle("on", pickingJoint || !!r.joint); }
   renderFollowRow(i); renderHitRow(i);
+  refreshConnRow(i);
   showXfDims();
   syncGizmo();
   renderPaintSw();
@@ -2496,6 +2691,40 @@ $("repIn").onchange = async () => {
   busy(true); try { await replaceActive(f); } catch (e) { console.error(e); alert(e.message); } busy(false);
 };
 $("repDel").onclick = () => { const p = S.parts[S.active]; if (!p?.rep) return; pushUndo(); delete p.rep; afterEdit(`${p.name}: replacement removed`); };
+function refreshConnRow(i) {
+  const p = S.parts[i], pj = S.G && i > 0 && p && !hasRep(p) ? bodyJoint(i) : null, nb = pj?.loopLen && pj.nb > 0 ? pj.nb : -1;
+  $("connBox").classList.toggle("hide", nb <= 0 || hasRep(S.parts[nb]));
+  if (nb <= 0) return;
+  const c = p.conn;
+  for (const b of $("connType").children) b.classList.toggle("on", (c?.type || "") === b.dataset.ct);
+  $("connOpts").classList.toggle("hide", !c);
+  if (!c) return;
+  $("connShape").value = c.shape;
+  for (const b of $("connStyle").children) b.classList.toggle("on", c.style === b.dataset.cs);
+  $("connStyle").style.visibility = c.type === "dowel" ? "hidden" : "";
+  for (const [id, k] of [["connD", "d"], ["connDepth", "depth"], ["connClr", "clr"]]) if (document.activeElement !== $(id)) $(id).value = c[k];
+  $("connOnRow").classList.toggle("hide", c.type !== "plug");
+  $("connOnNb").textContent = S.parts[nb].name; $("connOnNb").title = `The peg sticks out of ${S.parts[nb].name}`;
+  $("connOnThis").classList.toggle("on", !c.flip); $("connOnNb").classList.toggle("on", !!c.flip);
+  $("connWarn").textContent = connFitCached(i);
+  $("connNote").textContent = c.type === "dowel" ? `Holes in ${p.name} and ${S.parts[nb].name}; the dowel exports as its own part.`
+    : `Joins ${p.name} to ${S.parts[nb].name}. In Part STLs and the multi-part 3MF.`;
+}
+const connEdit = (fn) => { const i = S.active, p = S.parts[i]; if (!S.G || i <= 0 || !p?.conn) return; const c = { ...p.conn }; fn(c); setConn(i, c); };
+for (const b of $("connType").children) b.onclick = () => {
+  const i = S.active, p = S.parts[i]; if (!S.G || i <= 0 || !p) return;
+  const t = b.dataset.ct;
+  if (!t) { if (p.conn) setConn(i, null); return; }
+  const c = p.conn ? { ...p.conn } : connDefaults(i); if (!c) return;
+  c.type = t; setConn(i, c);
+};
+for (const b of $("connStyle").children) b.onclick = () => connEdit((c) => { c.style = b.dataset.cs; });
+$("connShape").onchange = () => connEdit((c) => { c.shape = $("connShape").value; });
+$("connD").onchange = () => connEdit((c) => { c.d = Math.max(0.5, +$("connD").value || c.d); });
+$("connDepth").onchange = () => connEdit((c) => { c.depth = Math.max(0.5, +$("connDepth").value || c.depth); });
+$("connClr").onchange = () => connEdit((c) => { c.clr = Math.max(0, Math.min(2, +$("connClr").value || 0)); });
+$("connOnThis").onclick = () => connEdit((c) => { c.flip = false; });
+$("connOnNb").onclick = () => connEdit((c) => { c.flip = true; });
 $("repFlip").onclick = () => repEdit((r) => { if (r.joint) r.joint = null; else r.flip = !r.flip; }, "Flipped joint end");
 $("repRoll").onclick = () => repEdit((r) => { r.roll = ((r.roll || 0) + 90) % 360; }, "Rolled 90°");
 $("repPick").onclick = () => {
@@ -3023,6 +3252,7 @@ function partSoup(i, raw = false, nbTris = null) {
   const body = M ? healSoup(i, faces, xformSoup(faces, M)) : Float32Array.from(faces);
   // caps start exactly on the part's own (float32) boundary positions, so the closed solid has no slivers
   ctx.fixL = i; ctx.fix = new Map(); ctx.fixV = body; let o = 0;
+  if (connOn && !raw) ctx.conn = connAt(i); // connectors at its cuts (files whose parts print apart)
   for (let f = 0; f < S.nF; f++) if (S.labels[f] === i) { for (let c = 0; c < 3; c++, o += 3) ctx.fix.set(S.tri[3*f+c], o); }
   const nt = nbTris ? [] : null, caps = capTris(loopPlans(m.loopList, ctx), ctx, nt), out = new Float32Array(body.length + caps.length);
   if (nt) for (const [a, e, l] of nt) nbTris.push([a + body.length / 9, e + body.length / 9, l]);
@@ -3058,11 +3288,15 @@ function mergedSoup() {
 // One object whose parts are the split parts (closed, transforms applied), each with its filament slot.
 function buildParts3MF() {
   const cnt = partCounts(), soups = [];
-  S.parts.forEach((p, i) => {
-    if (!cnt[i] && !hasRep(p)) return;
-    const v = partSoup(i); if (!v || !v.length) return;
-    soups.push({ name: p.name, filament: p.filament, soup: v });
-  });
+  connOn = true;
+  try {
+    S.parts.forEach((p, i) => {
+      if (!cnt[i] && !hasRep(p)) return;
+      const v = partSoup(i); if (!v || !v.length) return;
+      soups.push({ name: p.name, filament: p.filament, soup: v });
+    });
+    soups.push(...connExtras());
+  } finally { connOn = false; }
   return core.parts3MF(S.name, soups);
 }
 function exportParts3MF() {
@@ -3079,12 +3313,15 @@ function exportParts3MF() {
 function exportSTLs() {
   if (!S.G) return;
   const files = {}, cnt = partCounts(), names = new Set();
-  S.parts.forEach((p, i) => {
-    if (!cnt[i] && !hasRep(p)) return;
-    const v = partSoup(i); if (!v) return;
-    let nm = `${safe(S.name)}_${safe(p.name)}`; while (names.has(nm)) nm += "_"; names.add(nm);
-    files[`${nm}.stl`] = stlBinary(v);
-  });
+  const put = (name, v) => { let nm = `${safe(S.name)}_${safe(name)}`; while (names.has(nm)) nm += "_"; names.add(nm); files[`${nm}.stl`] = stlBinary(v); };
+  connOn = true;
+  try {
+    S.parts.forEach((p, i) => {
+      if (!cnt[i] && !hasRep(p)) return;
+      const v = partSoup(i); if (v) put(p.name, v);
+    });
+    for (const d of connExtras()) put(d.name, d.soup);
+  } finally { connOn = false; }
   download(`${S.name}_parts.zip`, zipSync(files, { level: 6 }), "application/zip");
   status(`${Object.keys(files).length} STL(s) zipped; cut openings capped${S.parts.some(hasRep) ? ", replacements included" : ""}.`);
 }
@@ -3318,4 +3555,4 @@ if (ORCA.on) {
   window.addEventListener("focus", () => orcaSend({ cmd: "objects" }));
   orcaSend({ cmd: "objects", auto: true });
 }
-window.app = { S, buildOne3MF, buildPainted3MF, setPrintAs, deleteGeometry, closeHoles, meshHoles, setAnchor, setGap, setTrim, trimResult, trimMeshes, setSlide, updateTrim, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, setConn, connPlan, connFit, connExtras, connDefaults, buildOne3MF, buildPainted3MF, setPrintAs, deleteGeometry, closeHoles, meshHoles, setAnchor, setGap, setTrim, trimResult, trimMeshes, setSlide, updateTrim, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };

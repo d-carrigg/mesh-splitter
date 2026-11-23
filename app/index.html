@@ -59,6 +59,20 @@
         <label id="repFitL" class="small" title="Scale the replacement so its longest dimension matches the old part's"><input id="repFit" type="checkbox"> fit</label>
         <label id="repEmbedL" class="small" title="How far the replacement sinks into the rest so the slicer fuses them">embed <input id="repEmbed" type="number" step="0.5" min="0" style="width:48px"> mm</label>
       </div>
+      <div id="connBox" title="Connector: a peg and a matching hole where this part joins the part across its cut, so printed pieces line up and glue together. Added to Part STLs and the multi-part 3MF.">
+        <div class="pr"><span class="lbl">Connector</span>
+          <span class="seg" id="connType"><button data-ct="" title="No connector">None</button><button data-ct="plug" title="Plug: a peg on one part and a matching hole in the other">Plug</button><button data-ct="dowel" title="Dowel: a hole in both parts and a separate peg that prints on its own">Dowel</button></span></div>
+        <div id="connOpts">
+          <div class="pr"><span class="lbl">Shape</span><select id="connShape" title="Cross-section of the peg"><option value="circle">Circle</option><option value="square">Square</option><option value="hex">Hexagon</option><option value="triangle">Triangle</option></select>
+            <span class="seg" id="connStyle"><button data-cs="prism" title="Prism: straight sides">Prism</button><button data-cs="frustum" title="Frustum: tapers to 60% at the tip, which eases fitting and overhangs">Frustum</button></span></div>
+          <div class="pr"><span class="lbl" title="Width across flats (a circle's diameter)">Size</span><input id="connD" type="number" min="1" step="0.5"><span class="small">mm</span>
+            <span class="lbl" style="flex:0" title="How far the peg goes into the other part (a dowel goes this far into each part)">Depth</span><input id="connDepth" type="number" min="1" step="0.5"><span class="small">mm</span></div>
+          <div class="pr"><span class="lbl" title="Gap added to the hole on every side (and at its bottom) so the peg slides in. 0.1 to 0.2 mm suits most PLA and PETG prints">Clearance</span><input id="connClr" type="number" min="0" max="2" step="0.05"><span class="small">mm</span></div>
+          <div class="pr" id="connOnRow"><span class="lbl">Peg on</span><span class="seg"><button id="connOnThis" title="The peg sticks out of this part">This part</button><button id="connOnNb"></button></span></div>
+          <div id="connWarn" class="small"></div>
+          <div id="connNote" class="small"></div>
+        </div>
+      </div>
     </div>
   </div>
 </aside>
