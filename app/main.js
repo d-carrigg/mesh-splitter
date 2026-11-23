@@ -1849,6 +1849,14 @@ function updateConnGhosts() {
   }
   render();
 }
+// The connector whose ghost is under the pointer (index in S.conns), or -1.
+function connGhostAt(ev) {
+  const pegs = connGroup.children.filter((o) => o.userData.conn !== undefined); if (!pegs.length) return -1;
+  const r = renderer.domElement.getBoundingClientRect(), rc = new THREE.Raycaster();
+  rc.setFromCamera(new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1), camera);
+  const h = rc.intersectObjects(pegs, false)[0];
+  return h ? h.object.userData.conn : -1;
+}
 
 // The original face of part i nearest a world point (clicks on a trimmed part select / act on that part).
 function nearestFace(i, w) {
@@ -2044,6 +2052,7 @@ window.addEventListener("pointerup", (ev) => {
   if (moved || ev.target !== canvas) return;
   if (pickingJoint) { pickJointAt(ev); return; }
   if (placing) { const h = hit(ev); if (h) placeAt(h); return; }
+  if (S.tool === "orbit") { const k = connGhostAt(ev); if (k >= 0) { connPick(k); return; } }
   const h = hit(ev);
   if (!h) { if (S.tool === "orbit" && S.active) selectPart(0); return; }
   if ((ev.shiftKey && S.tool === "orbit") || (ev.ctrlKey && ev.shiftKey)) { toggleSel(S.labels[h.face]); return; }
@@ -3044,6 +3053,7 @@ function refreshConnUI() {
   const sel = selSeams().length;
   $("connSel").disabled = !sel; $("connSelHint").hidden = !!sel;
   $("connAll").disabled = !seams().length; $("connNone").disabled = !S.conns.length;
+  refreshConnCard();
 }
 // Seams between the selected parts (Add to selected parts).
 const selSeams = () => { const set = new Set(selected()); return set.size > 1 ? seams().filter((s) => set.has(s.a) && set.has(s.b)) : []; };
@@ -3058,6 +3068,77 @@ $("connSel").onclick = () => later(() => addConns(selSeams(), " between the sele
 $("connNone").onclick = () => setConns([], `Removed ${plural(S.conns.length, "connector")}`);
 $("connDone").onclick = () => setGizmo("off");
 $("connPrintParts").onclick = () => { setPrintAs("parts"); status(`Print as: ${PRINT_AS.parts}`); };
+// The part card's Connectors: the selected parts' connectors. With one part selected, clicking one opens its settings
+// under it; with several, the settings under the list apply to all of them ("Mixed" where they differ).
+let connOpen = ""; // connKey of the open row
+const connKey = (c) => `${c.a}|${c.b}|${c.p}`;
+function connCard() {
+  const sel = new Set(selected());
+  return { list: connState().list.filter((e) => sel.has(e.ia) || sel.has(e.ib)), multi: sel.size > 1 };
+}
+// Its name in part from's card: the other part's name, or both parts' names.
+function connName(e, from = -1) {
+  if (e.s) return seamName(e.s, from);
+  const nm = (j) => (j > 0 ? S.parts[j].name : "a deleted part");
+  return from === e.ia ? nm(e.ib) : from === e.ib ? nm(e.ia) : `${nm(e.ia)} and ${nm(e.ib)}`;
+}
+function refreshConnCard() {
+  const { list, multi } = connCard(), box = $("connBox"), ed = $("connEd"), rows = $("connRows");
+  box.appendChild(ed); box.hidden = !list.length; box.classList.toggle("multi", multi);
+  if (!list.length) return;
+  if (!list.some((e) => connKey(e.c) === connOpen)) connOpen = "";
+  rows.innerHTML = "";
+  for (const e of list) {
+    const open = !multi && connKey(e.c) === connOpen, row = document.createElement("div");
+    row.className = `cRow${e.state === "ok" ? "" : " bad"}${open ? " open" : ""}`;
+    row.innerHTML = `<span class="nm">${esc(connName(e, multi ? -1 : S.active))}</span><span class="what">${e.c.peg ? "Plug" : "Dowel"} ${e.c.d} mm</span>`;
+    if (!multi) row.onclick = () => { connOpen = open ? "" : connKey(e.c); refreshConnCard(); };
+    if (e.s) { row.onmouseenter = () => { seamHover = e.s; updateConnGhosts(); }; row.onmouseleave = () => { if (seamHover === e.s) { seamHover = null; updateConnGhosts(); } }; }
+    rows.appendChild(row);
+    if (e.state !== "ok") rows.insertAdjacentHTML("beforeend", `<div class="cWhy">${esc(e.why)}</div>`);
+    if (open) rows.appendChild(ed);
+  }
+  const T = connTargets();
+  ed.hidden = !T.length;
+  if (!T.length) return;
+  const same = (f) => { const v = T.map(f); return v.every((x) => x === v[0]) ? v[0] : undefined; }, type = same((e) => (e.c.peg ? "plug" : "dowel"));
+  for (const b of $("connType").children) b.classList.toggle("on", type === b.dataset.ct);
+  $("connShape").value = same((e) => e.c.shape) ?? "mixed";
+  const style = same((e) => e.c.style);
+  for (const b of $("connStyle").children) b.classList.toggle("on", style === b.dataset.cs);
+  $("connStyle").style.visibility = type === "dowel" ? "hidden" : "";
+  for (const [id, f] of [["connD", (e) => e.c.d], ["connDepth", (e) => e.c.depth], ["connClr", (e) => e.c.clr]]) {
+    const v = same(f); $(id).placeholder = v === undefined ? "Mixed" : "";
+    if (document.activeElement !== $(id)) $(id).value = v ?? "";
+  }
+  const plugs = T.filter((e) => e.c.peg && e.s), on = $("connOn");
+  $("connOnRow").hidden = !plugs.length;
+  if (multi) on.innerHTML = `<button data-swap="1" title="Put each peg on the other part, and its hole in this one">Swap sides</button>`;
+  else if (plugs.length) { const e = plugs[0]; on.innerHTML = [e.s.a, e.s.b].map((j) => `<button data-on="${j}" class="${S.parts[j].uid === e.c.peg ? "on" : ""}" title="The peg sticks out of ${esc(S.parts[j].name)}">${esc(S.parts[j].name)}</button>`).join(""); }
+  $("connNote").textContent = multi ? `Changes apply to these ${plural(T.length, "connector")}.` : "";
+}
+// The connectors the card's settings act on: the open one, or with several parts selected every one listed.
+function connTargets() { const { list, multi } = connCard(); return multi ? list : list.filter((e) => connKey(e.c) === connOpen); }
+const connEdit = (fn, what) => { const T = connTargets(); if (T.length) editConns(T.map((e) => e.k), fn, T.length > 1 ? `${what} on ${T.length} connectors` : `${what}: ${connName(T[0])}`); };
+for (const b of $("connType").children) b.onclick = () => {
+  const t = b.dataset.ct, T = connTargets(); if (!T.length) return;
+  if (!t) setConns(S.conns.filter((_, k) => !T.some((e) => e.k === k)), `Removed ${plural(T.length, "connector")}`);
+  else connEdit((c, e) => { if (t === "dowel") c.peg = null; else if (!c.peg) c.peg = e.s ? connPegSide(c, e.s) : c.a; }, t === "plug" ? "Plug" : "Dowel");
+};
+$("connShape").onchange = () => connEdit((c) => { c.shape = $("connShape").value; }, "Shape");
+for (const b of $("connStyle").children) b.onclick = () => connEdit((c) => { if (c.peg) c.style = b.dataset.cs; }, b.dataset.cs === "prism" ? "Prism" : "Frustum");
+for (const [id, k, lo, hi, what] of [["connD", "d", 0.5, Infinity, "Size"], ["connDepth", "depth", 0.5, Infinity, "Depth"], ["connClr", "clr", 0, 2, "Clearance"]])
+  $(id).onchange = () => { const v = +$(id).value; if ($(id).value !== "" && v >= lo) connEdit((c) => { c[k] = Math.min(hi, v); }, `${what} ${v} mm`); };
+$("connOn").onclick = (ev) => {
+  const b = ev.target.closest("button"); if (!b) return;
+  if (b.dataset.swap) connEdit((c) => { if (c.peg) c.peg = c.peg === c.a ? c.b : c.a; }, "Swapped peg and hole");
+  else connEdit((c) => { c.peg = S.parts[+b.dataset.on].uid; }, `Peg on ${S.parts[+b.dataset.on].name}`);
+};
+// Clicking a connector's ghost opens it in the part card.
+function connPick(k) {
+  const e = connState().list[k]; if (!e) return;
+  connOpen = connKey(e.c); selectPart(e.pl?.plugOn > 0 ? e.pl.plugOn : e.ia);
+}
 // One part / Painted / Merged STL leave connectors out: said with the export.
 const connLeftOut = () => { const n = connState().list.filter((e) => e.state === "ok").length; return n ? ` Your ${plural(n, "connector")} ${n > 1 ? "are" : "is"} left out: Print as Parts includes them.` : ""; };
 $("repFlip").onclick = () => repEdit((r) => { if (r.joint) r.joint = null; else r.flip = !r.flip; }, "Flipped joint end");

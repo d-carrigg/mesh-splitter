@@ -92,6 +92,18 @@ table.parts td.pins.bad { color:#f06060; }
 table.parts td.pins svg.i { width:12px; height:12px; vertical-align:-2px; margin-right:1px; }
 #connPrint { display:flex; align-items:center; gap:8px; color:#f5a623; }
 #connPrint button { flex:none; }
+#connBox { display:flex; flex-direction:column; gap:4px; border-top:1px solid var(--sep); padding-top:9px; margin-top:4px; }
+.cRow { display:flex; align-items:center; gap:6px; min-height:24px; padding:1px 6px; border-radius:3px; cursor:pointer; }
+.cRow:hover { background:var(--hov); }
+.cRow.open { background:var(--sel); }
+#connBox.multi .cRow { cursor:default; background:none; }
+.cRow .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cRow .what { color:var(--mute); font-size:11px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.cRow.bad .what, .cWhy { color:#f06060; }
+.cWhy { font-size:11px; padding:0 6px 3px; }
+#connEd { display:flex; flex-direction:column; gap:6px; margin:2px 0 6px 10px; padding:4px 0 4px 10px; border-left:2px solid var(--acc); }
+#connNote:empty { display:none; }
+#connEd input[type=number] { width:64px; }
 
 /* canvas */
 #view { position:relative; min-width:0; min-height:0; overflow:hidden; background:var(--canvas); }
@@ -132,7 +144,7 @@ html .seg button:hover { background:#4D4D54; color:var(--fg); }
 html .seg button.on { background:var(--acc) !important; color:#fff; font-weight:400; }
 #connPanel .row { margin:0; justify-content:space-between; }
 #connPanel .acts button { flex:1; }
-.gp select { background:var(--in); color:var(--fg); border:1px solid var(--line); border-radius:3px; font:inherit; padding:2px 4px; }
+.gp select, #partCard select { background:var(--in); color:var(--fg); border:1px solid var(--line); border-radius:3px; font:inherit; padding:2px 4px; }
 #splitPanel [data-m] { display:none; flex-direction:column; gap:8px; }
 #splitPanel [data-m].show { display:flex; }
 #paintSw { display:flex; flex-wrap:wrap; gap:5px; }
