@@ -515,12 +515,13 @@ function renderHitRow(i) {
 // to zero over r mm from the cut (cosine falloff), so the part stretches or squeezes to stay flush.
 const healCache = new Map();
 function healBase(i) { // geometry-only part: loop, rim angles, nearest loop vertex + distance for each part vertex
-  const key = `${i}|${S.nF}|${fullHash()}`;
+  const jk = bodyJoint(i)?.loopKey, key = `${i}|${S.nF}|${fullHash()}|${jk}`;
   if (healCache.has(key)) return healCache.get(key);
   if (healCache.size > 8) healCache.clear();
   const pm = meshOf((l) => l === i); let best = null, bl = -1;
   const P = (v) => new THREE.Vector3(S.pos[3*v], S.pos[3*v+1], S.pos[3*v+2]);
-  for (const lp of pm?.loopList || []) { let len = 0; for (const [a, b] of lp) len += P(a).distanceTo(P(b)); if (len > bl) { bl = len; best = lp; } }
+  const loops = pm?.loopList || [], atJ = loops.filter((lp) => core.loopKey(lp) === jk);
+  for (const lp of atJ.length ? atJ : loops) { let len = 0; for (const [a, b] of lp) len += P(a).distanceTo(P(b)); if (len > bl) { bl = len; best = lp; } }
   if (!best) { healCache.set(key, null); return null; }
   const L = best.map(([a]) => a), pts = L.map(P), J = new THREE.Vector3();
   pts.forEach((p) => J.add(p)); J.divideScalar(pts.length);
