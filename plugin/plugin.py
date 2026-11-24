@@ -219,8 +219,9 @@ def list_objects(model):
     return out
 
 
-def object_mesh(obj):
-    """Model parts of instance 0 in world coordinates: (float32 N*3 positions, uint32 M*3 indices)."""
+def object_mesh(obj, groups=None):
+    """Model parts of instance 0 in world coordinates: (float32 N*3 positions, uint32 M*3 indices). groups, when
+    given, gets one {"name", "filament", "count"} per part, in face order, so the page can keep the object's parts."""
     inst = obj.instance(0)
     P, T, base = [], [], 0
     for vol in obj.volumes():
@@ -237,6 +238,10 @@ def object_mesh(obj):
             F = F[:, [0, 2, 1]]
         P.append(W.astype(np.float32))
         T.append((F + base).astype(np.uint32))
+        if groups is not None:
+            nm = getattr(vol, "name", "")
+            groups.append({"name": str((nm() if callable(nm) else nm) or ""), "count": int(len(F)),
+                           "filament": int(vol.extruder_id()) if hasattr(vol, "extruder_id") else 0})
         base += len(V)
     if not P:
         raise ValueError(f"'{obj.name}' has no model parts with geometry")
@@ -258,12 +263,12 @@ def find_object(model, msg):
     return objs[i]
 
 
-def mesh_messages(name, pos, tri, req=None):
+def mesh_messages(name, pos, tri, req=None, groups=None):
     data = base64.b64encode(pos.astype("<f4").tobytes() + tri.astype("<u4").tobytes()).decode("ascii")
     n = max(1, -(-len(data) // CHUNK))
     for i in range(n):
         yield {"cmd": "mesh", "req": req, "name": name, "nV": int(len(pos)), "nF": int(len(tri)),
-               "part": i, "of": n, "data": data[i * CHUNK:(i + 1) * CHUNK]}
+               "groups": groups or [], "part": i, "of": n, "data": data[i * CHUNK:(i + 1) * CHUNK]}
 
 
 def unique_path(folder, name):
@@ -376,8 +381,9 @@ class Bridge:
                 if np is None:
                     raise RuntimeError("numpy is not installed; reload the plugin so OrcaSlicer can install it")
                 obj = find_object(orca.host.model(), msg)
-                pos, tri = object_mesh(obj)
-                for m in mesh_messages(obj.name or "Object", pos, tri, msg.get("req")):
+                groups = []
+                pos, tri = object_mesh(obj, groups)
+                for m in mesh_messages(obj.name or "Object", pos, tri, msg.get("req"), groups if len(groups) > 1 else None):
                     self.send(m)
             elif cmd == "save":
                 self.save_chunk(msg)

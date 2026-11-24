@@ -172,19 +172,18 @@
   }
  },
  "3MF input (robot parts)": {
-  "log": "bc56677f47b9dacc",
+  "log": "f575ccf8ebda2532",
   "files": {
    "robot_from3mf.3mf": {
     "_rels/.rels": "465f67e7a55f044d",
     "[Content_Types].xml": "e1c3af6da2b2500c",
-    "3D/3dmodel.model": "a98abf1ec8a63bc9",
+    "3D/3dmodel.model": "ec7227b7b3cfec85",
     "Metadata/model_settings.config": "2c07a534a1854ddb"
    },
    "robot_from3mf_painted.3mf": {
     "_rels/.rels": "465f67e7a55f044d",
-    "[Content_Types].xml": "e1c3af6da2b2500c",
-    "3D/3dmodel.model": "e6ccd551d256677d",
-    "Metadata/model_settings.config": "0279fa33ac45d143"
+    "[Content_Types].xml": "ec0f198c3805b3ed",
+    "3D/3dmodel.model": "78f4d4c6258e767f"
    }
   }
  },

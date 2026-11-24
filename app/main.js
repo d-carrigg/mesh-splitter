@@ -126,7 +126,10 @@ function loadRaw(name, raw) {
   syncSliders();
   lastActive = -1;
   setPrintAs(initialPrintAs(), false);
-  if (!restoreAutosave() && S.nF >= 200) { autoSplit(0, true); S.hist = { past: [], future: [] }; refreshUI(); }
+  if (S.parts.length > 2) { // already split (an OrcaSlicer object with several parts, a multi-part 3MF): keep its parts
+    dropEmptyParts(); refreshUI(); updateColors();
+    status(`Loaded ${S.parts.length - 1} parts${S.capsRemoved ? ", joined at their cuts" : ""}`);
+  } else if (!restoreAutosave() && S.nF >= 200) { autoSplit(0, true); S.hist = { past: [], future: [] }; refreshUI(); }
   const fixes = [S.refined && `split long edges (+${S.refined.toLocaleString()} faces) so creases show`, S.flipped && `turned ${S.flipped} inside-out shell${S.flipped > 1 ? "s" : ""} right side out`].filter(Boolean);
   if (fixes.length) status(`${$("status").textContent} · On open: ${fixes.join("; ")}`);
 }
@@ -3923,7 +3926,7 @@ $("newProjKeep").onclick = () => { if ($("newProjRemember").checked) setNewProjM
 $("newProjMode").onchange = () => setNewProjMode($("newProjMode").value);
 function orcaMesh(m) { // chunks of the requested transfer, in any order
   if (!m.req || m.req !== ORCA.want) return; // a stale or superseded transfer
-  if (!ORCA.rx || ORCA.rx.req !== m.req) ORCA.rx = { req: m.req, name: m.name, nV: m.nV, nF: m.nF, parts: new Array(m.of), got: 0 };
+  if (!ORCA.rx || ORCA.rx.req !== m.req) ORCA.rx = { req: m.req, name: m.name, nV: m.nV, nF: m.nF, groups: m.groups, parts: new Array(m.of), got: 0 };
   const R = ORCA.rx;
   if (R.parts[m.part] == null) { R.parts[m.part] = m.data; R.got++; }
   if (R.got < m.of) return;
@@ -3932,8 +3935,8 @@ function orcaMesh(m) { // chunks of the requested transfer, in any order
     const bin = atob(R.parts.join("")), b = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
     const pos = new Float32Array(b.buffer, 0, R.nV * 3), tri = new Uint32Array(b.buffer, R.nV * 12, R.nF * 3);
-    loadRaw(R.name, { pos: Float32Array.from(pos), tri: Uint32Array.from(tri), source: { type: "orca", orca: { ...ORCA.cur } } });
-    status(`Loaded ${R.name} from the plate`);
+    loadRaw(R.name, { pos: Float32Array.from(pos), tri: Uint32Array.from(tri), groups: R.groups, source: { type: "orca", orca: { ...ORCA.cur } } });
+    status(`Loaded ${R.name} from the plate${S.parts.length > 2 ? ` with its ${S.parts.length - 1} parts` : ""}`);
   } catch (e) { console.error(e); alert(e.message); }
   finally { busy(false); }
 }
