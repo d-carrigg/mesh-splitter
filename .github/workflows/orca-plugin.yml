@@ -64,6 +64,9 @@ jobs:
           mkdir -p build/out
           PYTHON="$(uv run which python)" node e2e.mjs build/snowman.stl build/out
           uv run python verify_3mf.py build/out/snowman_parts.3mf
+      - name: Site CSP in a real browser (page, a model, AI providers, Cloudflare beacon)
+        if: env.RUN_TESTS == 'true'
+        run: node ../test/csp.browser.mjs
       - name: Cache OrcaSlicer ${{ env.ORCA_VERSION }}
         if: env.RUN_TESTS == 'true'
         uses: actions/cache@v6
