@@ -5,8 +5,13 @@
 Writes examples/robot/parts/<name>.stl:
 - top_hat, party_hat, crown: hats that replace the antenna, sitting on top of the head (z = 112)
 - round_head: a round head with big eyes that replaces the square head and neck
+
+and examples/gardener/parts/<name>.stl, in the gardener's coordinates:
+- cap: a baseball cap that replaces the straw hat (with its band merged in)
+- shovel: a shovel that replaces the rake, on the same handle line through the right fist
 """
 import pathlib
+import numpy as np
 import manifold3d as m3
 import trimesh
 
@@ -51,13 +56,46 @@ def round_head():
     return m3.Manifold.batch_boolean([head, neck, *eyes, mouth, *ears], m3.OpType.Add)
 
 
-def save(man, name):
+HEAD = (0, -1, 136)  # the gardener's head: center, radius 18
+FIST = np.array([36, -24, 80.0])  # center of the right fist; the rake handle runs along AXIS through it
+AXIS = np.array([-8, 34, 68.5]) / np.linalg.norm([-8, 34, 68.5])
+
+
+def along_axis(man, at):
+    """Turn a part built along +Z so it runs along the handle line, then move its origin to the point `at`."""
+    pitch, yaw = np.degrees(np.arccos(AXIS[2])), np.degrees(np.arctan2(AXIS[1], AXIS[0]))
+    return man.rotate([0, pitch, 0]).rotate([0, 0, yaw]).translate(list(at))
+
+
+def cap():
+    x, y, z = HEAD
+    crown = sphere(19.2, (x, y, z)) - m3.Manifold.cube([60, 60, 60], True).translate([x, y, z + 9 - 30])
+    visor = (m3.Manifold.cylinder(2, 16, 16, SEG).scale([1, 0.75, 1]).translate([x, y - 16, z + 9])
+             - m3.Manifold.cube([40, 40, 10], True).translate([x, y + 4, z + 9]))
+    button = sphere(2.2, (x, y, z + 19))
+    return m3.Manifold.batch_boolean([crown, visor, button], m3.OpType.Add)
+
+
+def shovel():
+    lo = FIST - AXIS * 44.5  # bottom of the handle, where the blade starts
+    handle = m3.Manifold.cylinder(98, 3.5, 3.5, SEG)
+    grip = (m3.Manifold.cube([4, 16, 4], True).translate([0, 0, 102])
+            + m3.Manifold.cylinder(6, 2.5, 2.5, SEG).translate([0, -7, 96])
+            + m3.Manifold.cylinder(6, 2.5, 2.5, SEG).translate([0, 7, 96]))
+    socket = m3.Manifold.cylinder(10, 4.5, 3.6, SEG).translate([0, 0, -6])
+    blade = m3.Manifold.extrude(m3.CrossSection([[[-12, 0], [-12, -24], [0, -32], [12, -24], [12, 0]]]), 2.4).rotate([90, 0, 0])
+    return along_axis(m3.Manifold.batch_boolean([handle, grip, socket, blade.translate([0, 1.2, -4]).rotate([0, 0, 90])], m3.OpType.Add), lo)
+
+
+def save(man, name, here=HERE):
     mesh = man.to_mesh()
     tm = trimesh.Trimesh(mesh.vert_properties[:, :3], mesh.tri_verts, process=True)
-    HERE.mkdir(parents=True, exist_ok=True)
-    tm.export(HERE / f"{name}.stl")
+    here.mkdir(parents=True, exist_ok=True)
+    tm.export(here / f"{name}.stl")
 
 
 if __name__ == "__main__":
     for f in (top_hat, party_hat, crown, round_head):
         save(f(), f.__name__)
+    for f in (cap, shovel):
+        save(f(), f.__name__, HERE.parent.parent / "gardener" / "parts")

@@ -6,6 +6,7 @@ Writes examples/<name>/<name>.stl for each model. Three styles, each a single cl
 - robot: hard-surface, boxes and cylinders (sharp creases at every joint)
 - bear: organic, smoothly blended blobs (soft creases)
 - rocket: a rocket with fins and portholes on a separate stand (two shells, thin fins)
+- gardener: the flagship example; organic figure (blended blobs) with hard-surface props (base, toolbox, rake, hat)
 """
 import pathlib
 import numpy as np
@@ -30,11 +31,17 @@ def sphere(r, at=(0, 0, 0)):
     return m3.Manifold.sphere(r, SEG).translate(at)
 
 
-def save(man, name, edge=None):
+def save(man, name, edge=None, weld=False):
     if edge:  # split long edges: CAD-style meshes have long thin triangles, see the README
         man = man.refine_to_length(edge)
     mesh = man.to_mesh()
     tm = trimesh.Trimesh(mesh.vert_properties[:, :3], mesh.tri_verts, process=True)
+    if weld:  # (gardener) clean up what welding in Mesh Splitter would otherwise load as stray one-face shells
+        shells = tm.split(only_watertight=False)
+        tm = trimesh.util.concatenate([s for s in shells if len(s.faces) >= 4])  # zero-area two-triangle slivers
+        tm.merge_vertices(digits_vertex=3)  # vertices closer than Mesh Splitter's weld tolerance
+        tm.update_faces(tm.nondegenerate_faces())
+        tm.remove_unreferenced_vertices()
     out = HERE / name / f"{name}.stl"
     out.parent.mkdir(exist_ok=True)
     tm.export(out)
@@ -129,7 +136,103 @@ def rocket():
     return shell + stand.translate([0, 0, 2.0])  # stand top at z=12-ish below the nozzle, separate shell
 
 
+def rod(a, b, r):
+    """Cylinder of radius r from point a to point b."""
+    a, b = np.array(a, float), np.array(b, float)
+    d = b - a
+    n = np.linalg.norm(d)
+    d /= n
+    c = m3.Manifold.cylinder(n, r, r, SEG, False)
+    return c.rotate([0, np.degrees(np.arccos(d[2])), 0]).rotate([0, 0, np.degrees(np.arctan2(d[1], d[0]))]).translate(a)
+
+
+def gardener():
+    """Gardener on a grass base: rake in the right hand, the left hand on the swing handle of a wooden toolbox.
+
+    The figure is organic (smooth-blended blobs, marching cubes) with hard unions at the joints, so each limb
+    meets the body at a crease. The props are hard-surface (flat faces, sharp edges). Front is -Y, right is +X.
+    """
+    def cap(p, a, b, r):
+        a, b = np.array(a, float), np.array(b, float)
+        ab = b - a
+        t = np.clip(((p - a) @ ab) / (ab @ ab), 0, 1)
+        return np.linalg.norm(p - (a + t[..., None] * ab), axis=-1) - r
+
+    def ball(p, c, r):
+        return np.linalg.norm(p - np.array(c, float), axis=-1) - r
+
+    def ell(p, c, r):
+        return (np.linalg.norm((p - np.array(c, float)) / np.array(r, float), axis=-1) - 1) * min(r)
+
+    def smin(a, b, k):
+        h = np.clip(0.5 + 0.5 * (b - a) / k, 0, 1)
+        return b * (1 - h) + a * h - k * h * (1 - h)
+
+    step = 0.9
+    xg, yg, zg = np.arange(-58, 52, step), np.arange(-38, 26, step), np.arange(5, 160, step)
+    X, Y, Z = np.meshgrid(xg, yg, zg, indexing="ij")
+    p = np.stack([X, Y, Z], -1)
+    d = ell(p, (0, 0, 84), (25, 19, 33))                                          # torso (overalls)
+    d = smin(d, ell(p, (0, 0, 112), (19, 15, 8)), 6)                              # shoulders
+    d = smin(d, cap(p, (0, -1, 116), (0, -1, 122), 7.5), 1.0)                     # neck
+    head = ball(p, (0, -1, 136), 18)
+    head = smin(head, ball(p, (0, -19.5, 133), 4.5), 1.5)                         # nose
+    for s in (-1, 1):
+        head = smin(head, ell(p, (s * 18, -1, 135), (2.5, 4, 5.5)), 1.5)          # ears
+    d = np.minimum(d, head)
+    for s in (-1, 1):
+        d = np.minimum(d, cap(p, (s * 9, -1, 58), (s * 10, -2, 20), 7.5))          # legs
+        boot = smin(cap(p, (s * 10, -3, 13), (s * 11, -16, 11), 8), ball(p, (s * 10, 1, 12), 8), 3)
+        d = np.minimum(d, np.maximum(boot, -(Z - 6.0)))                            # boots, flat soles
+    # right arm (+X): upper arm, forearm bent forward, fist around the rake handle
+    d = np.minimum(d, cap(p, (21, 0, 110), (34, -4, 90), 6.5))
+    d = smin(d, cap(p, (34, -4, 90), (36, -18, 82), 6), 2)
+    d = np.minimum(d, ball(p, (36, -24, 80), 7.5))
+    # left arm (-X): hangs down to the toolbox handle
+    d = np.minimum(d, cap(p, (-21, 0, 110), (-34, -2, 87), 6.5))
+    d = smin(d, cap(p, (-34, -2, 87), (-45, -4, 70), 6), 2)
+    d = np.minimum(d, ball(p, (-48, -4, 64), 7.5))
+    d = np.maximum(d, -(Z - 6.0))
+    v, f, _, _ = measure.marching_cubes(d, 0, spacing=(step, step, step))
+    v += np.array([xg[0], yg[0], zg[0]])
+    tm = trimesh.Trimesh(v, f, process=True)
+    figure = m3.Manifold(m3.Mesh(np.asarray(tm.vertices, np.float32), np.asarray(tm.faces, np.uint32)))
+
+    parts = [figure]
+    for s in (-1, 1):  # eyes
+        parts.append(sphere(2.6, (s * 7, -17.4, 140)))
+    parts += [cyl(31, 2.4, (0, -1, 150)),                    # hat brim
+              m3.Manifold.cylinder(8, 18.6, 18.0, 96, True).translate([0, -1, 155]),  # hat band
+              cyl(16, 13, (0, -1, 161.5), r2=13.5)]           # hat crown
+    parts += [cyl(3.2, 3, (-9, -17.6, 93), (90, 0, 0)), cyl(3.2, 3, (9, -17.6, 93), (90, 0, 0))]  # overall buttons
+    parts.append(box(16, 2, 10, (0, -19.0, 82)))                            # bib pocket
+
+    # toolbox: open wooden box with tall end boards; a swing handle on two pivots
+    cx, cy = -52, -4
+    parts.append(box(46, 30, 28, (cx, cy, 20)) - box(42, 26, 30, (cx, cy, 24)))
+    for s in (-1, 1):
+        parts.append(box(4, 30, 40, (cx + s * 25, cy, 26)))
+        parts.append(cyl(3, 3, (cx + s * 22.5, cy, 42), (0, 90, 0)))        # pivot pins
+    bail = [rod((cx + s * 21, cy, 42), (cx + s * 18, cy, 64), 2.6) for s in (-1, 1)]
+    bail += [rod((cx - 18, cy, 64), (cx + 18, cy, 64), 3.5)]                # grip, under the left hand
+    bail += [sphere(2.6, (cx + s * 18, cy, 64)) for s in (-1, 1)]
+    bail += [sphere(3.2, (cx + s * 21, cy, 42)) for s in (-1, 1)]
+    parts += bail
+
+    # rake: handle through the right fist, head resting on the base
+    a, b = (44, -58, 11.5), (31.6, -5.3, 117.7)  # through the fist center (36, -24, 80)
+    parts.append(rod(a, b, 3.5))
+    parts.append(box(44, 6, 5, a))
+    parts += [box(2.6, 2.6, 5, (a[0] + x, a[1], 7.5)) for x in range(-20, 21, 5)]
+
+    base = m3.Manifold.extrude(m3.CrossSection.square([190, 110], True).offset(8, m3.JoinType.Round), 4)
+    top = m3.Manifold.extrude(m3.CrossSection.square([186, 106], True).offset(6, m3.JoinType.Round), 2.5).translate([0, 0, 3.5])
+    parts.append((base + top).translate([-5, -12, 0]))
+    return m3.Manifold.batch_boolean(parts, m3.OpType.Add)
+
+
 if __name__ == "__main__":
     save(robot(), "robot", edge=2.5)
     save(bear(), "bear")
     save(rocket(), "rocket", edge=2.5)
+    save(gardener(), "gardener", edge=4, weld=True)
