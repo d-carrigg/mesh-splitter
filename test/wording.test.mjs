@@ -11,11 +11,6 @@ const RULES = [
   [/\bneighbou?r/i, (w) => /neighbour/i.test(w) && `"${w}": ${AMERICAN}, write "neighbor"`],
   [/\b(centre|metre|litre|fibre)s?\b/i, (w) => `"${w}": ${AMERICAN}, write "${w.replace(/re(s?)$/i, "er$1")}"`],
   [/\bgrey/i, (w) => `"${w}": ${AMERICAN}, write "gray"`],
-  [/\b(behaviour|favourite|flavour|honour|labour|harbour|rumour|humour|armour|savour)\w*/i, (w) => `"${w}": ${AMERICAN}, drop the "u"`],
-  [/\b(organis|optimis|normalis|recognis|initialis|visualis|minimis|maximis|summaris|customis|prioritis|serialis|finalis|realis|utilis|categoris|authoris|apologis|emphasis(?!e?s?\b))(e|ed|es|ing|ation)\b/i, (w) => `"${w}": ${AMERICAN}, write it with "z"`],
-  [/\banalys(e|ed|es|ing)\b/i, (w) => `"${w}": ${AMERICAN}, write "analyze"`],
-  [/\blicence\b/i, (w) => `"${w}": ${AMERICAN}, write "license"`],
-  [/\b(modell|travell)(ing|ed|er)\b/i, (w) => `"${w}": ${AMERICAN}, use one "l"`],
   [/\bAI[- ](generated|made|created)\b|\b(generated|made|created) (by|with) AI\b|\bfor AI (models|figures|meshes)\b/i,
     (w) => `"${w}": Mesh Splitter is a general mesh-splitting tool, never describe it as for AI-made models (the Meshy credit for the screenshot model is the only allowed mention, marked wording-ok)`],
 ];

@@ -39,7 +39,7 @@ GRANT_KEYS = {"fs_readwrite": "fs_readwrite", "process": "process", "network": "
 
 def requested_permissions():
     import importlib.util
-    fake_orca.install([])
+    fake_orca.install([], storage=tempfile.mkdtemp())
     import orca
     spec = importlib.util.spec_from_file_location("mesh_splitter_plugin", HERE / "plugin.py")
     mod = importlib.util.module_from_spec(spec)

@@ -510,7 +510,7 @@ function renderHitRow(i) {
 }
 
 // ---------------------------------------------------------------- heal joint
-// part.heal = { r: blend mm }. After the part is moved/rotated, each vertex of its joint loop (longest cut) is pulled
+// part.heal = { r: blend mm }. After the part is moved/rotated, each vertex of its joint loop (the cut it turns at) is pulled
 // to the neighbor's rim (the same loop at its original place) at the same angle about the joint axis; the pull fades
 // to zero over r mm from the cut (cosine falloff), so the part stretches or squeezes to stay flush.
 const healCache = new Map();
@@ -3796,7 +3796,7 @@ $("sessIn").onchange = async () => { const f = $("sessIn").files[0]; if (f) load
 
 // ---------------------------------------------------------------- boot
 document.querySelectorAll("[data-icon]").forEach((b) => setHTML(b, icon(b.dataset.icon), "afterbegin"));
-document.querySelectorAll("[data-icon-span]").forEach((b) => (setHTML(b, icon(b.dataset.iconSpan))));
+document.querySelectorAll("[data-icon-span]").forEach((b) => setHTML(b, icon(b.dataset.iconSpan)));
 new ResizeObserver(resize).observe(view);
 setTool("orbit"); syncSliders(); resize(); llmStatus(); renderRecent(); $("colorMode").classList.toggle("on", byFilament);
 const qp = new URLSearchParams(location.search).get("file");

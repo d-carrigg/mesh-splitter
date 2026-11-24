@@ -3,15 +3,9 @@
   "private": true,
   "type": "module",
   "description": "Command line for Mesh Splitter: runs app/core.js, the splitting code the browser app and OrcaSlicer plugin use",
-  "bin": {
-    "mesh-splitter": "cli/split.mjs"
-  },
-  "scripts": {
-    "check": "node --test test/*.test.mjs && node test/golden.mjs && cd plugin && uv run --frozen python test_plugin.py && uv run --frozen python ../server/test_llm_review.py"
-  },
-  "engines": {
-    "node": ">=20"
-  },
+  "bin": { "mesh-splitter": "cli/split.mjs" },
+  "engines": { "node": ">=20" },
+  "scripts": { "check": "node --test test/*.test.mjs && node test/golden.mjs && cd plugin && uv run --frozen python test_plugin.py && uv run --frozen python ../server/test_llm_review.py" },
   "dependencies": {
     "@xmldom/xmldom": "0.9.12",
     "fflate": "0.8.3"

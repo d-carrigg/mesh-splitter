@@ -4,21 +4,12 @@ Run `npm run check` before you push. It is the same command the Checks workflow 
 
 The slow checks run only on the Release Please PR: the plugin end-to-end test (`plugin/e2e.mjs`), the real OrcaSlicer test (`plugin/real_orca_test.py`), the site CSP in a browser (`test/csp.browser.mjs`) and the command line binaries.
 
-## Rules and what enforces them
-
-When a rule here is broken again, encode it in a check and change its row. Don't add another sentence.
+## Release-only checks
 
 | Rule | Enforced by |
 | --- | --- |
-| Every action in a workflow points at a tag or branch that exists | `test/workflows.test.mjs` |
-| The real OrcaSlicer test grants every permission the plugin requests | `real_orca_test.requested_permissions()` reads them from `plugin.py`; `test_real_orca_check_can_grant_everything_the_plugin_requests` |
-| American English, and never describe the tool as for AI-made models | `test/wording.test.mjs` | <!-- wording-ok: names the banned phrase -->
-| The app writes markup only through `setHTML` with an `html` template, which escapes every value | `app/html.js`, `test/html.test.mjs` |
-| The site's CSP allows everything the page loads | `test/csp.browser.mjs`: Chromium reports no CSP violation (release PR only) |
-| The plugin wheel has no encoded blobs and no huge `.py` (OrcaCloud rates those Medium) | `review_risks` in `plugin/build.py` |
-| Send to Orca works after any order of sends, Open as project and deletes | `SendSequenceModel` in `plugin/test_plugin.py` |
-| Moving a part shows the gap by default and Fill/Anchor stay closed | `plugin/e2e.mjs` (release PR only) |
-| Forks build as "Mesh Splitter (unofficial copy)"; the license ships in the wheel | `BuildTests` |
+| The site's CSP allows everything the page loads | `test/csp.browser.mjs`: Chromium reports no CSP violation |
+| Moving a part shows the gap by default and Fill/Anchor stay closed | `plugin/e2e.mjs` |
 
 ## Judgment calls nothing checks
 

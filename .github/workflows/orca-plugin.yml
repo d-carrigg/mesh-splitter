@@ -50,11 +50,6 @@ jobs:
           fi
           uv run python build.py --page-out build/page.html   # version from pyproject.toml
           echo "WHL=$(ls dist/*.whl)" >> "$GITHUB_ENV"   # dist/mesh_splitter_any.whl, or the _copy_ name
-      - name: Unit tests
-        if: env.RUN_TESTS == 'true'
-        run: |
-          uv run python test_plugin.py
-          uv run python ../server/test_llm_review.py
       - name: End-to-end (page + plugin bridge + multi-part 3MF)
         if: env.RUN_TESTS == 'true'
         run: |
