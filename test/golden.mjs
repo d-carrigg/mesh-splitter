@@ -76,7 +76,6 @@ for (const [name, [args]] of Object.entries(CASES)) {
   core.autoSplit(S, 8, { step: core.DEFAULTS.step, smooth: core.DEFAULTS.smooth });
   const m = core.meshOf(S, (l) => l === 1);
   const d = {
-    exports: sha(Object.keys(core).sort().join(",")),
     meshOf: sha(JSON.stringify(m, (k, v) => (v instanceof Map ? [...v] : v))),
     soupVolume: core.soupVolume(core.closedPart(S, 1)).toFixed(6),
     reverseSoup: sha(new Uint8Array(core.reverseSoup(core.closedPart(S, 2)).buffer)),

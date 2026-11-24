@@ -5,6 +5,7 @@ import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast, MeshBVH } fro
 import { Brush, Evaluator, SUBTRACTION } from "three-bvh-csg";
 import { zipSync } from "fflate";
 import * as core from "./core.js";
+import { html, trusted, setHTML } from "./html.js";
 import { PALETTE, UNASSIGNED_COLOR, weld, soupIndex, paintCode, stlBinary, safeName as safe } from "./core.js";
 
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
@@ -56,7 +57,7 @@ const ICONS = {
   move: '<path d="M12 2v20M2 12h20"/><path d="m9 5 3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3M19 9l3 3-3 3"/>',
   load: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
 };
-const icon = (n) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
+const icon = (n) => trusted(`<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`);
 
 // ---------------------------------------------------------------- state
 const S = {
@@ -509,17 +510,18 @@ function renderHitRow(i) {
 }
 
 // ---------------------------------------------------------------- heal joint
-// part.heal = { r: blend mm }. After the part is moved/rotated, each vertex of its joint loop (longest cut) is pulled
+// part.heal = { r: blend mm }. After the part is moved/rotated, each vertex of its joint loop (the cut it turns at) is pulled
 // to the neighbor's rim (the same loop at its original place) at the same angle about the joint axis; the pull fades
 // to zero over r mm from the cut (cosine falloff), so the part stretches or squeezes to stay flush.
 const healCache = new Map();
 function healBase(i) { // geometry-only part: loop, rim angles, nearest loop vertex + distance for each part vertex
-  const key = `${i}|${S.nF}|${fullHash()}`;
+  const jk = bodyJoint(i)?.loopKey, key = `${i}|${S.nF}|${fullHash()}|${jk}`;
   if (healCache.has(key)) return healCache.get(key);
   if (healCache.size > 8) healCache.clear();
   const pm = meshOf((l) => l === i); let best = null, bl = -1;
   const P = (v) => new THREE.Vector3(S.pos[3*v], S.pos[3*v+1], S.pos[3*v+2]);
-  for (const lp of pm?.loopList || []) { let len = 0; for (const [a, b] of lp) len += P(a).distanceTo(P(b)); if (len > bl) { bl = len; best = lp; } }
+  const loops = pm?.loopList || [], atJ = loops.filter((lp) => core.loopKey(lp) === jk);
+  for (const lp of atJ.length ? atJ : loops) { let len = 0; for (const [a, b] of lp) len += P(a).distanceTo(P(b)); if (len > bl) { bl = len; best = lp; } }
   if (!best) { healCache.set(key, null); return null; }
   const L = best.map(([a]) => a), pts = L.map(P), J = new THREE.Vector3();
   pts.forEach((p) => J.add(p)); J.divideScalar(pts.length);
@@ -832,10 +834,10 @@ function setAutoStretch(js, on, gap) {
   scheduleHits(); // applyXf skips it when no part has a transform yet, and the solve runs from it
 }
 function renderFollowRow(i) {
-  const row = $("followRow"); row.innerHTML = "";
+  const row = $("followRow"); row.replaceChildren();
   if (!S.G || i <= 0 || !S.parts[i]) return;
   const chip = (j, label) => {
-    const c = document.createElement("span"); c.className = "chip"; c.innerHTML = `<span class="sw" style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${esc(S.parts[j].color)}"></span>${esc(label)}`;
+    const c = document.createElement("span"); c.className = "chip"; setHTML(c, html`<span class="sw" style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${S.parts[j].color}"></span>${label}`);
     const x = document.createElement("button"); x.textContent = "×"; x.title = "Stop moving together";
     x.onclick = () => setFollow([j === leaderOf(i) ? i : j], null); c.appendChild(x); return c;
   };
@@ -860,10 +862,10 @@ function healSoup(i, orig, out) {
 }
 
 // ---------------------------------------------------------------- fill / anchor
-// When a part moves away from a neighbor, the cut between them opens and each side shows a hole. Fill (the default)
-// closes each side with a patch that follows the surrounding surface, so the body stays smooth where a hand used to
-// rest. Anchor (part.anchor) keeps the part joined instead: new material sweeps from the neighbor's rim to the part's
-// moved cut, along the same turn, so an arm turned at the shoulder stays attached to the body.
+// When a part moves away from a neighbor, the cut between them opens and each side shows a hole. Open (the default)
+// shows the gap. Fill (part.fill) closes each side with a patch that follows the surrounding surface, so the body stays
+// smooth where a hand used to rest. Anchor (part.anchor) keeps the part joined instead: new material sweeps from the
+// neighbor's rim to the part's moved cut, along the same turn, so an arm turned at the shoulder stays attached to the body.
 let twinCache = { key: null, map: null }, loopCache = new Map();
 function twinLabels(hash) { // directed edge a->b (key a*nV+b) -> label of the face that has it
   const key = `${S.nF}|${hash}`;
@@ -1999,7 +2001,7 @@ const TOOLS = [
 ];
 document.querySelectorAll("[data-tools]").forEach((g) => [...g.dataset.tools.split(",")].reverse().forEach((id) => {
   const t = TOOLS.find((t) => t.id === id), b = document.createElement("button");
-  b.dataset.tool = t.id; b.title = t.title; b.innerHTML = icon(t.icon);
+  b.dataset.tool = t.id; b.title = t.title; setHTML(b, icon(t.icon));
   b.onclick = () => setTool(t.id);
   g.prepend(b);
 }));
@@ -2143,7 +2145,7 @@ function refreshUI() {
     rows.set(tr.dataset.k, tr);
     if (before) { const rect = tr.getBoundingClientRect(); before.set(tr.dataset.k, { tr, rect, top: rect.top }); }
   }
-  if (!S.G) body.innerHTML = "";
+  if (!S.G) body.replaceChildren();
   document.body.classList.toggle("empty", !S.G);
   if (!S.G) { updateConnGhosts(); return; }
   const solo = isSolo(S.active);
@@ -2157,12 +2159,12 @@ function refreshUI() {
     rows.delete(key);
     tr.className = i === S.active ? "active" : mergeSel.has(i) ? "msel" : "";
     tr.title = i ? "Click: select · Ctrl/Shift+click: select more · Right-click: actions" : "Click: select · Right-click: actions";
-    tr.innerHTML = `<td><span class="sw" style="background:${esc(p.color)}"></span></td>
-      <td class="nm">${esc(p.name)}</td>
-      <td class="fcol" title="Filament slot"><span class="fil" style="background:${esc(filColor(p.filament))}">${esc(p.filament)}</span></td>
-      <td class="n">${cnt[i].toLocaleString()}${p.seeds.length ? ` · ${p.seeds.length}●` : ""}</td>
-      <td class="pins${pins[i]?.bad ? " bad" : ""}" title="${pins[i] ? `${plural(pins[i].n, "connector")}${pins[i].bad ? `, ${pins[i].bad} that ${pins[i].bad > 1 ? "don't" : "doesn't"} fit` : ""}` : ""}">${pins[i] ? `${icon("pin")}${pins[i].n}` : ""}</td>
-      <td><button class="eye" title="${p.visible ? "Hide" : "Show"}">${icon(p.visible ? "eye" : "eyeOff")}</button></td>`;
+    setHTML(tr, html`<td><span class="sw" style="background:${p.color}"></span></td>
+      <td class="nm">${p.name}</td>
+      <td class="fcol" title="Filament slot"><span class="fil" style="background:${filColor(p.filament)}">${p.filament}</span></td>
+      <td class="n">${cnt[i].toLocaleString()}${p.seeds.length ? html` · ${p.seeds.length}●` : ""}</td>
+      <td class="pins${pins[i]?.bad ? " bad" : ""}" title="${pins[i] ? html`${plural(pins[i].n, "connector")}${pins[i].bad ? html`, ${pins[i].bad} that ${pins[i].bad > 1 ? "don't" : "doesn't"} fit` : ""}` : ""}">${pins[i] ? html`${icon("pin")}${pins[i].n}` : ""}</td>
+      <td><button class="eye" title="${p.visible ? "Hide" : "Show"}">${icon(p.visible ? "eye" : "eyeOff")}</button></td>`);
     tr.onclick = (ev) => {
       if (ev.target.closest(".eye")) return;
       if (ev.shiftKey || ev.ctrlKey || ev.metaKey) toggleSel(i); else selectPart(i);
@@ -2245,14 +2247,14 @@ function openCtx(ev) {
   { const sel2 = selected(); if (l > 0 && sel2.length === 2 && !sel2.includes(l)) it("reach", `Hold between ${S.parts[sel2[0]].name} and ${S.parts[sel2[1]].name}`, () => setHold(l, sel2[0], sel2[1])); }
   if (l > 0 && holdersOf(l)) it("unlink", "Release (no longer held)", () => setHold(l, 0));
   if (l > 0 && mergeSel.size && selected().includes(l)) it("merge", `Merge ${selected().length} selected into ${S.parts[S.active].name}`, mergeSelected);
-  showMenu(ev, `<span class="sw" style="background:${esc(p.color)}"></span>${esc(p.name)}`, items);
+  showMenu(ev, html`<span class="sw" style="background:${p.color}"></span>${p.name}`, items);
 }
 function showMenu(ev, head, items) {
-  const m = $("ctxMenu"); m.innerHTML = `<div class="hd">${head}</div>`;
+  const m = $("ctxMenu"); setHTML(m, html`<div class="hd">${head}</div>`);
   for (const x of items) {
-    if (x === "-") { m.insertAdjacentHTML("beforeend", '<div style="border-top:1px solid var(--line);margin:2px 0"></div>'); continue; }
+    if (x === "-") { setHTML(m, html`<div style="border-top:1px solid var(--line);margin:2px 0"></div>`, "beforeend"); continue; }
     const b = document.createElement("button"); if (x.cls) b.className = x.cls;
-    b.innerHTML = icon(x.ic) + esc(x.label);
+    setHTML(b, html`${icon(x.ic)}${x.label}`);
     b.onclick = (e) => { e.stopPropagation(); closeCtx(); later(x.fn); };
     m.appendChild(b);
   }
@@ -2267,7 +2269,7 @@ function openPartMenu(ev, i) {
   if (i === 0) {
     it("fill", "Fill all unassigned", () => fillUnassigned(-1));
     it("eyeOff", p.visible ? "Hide" : "Show", () => { p.visible = !p.visible; afterEdit(); });
-    showMenu(ev, `<span class="sw" style="background:${esc(p.color)}"></span>${esc(p.name)}`, items); return;
+    showMenu(ev, html`<span class="sw" style="background:${p.color}"></span>${p.name}`, items); return;
   }
   if (multi) {
     const main = S.parts[S.active];
@@ -2280,7 +2282,7 @@ function openPartMenu(ev, i) {
     it("trash", `Delete ${sel.length} parts (merge into neighbors)`, () => { const ps = sel.map((j) => S.parts[j]); mergeSel.clear(); for (const q of ps) { const j = S.parts.indexOf(q); if (j > 0) deletePart(j); } }, "danger");
     it("trash", `Delete geometry of ${sel.length} parts, close holes`, () => deleteGeometry(sel, true), "danger");
     it("trash", `Delete geometry of ${sel.length} parts, leave holes`, () => deleteGeometry(sel, false), "danger");
-    showMenu(ev, `${sel.length} parts selected`, items); return;
+    showMenu(ev, html`${sel.length} parts selected`, items); return;
   }
   it("text", "Rename", () => startRename(i));
   it("frame", "Zoom to part", () => { selectPart(i); frameBox(partWorldBox(i)); });
@@ -2293,7 +2295,7 @@ function openPartMenu(ev, i) {
   it("trash", "Delete (merge into neighbor)", () => deletePart(i), "danger");
   it("trash", "Delete geometry, close holes", () => deleteGeometry([i], true), "danger");
   it("trash", "Delete geometry, leave holes", () => deleteGeometry([i], false), "danger");
-  showMenu(ev, `<span class="sw" style="background:${esc(p.color)}"></span>${esc(p.name)} · F${esc(p.filament)}`, items);
+  showMenu(ev, html`<span class="sw" style="background:${p.color}"></span>${p.name} · F${p.filament}`, items);
 }
 
 // ---------------------------------------------------------------- guided add part
@@ -2459,7 +2461,7 @@ $("autoK").addEventListener("keydown", (e) => { if (e.key === "Enter") $("autoRu
 // Paint into part: one swatch per part, numbered like OrcaSlicer's filament swatches.
 function renderPaintSw() {
   const box = $("paintSw"); if ($("splitPanel").hidden || splitMethod !== "paint" || !S.G) return;
-  box.innerHTML = "";
+  box.replaceChildren();
   S.parts.forEach((p, i) => {
     if (!i) return;
     const b = document.createElement("button");
@@ -2507,10 +2509,10 @@ const ago = (t) => { const m = (Date.now() - t) / 6e4; return m < 60 ? `${Math.m
 async function renderRecent() {
   const all = await recentAll();
   for (const box of [$("recentMenu"), $("dropRecent")]) {
-    box.innerHTML = "";
+    box.replaceChildren();
     for (const r of all) {
       const b = document.createElement("button"); b.title = r.name;
-      b.innerHTML = `${icon("open")}<span style="overflow:hidden;text-overflow:ellipsis;max-width:320px">${esc(r.name)}</span><span class="meta">${ago(r.t)}</span>`;
+      setHTML(b, html`${icon("open")}<span style="overflow:hidden;text-overflow:ellipsis;max-width:320px">${r.name}</span><span class="meta">${ago(r.t)}</span>`);
       b.onclick = () => { closeMenus(); openBuf(r.name, r.buf); };
       box.appendChild(b);
     }
@@ -2793,7 +2795,7 @@ function showXfDims() {
   if (!S.G || !mesh || i <= 0) { info.hidden = true; return; }
   const b = partWorldBox(i), p = S.parts[i];
   const dims = isFinite(b[0]) ? `${(b[3]-b[0]).toFixed(1)} × ${(b[4]-b[1]).toFixed(1)} × ${(b[5]-b[2]).toFixed(1)} mm` : "no faces";
-  info.innerHTML = `Part name: ${esc(p.name)}<br>Size: ${dims}<br>Triangles: ${partCounts()[i].toLocaleString()}${S.printAs === "one" ? "" : ` · Filament ${p.filament}`}`;
+  setHTML(info, html`Part name: ${p.name}<br>Size: ${dims}<br>Triangles: ${partCounts()[i].toLocaleString()}${S.printAs === "one" ? "" : html` · Filament ${p.filament}`}`);
   info.hidden = false;
 }
 $("xfPanel").addEventListener("focusin", () => { if (S.G) xfSnap = snapshot(); });
@@ -3043,8 +3045,8 @@ function drawPartLinks() {
   const gut = Math.max(12, 8 + 4 * lanes.length), hi = new Set(linkHover > 0 ? [linkHover] : selected());
   wrap.style.setProperty("--gut", `${gut}px`);
   svg.setAttribute("width", gut); svg.setAttribute("height", wrap.offsetHeight);
-  svg.innerHTML = links.map((l) => { const x = gut - 5 - 4 * l.lane, xe = gut - 1;
-    return `<path class="${l.bad ? "bad" : ""}${hi.has(l.a) || hi.has(l.b) ? " hi" : ""}" d="M${xe} ${l.y1}H${x}V${l.y2}H${xe}"/>`; }).join("");
+  setHTML(svg, html`${links.map((l) => { const x = gut - 5 - 4 * l.lane, xe = gut - 1;
+    return html`<path class="${l.bad ? "bad" : ""}${hi.has(l.a) || hi.has(l.b) ? " hi" : ""}" d="M${xe} ${l.y1}H${x}V${l.y2}H${xe}"/>`; })}`);
 }
 function refreshConnUI() {
   if (!S.G) return;
@@ -3093,15 +3095,15 @@ function refreshConnCard() {
   box.appendChild(ed); box.hidden = !list.length; box.classList.toggle("multi", multi);
   if (!list.length) return;
   if (!list.some((e) => connKey(e.c) === connOpen)) connOpen = "";
-  rows.innerHTML = "";
+  rows.replaceChildren();
   for (const e of list) {
     const open = !multi && connKey(e.c) === connOpen, row = document.createElement("div");
     row.className = `cRow${e.state === "ok" ? "" : " bad"}${open ? " open" : ""}`;
-    row.innerHTML = `<span class="nm">${esc(connName(e, multi ? -1 : S.active))}</span><span class="what">${e.c.peg ? "Plug" : "Dowel"} ${e.c.d} mm</span>`;
+    setHTML(row, html`<span class="nm">${connName(e, multi ? -1 : S.active)}</span><span class="what">${e.c.peg ? "Plug" : "Dowel"} ${e.c.d} mm</span>`);
     if (!multi) row.onclick = () => { connOpen = open ? "" : connKey(e.c); refreshConnCard(); };
     if (e.s) { row.onmouseenter = () => { seamHover = e.s; updateConnGhosts(); }; row.onmouseleave = () => { if (seamHover === e.s) { seamHover = null; updateConnGhosts(); } }; }
     rows.appendChild(row);
-    if (e.state !== "ok") rows.insertAdjacentHTML("beforeend", `<div class="cWhy">${esc(e.why)}</div>`);
+    if (e.state !== "ok") setHTML(rows, html`<div class="cWhy">${e.why}</div>`, "beforeend");
     if (open) rows.appendChild(ed);
   }
   const T = connTargets();
@@ -3119,8 +3121,8 @@ function refreshConnCard() {
   }
   const plugs = T.filter((e) => e.c.peg && e.s), on = $("connOn");
   $("connOnRow").hidden = !plugs.length;
-  if (multi) on.innerHTML = `<button data-swap="1" title="Put each peg on the other part, and its hole in this one">Swap sides</button>`;
-  else if (plugs.length) { const e = plugs[0]; on.innerHTML = [e.s.a, e.s.b].map((j) => `<button data-on="${j}" class="${S.parts[j].uid === e.c.peg ? "on" : ""}" title="The peg sticks out of ${esc(S.parts[j].name)}">${esc(S.parts[j].name)}</button>`).join(""); }
+  if (multi) setHTML(on, html`<button data-swap="1" title="Put each peg on the other part, and its hole in this one">Swap sides</button>`);
+  else if (plugs.length) { const e = plugs[0]; setHTML(on, html`${[e.s.a, e.s.b].map((j) => html`<button data-on="${j}" class="${S.parts[j].uid === e.c.peg ? "on" : ""}" title="The peg sticks out of ${S.parts[j].name}">${S.parts[j].name}</button>`)}`); }
   $("connNote").textContent = multi ? `Changes apply to these ${plural(T.length, "connector")}.` : "";
 }
 // The connectors the card's settings act on: the open one, or with several parts selected every one listed.
@@ -3411,7 +3413,7 @@ async function llmSendName(body, onProgress, signal) {
 const llmWho = (j) => j.provider === "custom" ? (j.base_url || "").replace(/^https?:\/\//, "") : j.label;
 function llmShow(j) {
   LLM.st = j;
-  $("aiState").innerHTML = j.configured ? `${esc(llmWho(j))} · <b style="color:var(--fg)">${esc(j.model || "the loaded model")}</b>` : "No AI model connected yet.";
+  setHTML($("aiState"), html`${j.configured ? html`${llmWho(j)} · <b style="color:var(--fg)">${j.model || "the loaded model"}</b>` : "No AI model connected yet."}`);
   $("aiState").title = j.configured ? `${j.label}${j.has_key ? ` · key ${j.source === "saved" ? "saved" : `from ${j.key_note || j.source}`}` : ""}` : "";
   $("aiChange").textContent = j.configured ? "Change" : "Connect";
   $("aiBtn").disabled = !j.configured;
@@ -3428,11 +3430,11 @@ const KEY_HELP = { openrouter: "Get a key at openrouter.ai/keys", openai: "Get a
   anthropic: "Get a key at console.anthropic.com", custom: "LM Studio, Ollama and other OpenAI-compatible servers. Key optional." };
 function llmFillModels(pid) {
   const list = [...new Set([...(MODEL_HINTS[pid] || []), ...(LLM.models[pid] || [])])];
-  $("aiModels").innerHTML = list.map((m) => `<option value="${esc(m)}">`).join("");
+  setHTML($("aiModels"), html`${list.map((m) => html`<option value="${m}">`)}`);
 }
 function llmFillSettings(pid) {
   const j = LLM.st, p = j.providers.find((x) => x.id === pid) || j.providers[0], cur = pid === j.provider;
-  $("aiProv").innerHTML = j.providers.map((x) => `<option value="${x.id}">${esc(x.label)}</option>`).join(""); $("aiProv").value = p.id;
+  setHTML($("aiProv"), html`${j.providers.map((x) => html`<option value="${x.id}">${x.label}</option>`)}`); $("aiProv").value = p.id;
   $("aiUrlRow").hidden = p.id !== "custom";
   $("aiUrl").value = cur && p.id === "custom" ? j.base_url : p.base_url;
   $("aiKey").value = "";
@@ -3483,24 +3485,23 @@ $("aiSave").onclick = () => llmSave();
 $("aiForget").onclick = () => llmSave({ clear_key: true });
 for (const id of ["aiKey", "aiUrl", "aiModel"]) $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") llmSave(); });
 
-const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 function renderNaming(R) {
-  const o = $("aiOut"), nP = S.parts.length; o.innerHTML = "";
-  const ai = R.ai, add = (h) => o.insertAdjacentHTML("beforeend", h);
-  if (R.error) add(`<div class="iss high">${esc(R.error)}${R.raw ? `<div class="fix">${esc(R.raw.slice(0, 300))}</div>` : ""}</div>`);
-  if (ai?.object || ai?.summary) add(`<div class="small" style="margin-top:4px"><b style="color:var(--fg)">${esc(ai.object || "")}</b> ${esc(ai.summary || "")}</div>`);
+  const o = $("aiOut"), nP = S.parts.length; o.replaceChildren();
+  const ai = R.ai, add = (h) => setHTML(o, h, "beforeend");
+  if (R.error) add(html`<div class="iss high">${R.error}${R.raw ? html`<div class="fix">${R.raw.slice(0, 300)}</div>` : ""}</div>`);
+  if (ai?.object || ai?.summary) add(html`<div class="small" style="margin-top:4px"><b style="color:var(--fg)">${ai.object || ""}</b> ${ai.summary || ""}</div>`);
   const names = (ai?.parts || []).filter((p) => Number.isInteger(p.id) && p.id > 0 && p.id < nP && p.name);
   if (names.length) {
-    add(`<div class="sec">Names</div>`);
+    add(html`<div class="sec">Names</div>`);
     const box = document.createElement("div"); o.appendChild(box);
     for (const p of names) {
       const cur = S.parts[p.id], row = document.createElement("label"); row.className = "nm";
       const conf = typeof p.confidence === "number" ? ` (${Math.round(p.confidence * 100)}%)` : "";
       row.title = `Now: ${cur.name}${conf}`;
-      row.innerHTML = `<input type="checkbox" ${p.name !== cur.name && (p.confidence ?? 1) >= 0.4 ? "checked" : ""}><span><span class="sw" style="background:${esc(cur.color)}"></span> #${p.id}</span><input type="text" value="${esc(p.name)}">`;
+      setHTML(row, html`<input type="checkbox" ${p.name !== cur.name && (p.confidence ?? 1) >= 0.4 ? "checked" : ""}><span><span class="sw" style="background:${cur.color}"></span> #${p.id}</span><input type="text" value="${p.name}">`);
       row.dataset.id = p.id; box.appendChild(row);
     }
-    const b = document.createElement("button"); b.innerHTML = icon("check") + "Apply names"; b.style.marginTop = "4px";
+    const b = document.createElement("button"); setHTML(b, html`${icon("check")}Apply names`); b.style.marginTop = "4px";
     b.onclick = () => {
       const rows = [...box.querySelectorAll(".nm")].filter((r) => r.querySelector("input[type=checkbox]").checked);
       if (!rows.length) return;
@@ -3511,19 +3512,19 @@ function renderNaming(R) {
     o.appendChild(b);
   }
   const issues = [...(R.checks || []).map((x) => ({ ...x, src: "check" })), ...(ai?.issues || []).map((x) => ({ ...x, src: "AI" }))];
-  if (issues.length || R.checks) add(`<div class="sec">Issues</div>`);
-  if (!issues.length && R.checks && !R.pending) add(`<div class="small">None found.</div>`);
+  if (issues.length || R.checks) add(html`<div class="sec">Issues</div>`);
+  if (!issues.length && R.checks && !R.pending) add(html`<div class="small">None found.</div>`);
   for (const x of issues) {
     const ids = (x.parts || []).filter((i) => Number.isInteger(i) && i >= 0 && i < nP);
     const d = document.createElement("div"); d.className = `iss ${["high", "medium", "low"].includes(x.severity) ? x.severity : "low"}`;
-    d.innerHTML = `${esc(x.problem)} <span class="small">· ${x.src}</span>${x.fix ? `<div class="fix">${esc(x.fix)}</div>` : ""}`;
+    setHTML(d, html`${x.problem} <span class="small">· ${x.src}</span>${x.fix ? html`<div class="fix">${x.fix}</div>` : ""}`);
     d.title = ids.length ? "Click: make the first part active and show only these parts (eye button shows all again)" : "";
     d.onclick = () => { if (!ids.length) return; S.active = ids[0]; S.parts.forEach((p, i) => (p.visible = ids.includes(i))); afterEdit(`Showing ${ids.map((i) => "#" + i).join(", ")}`); };
     o.appendChild(d);
   }
   if (R.images) {
     const urls = R.images.map((u) => { const b = atob(u.split(",")[1]), a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return URL.createObjectURL(new Blob([a], { type: "image/jpeg" })); });
-    add(`<div class="small" style="margin-top:6px">Sent: <a href="${urls[0]}" target="_blank" style="color:var(--acc)">views</a> · <a href="${urls[1]}" target="_blank" style="color:var(--acc)">part sheet</a>${R.usage ? ` · ${R.usage.prompt_tokens ?? "?"}+${R.usage.completion_tokens ?? "?"} tokens` : ""}</div>`);
+    add(html`<div class="small" style="margin-top:6px">Sent: <a href="${urls[0]}" target="_blank" style="color:var(--acc)">views</a> · <a href="${urls[1]}" target="_blank" style="color:var(--acc)">part sheet</a>${R.usage ? ` · ${R.usage.prompt_tokens ?? "?"}+${R.usage.completion_tokens ?? "?"} tokens` : ""}</div>`);
   }
 }
 
@@ -3794,8 +3795,8 @@ $("loadSess").onclick = () => { closeMenus(); S.G ? $("sessIn").click() : alert(
 $("sessIn").onchange = async () => { const f = $("sessIn").files[0]; if (f) loadSession(await f.text()); $("sessIn").value = ""; };
 
 // ---------------------------------------------------------------- boot
-document.querySelectorAll("[data-icon]").forEach((b) => b.insertAdjacentHTML("afterbegin", icon(b.dataset.icon)));
-document.querySelectorAll("[data-icon-span]").forEach((b) => (b.innerHTML = icon(b.dataset.iconSpan)));
+document.querySelectorAll("[data-icon]").forEach((b) => setHTML(b, icon(b.dataset.icon), "afterbegin"));
+document.querySelectorAll("[data-icon-span]").forEach((b) => setHTML(b, icon(b.dataset.iconSpan)));
 new ResizeObserver(resize).observe(view);
 setTool("orbit"); syncSliders(); resize(); llmStatus(); renderRecent(); $("colorMode").classList.toggle("on", byFilament);
 const qp = new URLSearchParams(location.search).get("file");
@@ -3855,15 +3856,15 @@ ORCA.send = (mode = "add") => {
 };
 function orcaRenderObjects() {
   for (const box of [$("orcaMenu"), $("dropOrca")]) {
-    box.innerHTML = "";
-    if (box === $("dropOrca") && ORCA.objects.length) box.insertAdjacentHTML("beforeend", `<div class="small" style="margin:8px 0 4px">From the plate:</div>`);
+    box.replaceChildren();
+    if (box === $("dropOrca") && ORCA.objects.length) setHTML(box, html`<div class="small" style="margin:8px 0 4px">From the plate:</div>`, "beforeend");
     for (const o of ORCA.objects) {
       const b = document.createElement("button"); b.title = o.name;
-      b.innerHTML = `${icon("open")}<span style="overflow:hidden;text-overflow:ellipsis;max-width:320px">${esc(o.name)}</span><span class="meta">${o.faces.toLocaleString()} faces${o.parts > 1 ? ` · ${o.parts} parts` : ""}${o.ignored ? ` · ${o.ignored} modifier(s) ignored` : ""}</span>`;
+      setHTML(b, html`${icon("open")}<span style="overflow:hidden;text-overflow:ellipsis;max-width:320px">${o.name}</span><span class="meta">${o.faces.toLocaleString()} faces${o.parts > 1 ? html` · ${o.parts} parts` : ""}${o.ignored ? html` · ${o.ignored} modifier(s) ignored` : ""}</span>`);
       b.onclick = () => { closeMenus(); orcaLoad(o); };
       box.appendChild(b);
     }
-    if (!ORCA.objects.length) box.insertAdjacentHTML("beforeend", `<div class="small" style="padding:6px 8px">No objects on the plate.</div>`);
+    if (!ORCA.objects.length) setHTML(box, html`<div class="small" style="padding:6px 8px">No objects on the plate.</div>`, "beforeend");
   }
 }
 let rxTimer = 0;
@@ -3907,7 +3908,7 @@ function orcaNewProject(prev, objs) {
     return;
   }
   $("newProjText").textContent = `Load ${objs.length === 1 ? "its model" : "one of its models"} here? Your split of ${S.name} is saved: open it again to continue it.`;
-  const list = $("newProjList"); list.innerHTML = "";
+  const list = $("newProjList"); list.replaceChildren();
   for (const o of objs) {
     const b = document.createElement("button"); b.className = "pri"; b.title = o.name;
     b.textContent = `Load ${o.name}`;

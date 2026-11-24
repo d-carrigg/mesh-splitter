@@ -132,6 +132,22 @@ def as_copy(src, page):
     return src.replace(name_line, f'# name = "{COPY_NAME}"'), OFFICIAL_LINE_RE.sub(COPY_LINE, page)
 
 
+BLOB_RE = re.compile(r"[A-Za-z0-9+/=]{200,}")
+PY_MAX = 200_000
+
+
+def review_risks(files):
+    """OrcaCloud's automated review decodes encoded payloads and can't read a huge .py: either rates the plugin
+    Medium (#5, #75). Ship code and the page as plain files instead (#77)."""
+    for name, text in files.items():
+        if BLOB_RE.search(text):
+            sys.exit(f"{name}: has a {len(BLOB_RE.search(text).group()):,}-character encoded run. OrcaCloud's review "
+                     "decodes it and rates the plugin Medium: ship it as a plain file in the wheel (write_wheel).")
+        if name.endswith(".py") and len(text) > PY_MAX:
+            sys.exit(f"{name}: {len(text):,} characters, over {PY_MAX:,}. OrcaCloud's review can't read a .py that "
+                     "large and rates the plugin Medium: move the bulk into its own plain file in the wheel.")
+
+
 def write_wheel(out, src, page, version, package):
     """A pure-Python wheel: OrcaSlicer reads Name/Version/Summary/Author/Requires-Dist from METADATA."""
     m = HEADER_RE.match(src)
@@ -162,6 +178,7 @@ def write_wheel(out, src, page, version, package):
         digest = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode("ascii")
         record += f"{name},sha256={digest},{len(data)}\n"
     files[info + "RECORD"] = record + f"{info}RECORD,,\n"
+    review_risks(files)
     out.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         for name, text in files.items():

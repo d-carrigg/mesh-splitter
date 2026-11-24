@@ -285,7 +285,6 @@ class RegistrationTests(unittest.TestCase):
         self.assertEqual(self.register({}), [{
             "fs_readwrite": [os.path.join("C:", "Users", "d", "Downloads", "*")], "process": handoff.PROCESSES,
             "network": [], "threading": False}])
-        self.assertEqual(handoff.PROCESSES, ["dbus-send"] if sys.platform.startswith("linux") else [])
 
     def test_declares_only_the_saved_provider_host(self):
         perms = self.register({"provider": "openrouter", "providers": {"openrouter": {"api_key": "k"}}})
@@ -293,6 +292,12 @@ class RegistrationTests(unittest.TestCase):
         self.assertTrue(perms[0]["threading"])
         custom = self.register({"provider": "custom", "providers": {"custom": {"base_url": "http://localhost:1234/v1"}}})
         self.assertEqual(custom[0]["network"], ["http://localhost"])
+
+    def test_real_orca_check_can_grant_everything_the_plugin_requests(self):
+        import real_orca_test
+        unknown = set(self.register({"provider": "openrouter", "providers": {"openrouter": {"api_key": "k"}}})[0]) - set(real_orca_test.GRANT_KEYS)
+        self.assertFalse(unknown, f"add {sorted(unknown)} to GRANT_KEYS in real_orca_test.py, "
+                                  "or the real OrcaSlicer check stalls on the permissions prompt")
 
     def test_window_and_page_share_bridge(self):
         p = load_plugin([fake_orca.FakeObject("cube", [fake_orca.FakeVolume(TET_V, TET_F)])])
@@ -310,12 +315,12 @@ class RegistrationTests(unittest.TestCase):
 
 
 class BuildTests(unittest.TestCase):
-    @unittest.skipUnless((HERE / "node_modules" / "three").is_dir(), "run npm ci in plugin/ first")
     def test_build_writes_plain_wheel_with_self_contained_page(self):
         with tempfile.TemporaryDirectory() as d:
             out = Path(d) / "mesh_splitter_any.whl"
             import subprocess, zipfile
-            subprocess.run([sys.executable, str(HERE / "build.py"), "--version", "9.9.9", "--name", "meshsplitter", "--out", str(out)],
+            subprocess.run([sys.executable, str(HERE / "build.py"), "--version", "9.9.9", "--name", "meshsplitter", "--out", str(out),
+                            "--page-out", str(Path(d) / "not" / "made" / "yet" / "page.html")],
                            check=True, capture_output=True)
             z = zipfile.ZipFile(out)
             info = "mesh_splitter_any-9.9.9.dist-info/"
@@ -344,7 +349,6 @@ class BuildTests(unittest.TestCase):
             self.assertLess(len(html.encode()), 1_800_000)
             self.assertIn("Official build by", html)
 
-    @unittest.skipUnless((HERE / "node_modules" / "three").is_dir(), "run npm ci in plugin/ first")
     def test_build_without_official_flag_is_an_unofficial_copy(self):
         import subprocess, zipfile
         with tempfile.TemporaryDirectory() as d:

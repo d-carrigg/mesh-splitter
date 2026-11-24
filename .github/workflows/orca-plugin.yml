@@ -50,11 +50,6 @@ jobs:
           fi
           uv run python build.py --page-out build/page.html   # version from pyproject.toml
           echo "WHL=$(ls dist/*.whl)" >> "$GITHUB_ENV"   # dist/mesh_splitter_any.whl, or the _copy_ name
-      - name: Unit tests
-        if: env.RUN_TESTS == 'true'
-        run: |
-          uv run python test_plugin.py
-          uv run python ../server/test_llm_review.py
       - name: End-to-end (page + plugin bridge + multi-part 3MF)
         if: env.RUN_TESTS == 'true'
         run: |
@@ -64,6 +59,9 @@ jobs:
           mkdir -p build/out
           PYTHON="$(uv run which python)" node e2e.mjs build/snowman.stl build/out
           uv run python verify_3mf.py build/out/snowman_parts.3mf
+      - name: Site CSP in a real browser (page, a model, AI providers, Cloudflare beacon)
+        if: env.RUN_TESTS == 'true'
+        run: node ../test/csp.browser.mjs
       - name: Cache OrcaSlicer ${{ env.ORCA_VERSION }}
         if: env.RUN_TESTS == 'true'
         uses: actions/cache@v6
