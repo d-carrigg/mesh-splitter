@@ -1,0 +1,155 @@
+{
+ "assets": "examples/gardener",
+ "model": "gardener.stl",
+ "out": null,
+ "shots": "docs/examples/img",
+ "viewport": {
+  "width": 1300,
+  "height": 900
+ },
+ "camera": {
+  "az": 25,
+  "el": 14,
+  "dist": 0.9,
+  "lift": 0.05
+ },
+ "css": "#view > :not(canvas) { visibility: hidden !important }",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "session",
+   "file": "gardener.split.json"
+  },
+  {
+   "do": "script",
+   "file": "gallery.js"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Hat\": \"#e2c275\", \"Hat band\": \"#4a3020\", \"Head\": \"#f0c8a0\", \"Eyes\": \"#4a3020\", \"Torso\": \"#3f6fb0\", \"Left arm\": \"#c8553d\", \"Right arm\": \"#c8553d\", \"Left hand\": \"#f0c8a0\", \"Right hand\": \"#f0c8a0\", \"Left leg\": \"#3f6fb0\", \"Right leg\": \"#3f6fb0\", \"Left boot\": \"#4a3020\", \"Right boot\": \"#4a3020\", \"Rake\": \"#a8703c\", \"Toolbox\": \"#a8703c\", \"Handle\": \"#8a939c\", \"Base\": \"#5f9e47\"}); ; G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "gardener-model",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Hat\": \"#e2c275\", \"Hat band\": \"#4a3020\", \"Head\": \"#f0c8a0\", \"Eyes\": \"#4a3020\", \"Torso\": \"#3f6fb0\", \"Left arm\": \"#c8553d\", \"Right arm\": \"#c8553d\", \"Left hand\": \"#f0c8a0\", \"Right hand\": \"#f0c8a0\", \"Left leg\": \"#3f6fb0\", \"Right leg\": \"#3f6fb0\", \"Left boot\": \"#4a3020\", \"Right boot\": \"#4a3020\", \"Rake\": \"#a8703c\", \"Toolbox\": \"#a8703c\", \"Handle\": \"#8a939c\", \"Base\": \"#5f9e47\"}); G.rotate('Right arm',[1,0,0],-40,[21, 0, 110]); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "gardener-rake-up",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Hat\": \"#e2c275\", \"Hat band\": \"#4a3020\", \"Head\": \"#f0c8a0\", \"Eyes\": \"#4a3020\", \"Torso\": \"#3f6fb0\", \"Left arm\": \"#c8553d\", \"Right arm\": \"#c8553d\", \"Left hand\": \"#f0c8a0\", \"Right hand\": \"#f0c8a0\", \"Left leg\": \"#3f6fb0\", \"Right leg\": \"#3f6fb0\", \"Left boot\": \"#4a3020\", \"Right boot\": \"#4a3020\", \"Rake\": \"#a8703c\", \"Toolbox\": \"#a8703c\", \"Handle\": \"#8a939c\", \"Base\": \"#5f9e47\"}); G.rotate('Rake',[1,0,0],35,[36, -24, 80]); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "gardener-rake-turn",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Hat\": \"#e2c275\", \"Hat band\": \"#4a3020\", \"Head\": \"#f0c8a0\", \"Eyes\": \"#4a3020\", \"Torso\": \"#3f6fb0\", \"Left arm\": \"#c8553d\", \"Right arm\": \"#c8553d\", \"Left hand\": \"#f0c8a0\", \"Right hand\": \"#f0c8a0\", \"Left leg\": \"#3f6fb0\", \"Right leg\": \"#3f6fb0\", \"Left boot\": \"#4a3020\", \"Right boot\": \"#4a3020\", \"Rake\": \"#a8703c\", \"Toolbox\": \"#a8703c\", \"Handle\": \"#8a939c\", \"Base\": \"#5f9e47\"}); G.move('Rake',[-2.29, 9.73, 19.6]); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "gardener-rake-slide",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Hat\": \"#e2c275\", \"Hat band\": \"#4a3020\", \"Head\": \"#f0c8a0\", \"Eyes\": \"#4a3020\", \"Torso\": \"#3f6fb0\", \"Left arm\": \"#c8553d\", \"Right arm\": \"#c8553d\", \"Left hand\": \"#f0c8a0\", \"Right hand\": \"#f0c8a0\", \"Left leg\": \"#3f6fb0\", \"Right leg\": \"#3f6fb0\", \"Left boot\": \"#4a3020\", \"Right boot\": \"#4a3020\", \"Rake\": \"#a8703c\", \"Toolbox\": \"#a8703c\", \"Handle\": \"#8a939c\", \"Base\": \"#5f9e47\"}); G.rotate('Handle',[1,0,0],-80,[-52, -4, 42]); G.rotate('Left arm',[0,1,0],110,[-21, 0, 110]); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "gardener-wave",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Hat\": \"#e2c275\", \"Hat band\": \"#4a3020\", \"Head\": \"#f0c8a0\", \"Eyes\": \"#4a3020\", \"Torso\": \"#3f6fb0\", \"Left arm\": \"#c8553d\", \"Right arm\": \"#c8553d\", \"Left hand\": \"#f0c8a0\", \"Right hand\": \"#f0c8a0\", \"Left leg\": \"#3f6fb0\", \"Right leg\": \"#3f6fb0\", \"Left boot\": \"#4a3020\", \"Right boot\": \"#4a3020\", \"Rake\": \"#a8703c\", \"Toolbox\": \"#a8703c\", \"Handle\": \"#8a939c\", \"Base\": \"#5f9e47\"}); G.rotate('Head',[0,0,1],35,[0,-1,118]); G.heal('Head'); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "gardener-head-turn",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Hat\": \"#e2c275\", \"Hat band\": \"#4a3020\", \"Head\": \"#f0c8a0\", \"Eyes\": \"#4a3020\", \"Torso\": \"#3f6fb0\", \"Left arm\": \"#c8553d\", \"Right arm\": \"#c8553d\", \"Left hand\": \"#f0c8a0\", \"Right hand\": \"#f0c8a0\", \"Left leg\": \"#3f6fb0\", \"Right leg\": \"#3f6fb0\", \"Left boot\": \"#4a3020\", \"Right boot\": \"#4a3020\", \"Rake\": \"#a8703c\", \"Toolbox\": \"#a8703c\", \"Handle\": \"#8a939c\", \"Base\": \"#5f9e47\"}); G.rotate('Left leg',[1,0,0],-18,[-9,-1,58]); G.rotate('Right leg',[1,0,0],12,[9,-1,58]); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "gardener-step",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Hat\": \"#e2c275\", \"Hat band\": \"#4a3020\", \"Head\": \"#f0c8a0\", \"Eyes\": \"#4a3020\", \"Torso\": \"#3f6fb0\", \"Left arm\": \"#c8553d\", \"Right arm\": \"#c8553d\", \"Left hand\": \"#f0c8a0\", \"Right hand\": \"#f0c8a0\", \"Left leg\": \"#3f6fb0\", \"Right leg\": \"#3f6fb0\", \"Left boot\": \"#4a3020\", \"Right boot\": \"#4a3020\", \"Rake\": \"#a8703c\", \"Toolbox\": \"#a8703c\", \"Handle\": \"#8a939c\", \"Base\": \"#5f9e47\"}); G.scale('Hat',125,[0,-1,149]); G.scale('Hat band',125,[0,-1,149]); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "gardener-big-hat",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Hat\": \"#e2c275\", \"Hat band\": \"#4a3020\", \"Head\": \"#f0c8a0\", \"Eyes\": \"#4a3020\", \"Torso\": \"#3f6fb0\", \"Left arm\": \"#c8553d\", \"Right arm\": \"#c8553d\", \"Left hand\": \"#f0c8a0\", \"Right hand\": \"#f0c8a0\", \"Left leg\": \"#3f6fb0\", \"Right leg\": \"#3f6fb0\", \"Left boot\": \"#4a3020\", \"Right boot\": \"#4a3020\", \"Rake\": \"#a8703c\", \"Toolbox\": \"#a8703c\", \"Handle\": \"#8a939c\", \"Base\": \"#5f9e47\"}); G.connect([[\"Head\", \"Torso\"], [\"Left arm\", \"Torso\"], [\"Right arm\", \"Torso\"], [\"Left leg\", \"Torso\"], [\"Right leg\", \"Torso\"], [\"Left hand\", \"Left arm\"], [\"Right hand\", \"Right arm\"], [\"Left boot\", \"Left leg\"], [\"Right boot\", \"Right leg\"], [\"Left boot\", \"Base\"], [\"Right boot\", \"Base\"], [\"Toolbox\", \"Base\"]]); G.explode({\"Head\": [0, 0, 40], \"Hat\": [0, 0, 40], \"Hat band\": [0, 0, 40], \"Eyes\": [0, 0, 40], \"Left arm\": [-35, -5, 10], \"Left hand\": [-35, -5, 10], \"Handle\": [-35, -5, 10], \"Toolbox\": [0, 0, 22], \"Right arm\": [35, -5, 10], \"Right hand\": [35, -5, 10], \"Rake\": [35, -5, 10]}); G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "gardener-connectors",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Hat\": \"#e2c275\", \"Hat band\": \"#4a3020\", \"Head\": \"#f0c8a0\", \"Eyes\": \"#4a3020\", \"Torso\": \"#3f6fb0\", \"Left arm\": \"#c8553d\", \"Right arm\": \"#c8553d\", \"Left hand\": \"#f0c8a0\", \"Right hand\": \"#f0c8a0\", \"Left leg\": \"#3f6fb0\", \"Right leg\": \"#3f6fb0\", \"Left boot\": \"#4a3020\", \"Right boot\": \"#4a3020\", \"Rake\": \"#a8703c\", \"Toolbox\": \"#a8703c\", \"Handle\": \"#8a939c\", \"Base\": \"#5f9e47\"}); G.colors({'Rake':'#8a939c'}); G.select('Rake')"
+  },
+  {
+   "do": "file",
+   "input": "#repIn",
+   "file": "parts/shovel.stl"
+  },
+  {
+   "do": "eval",
+   "js": "G.inPlace('Rake')"
+  },
+  {
+   "do": "eval",
+   "js": "G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "gardener-shovel",
+   "clip": "#view"
+  },
+  {
+   "do": "eval",
+   "js": "G.reset(); G.colors({\"Hat\": \"#e2c275\", \"Hat band\": \"#4a3020\", \"Head\": \"#f0c8a0\", \"Eyes\": \"#4a3020\", \"Torso\": \"#3f6fb0\", \"Left arm\": \"#c8553d\", \"Right arm\": \"#c8553d\", \"Left hand\": \"#f0c8a0\", \"Right hand\": \"#f0c8a0\", \"Left leg\": \"#3f6fb0\", \"Right leg\": \"#3f6fb0\", \"Left boot\": \"#4a3020\", \"Right boot\": \"#4a3020\", \"Rake\": \"#a8703c\", \"Toolbox\": \"#a8703c\", \"Handle\": \"#8a939c\", \"Base\": \"#5f9e47\"}); G.merge('Hat',['Hat band']); G.colors({'Hat':'#c8553d'}); G.select('Hat')"
+  },
+  {
+   "do": "file",
+   "input": "#repIn",
+   "file": "parts/cap.stl"
+  },
+  {
+   "do": "eval",
+   "js": "G.inPlace('Hat')"
+  },
+  {
+   "do": "eval",
+   "js": "G.quiet()"
+  },
+  {
+   "do": "shot",
+   "name": "gardener-cap",
+   "clip": "#view"
+  }
+ ]
+}

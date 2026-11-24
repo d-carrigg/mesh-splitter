@@ -15,8 +15,9 @@
   window.G = {
     // Clean start: no transforms, heal, replacements or seed dots; parts that move with another part keep doing so.
     reset() {
-      for (const p of S.parts) { delete p.xf; delete p.heal; delete p.rep; p.seeds = []; p.visible = true; }
-      S.active = 0; app.setGizmo("off"); app.afterEdit(""); G.quiet();
+      G.unexplode?.();
+      for (const p of S.parts) { delete p.xf; delete p.trim; delete p.heal; delete p.rep; p.seeds = []; p.visible = true; }
+      S.conns = []; S.active = 0; app.setGizmo("off"); app.afterEdit(""); G.quiet();
     },
     quiet() { document.getElementById("status").textContent = ""; },
     colors(map) { for (const [n, c] of Object.entries(map)) S.parts[idx(n)].color = c; app.afterEdit(""); },
@@ -51,6 +52,33 @@
       app.afterEdit("");
     },
     select(name) { S.active = idx(name); app.refreshUI(); },
+    // Connectors tool, Add to selected parts: a connector on each seam between the named pairs of parts.
+    connect(pairs) {
+      const want = new Set(pairs.map(([a, b]) => [idx(a), idx(b)].sort((x, y) => x - y).join()));
+      app.addConns(app.seams().filter((s) => want.has([s.a, s.b].sort((x, y) => x - y).join()))); G.quiet();
+    },
+    // Show the exported parts (the multi-part 3MF's meshes, connectors included) instead of the model, each part
+    // in moves pulled apart by [dx, dy, dz] mm. G.reset() shows the model again.
+    explode(moves) {
+      let any; app.scene.traverse((o) => { if (o.isMesh && o.material?.isMeshStandardMaterial && !any) any = o; });
+      const color = Object.fromEntries(S.parts.map((p) => [p.name, p.color]));
+      G.hidden = [];
+      app.scene.traverse((o) => { if ((o.isMesh || o.isLine || o.isLineSegments || o.isPoints) && !o.userData.ex && o.visible) { o.visible = false; G.hidden.push(o); } });
+      for (const p of app.buildParts3MF().parts) {
+        const g = new any.geometry.constructor(), A = any.geometry.getAttribute("position").constructor;
+        g.setAttribute("position", new A(p.pos, 3)); g.setIndex([...p.tri]);
+        const m = new any.constructor(g.toNonIndexed(), new any.material.constructor({ roughness: 0.7, flatShading: true }));
+        m.material.color.set(p.name.endsWith("dowel") ? "#e4e4e4" : color[p.name] || "#888");
+        m.geometry.computeVertexNormals(); m.userData.ex = true; m.position.set(...(moves[p.name] || [0, 0, 0]));
+        app.scene.add(m);
+      }
+      app.render();
+    },
+    unexplode() {
+      const ex = []; app.scene.traverse((o) => { if (o.userData.ex) ex.push(o); });
+      ex.forEach((o) => { o.parent.remove(o); o.geometry.dispose(); });
+      (G.hidden || []).forEach((o) => { o.visible = true; }); G.hidden = [];
+    },
     // After a "file" step on #repIn: keep the replacement in the file's own coordinates (made for this model).
     inPlace(name) { const p = S.parts[idx(name)]; Object.assign(p.rep, { inPlace: true, fit: false, embed: 0 }); S.active = 0; app.setGizmo("off"); app.afterEdit(""); },
   };

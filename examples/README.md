@@ -1,9 +1,10 @@
 # Examples
 
-Three test models in different styles, with the split made for each. The [Examples page](https://d-carrigg.github.io/mesh-splitter/examples/) in the docs shows them.
+Four test models in different styles, with the split made for each. The [Examples page](https://d-carrigg.github.io/mesh-splitter/examples/) in the docs shows them.
 
 | Folder | Model | Style | Split |
 | --- | --- | --- | --- |
+| [gardener](gardener) | Gardener with a rake and a toolbox on a grass base | Organic figure (blended blobs, creases at the joints) with hard-surface props; sized for a 256 mm plate | 17 parts from seed points; hands, rake, boots, hat and eyes move with the part that carries them; 8 filaments |
 | [robot](robot) | Waving robot holding a wrench | Hard-surface: boxes and cylinders, sharp creases | 12 parts from seed points; hands move with the arms, the wrench with the left hand, right arm stretched to 125% |
 | [bear](bear) | Seated teddy bear | Organic: smoothly blended blobs, soft creases | 9 parts from seed points; snout and ears move with the head, head turned 25° on its joint with heal joint on |
 | [rocket](rocket) | Rocket with fins and portholes on a stand | Two shells, thin fins, recessed details | 7 parts from the auto split on open, renamed |
@@ -11,7 +12,7 @@ Three test models in different styles, with the split made for each. The [Exampl
 Each folder has:
 
 - `<name>.stl`: the model.
-- `<name>.seeds.json`: seed points for the [command line](../docs/features/command-line.md#seeds-file) (robot and bear).
+- `<name>.seeds.json`: seed points for the [command line](../docs/features/command-line.md#seeds-file) (robot, bear and gardener).
 - `<name>.split.json`: the finished session. Open the STL in the app, then **Open > Load session…**.
 - `<name>_parts.3mf`: the multi-part 3MF from **Export 3MF**, with transforms and heal applied.
 
@@ -33,9 +34,9 @@ These models are made from code by [make_models.py](make_models.py) for this rep
 uv run --with manifold3d --with trimesh --with scikit-image --with scipy python examples/make_models.py
 ```
 
-The robot and rocket are refined to edges of 2.5 mm or less, which is finer than Mesh Splitter's own refinement of coarse meshes.
+The robot and rocket are refined to edges of 2.5 mm or less and the gardener to 4 mm, which is finer than Mesh Splitter's own refinement of coarse meshes.
 
-`robot/parts/` holds the hats and round head the docs gallery swaps onto the robot, made by [make_parts.py](make_parts.py) in the robot's own coordinates:
+`robot/parts/` holds the hats and round head the docs gallery swaps onto the robot, and `gardener/parts/` the cap and shovel for the gardener, made by [make_parts.py](make_parts.py) in each model's own coordinates:
 
 ```
 uv run --with manifold3d --with trimesh python examples/make_parts.py

@@ -1,0 +1,31 @@
+{
+ "assets": "examples/gardener",
+ "model": "gardener.stl",
+ "out": null,
+ "shots": "docs/examples/img",
+ "viewport": {
+  "width": 1300,
+  "height": 900
+ },
+ "camera": {
+  "az": 25,
+  "el": 14,
+  "dist": 0.9,
+  "lift": 0.05
+ },
+ "css": "#view > :not(canvas) { visibility: hidden !important }",
+ "steps": [
+  {
+   "do": "load"
+  },
+  {
+   "do": "eval",
+   "js": "app.S.parts.forEach(p=>p.seeds=[]); app.afterEdit(''); document.getElementById('status').textContent=''"
+  },
+  {
+   "do": "shot",
+   "name": "gardener-auto",
+   "clip": "#view"
+  }
+ ]
+}

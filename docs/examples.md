@@ -2,6 +2,17 @@
 
 Split a model once, then pose it, resize parts, or swap them out. Every picture below is the same model, edited in Mesh Splitter.
 
+## Gardener
+
+Every feature on one model: an organic figure with hard-edged props, 17 parts, sized for a 256 mm plate.
+
+| | | |
+| --- | --- | --- |
+| ![Original](examples/img/gardener-model.png)<br>Original | ![Auto split on open](examples/img/gardener-auto.png)<br>Auto split on open: the props come apart at their sharp edges; seed points split the figure | ![Rake raised](examples/img/gardener-rake-up.png)<br>Rake raised: the hand and rake move with the arm |
+| ![Rake turned in the hand](examples/img/gardener-rake-turn.png)<br>Rake turned in the hand | ![Rake slid up through the hand](examples/img/gardener-rake-slide.png)<br>Rake slid up through the hand (Move along Joint) | ![Handle swung down, waving](examples/img/gardener-wave.png)<br>Toolbox handle swung down, waving |
+| ![Head turned](examples/img/gardener-head-turn.png)<br>Head turned, Heal joint on | ![Walking](examples/img/gardener-step.png)<br>Walking: legs turned at the hips, boots follow | ![Bigger hat](examples/img/gardener-big-hat.png)<br>Bigger hat |
+| ![Connectors, parts pulled apart](examples/img/gardener-connectors.png)<br>Connectors at the joints, parts pulled apart | ![Shovel](examples/img/gardener-shovel.png)<br>Rake replaced with a shovel | ![Cap](examples/img/gardener-cap.png)<br>Hat and band merged, then replaced with a cap |
+
 ## Robot
 
 Move, rotate, stretch and scale parts, or replace them with your own.
