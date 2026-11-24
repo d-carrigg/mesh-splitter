@@ -40,12 +40,17 @@ await page.route("https://cdn.jsdelivr.net/npm/**", (r) => {
 });
 await page.route("https://static.cloudflareinsights.com/**", (r) => r.fulfill({ body: "", contentType: "text/javascript" }));
 
+// Not page.waitForFunction: older Playwright evaluates its predicate as a string, which this CSP blocks.
+async function until(fn, ms) {
+  for (const end = Date.now() + ms; !(await page.evaluate(fn)); await page.waitForTimeout(200))
+    if (Date.now() > end) throw new Error(`timed out after ${ms} ms waiting for ${fn}`);
+}
 let stuck = "";
 try {
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
-  await page.waitForFunction(() => window.app, null, { timeout: 30000 });
+  await until(() => !!window.app, 30000);
   await page.setInputFiles("#fileIn", path.join(root, "examples", "robot", "robot.stl"));
-  await page.waitForFunction(() => /robot\.stl/.test(document.getElementById("fileName").textContent), null, { timeout: 60000 });
+  await until(() => /robot\.stl/.test(document.getElementById("fileName").textContent), 60000);
   await page.evaluate(async () => {
     const { PROVIDERS } = await import("./llm-direct.js");
     const urls = [...Object.values(PROVIDERS).map((p) => p.base_url), "http://localhost:1234/v1"];
