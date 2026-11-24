@@ -34,7 +34,7 @@ A hands-on pass over every feature, run on request ("check the whole app") rathe
 | 2.2 | Set Parts to 6, click **Split**. | Exactly 6 parts. Cuts sit on concave creases (shoulders, neck, wrists), not across flat faces. 📷 |
 | 2.3 | Clear Parts, click **Split**. | Automatic count again (same as on open). |
 | 2.4 | Select one part, tick **Only inside the selected part**, Parts 2, **Split**. | Only that part is split in two; the others keep their faces and names. No empty (0-face) part is left in the list. |
-| 2.5 | Pick **Seeds**. Press Esc to deselect, click the head; Esc, click the body; Esc, click an arm. Then **Grow from seeds**. | A marker per click. After Grow: 3 parts grown from the clicks, boundaries on creases. Alt+click near a seed removes it. **Clear seeds** removes all. 📷 |
+| 2.5 | Start from the un-split robot (seeds grow only into unassigned faces). Pick **Seeds**. Press Esc to deselect, click the head; Esc, click the body; Esc, click an arm. Then **Grow from seeds**. | A marker per click. After Grow: 3 parts grown from the clicks, boundaries on creases. Alt+click near a seed removes it. **Clear seeds** removes all. 📷 |
 | 2.6 | Pick **Paint**, select a part, pick the brush (B), set Pen size, drag over a neighboring part. | Painted faces join the selected part. Shift+drag erases (faces become unassigned, gray). Right-drag still orbits. |
 | 2.7 | Pick the fill tool (F), click a region of another part. | The clicked region floods into the selected part up to creases sharper than **Fill stop angle**. |
 | 2.8 | Right-click a gray (unassigned) face. | Menu offers **Fill into nearest part** and **Fill all unassigned**; both clear the gray. |
@@ -121,7 +121,7 @@ A hands-on pass over every feature, run on request ("check the whole app") rathe
 | # | Do | Expect |
 |---|---|---|
 | 9.1 | First right-click on a part in the view. | Mesh Splitter's part menu (Select, New part here, Show only this, Hide, Replace with…, Delete) and **not** the browser's own menu. 📷 |
-| 9.2 | Hover each toolbar and panel button. | Every button has a tooltip naming it and its key. |
+| 9.2 | Hover each toolbar button and each icon-only panel button. | Each has a tooltip naming it and its key. Text buttons (Split, Done, Cancel) need none. |
 | 9.3 | Open Split, then Check parts; open Transform, then the export menu; open AI names with Transform open. | The last opened popover/menu is on top and readable; none is hidden behind another panel. |
 | 9.4 | Esc. | Closes the context menu, then add-part, then deselects, then closes Split, in that order. |
 
