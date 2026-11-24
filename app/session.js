@@ -5,8 +5,6 @@ import { zlibSync, unzlibSync } from "fflate";
 // v2 zlib-compresses labels so large meshes still fit the browser's localStorage quota; v1 files still load.
 export function b64(b) { let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }
 export function unb64(t) { const bin = atob(t), b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return b; }
-const gapFromFillAnchorFlags = ({ fill, anchor, ...p }) => anchor || fill ? { ...p, gap: anchor ? "anchor" : "fill" } : p;
-
 // Labels, parts, connectors, replacement meshes and (after boundary smoothing) the cut mesh of a saved session.
 // nF0: face count of the mesh as loaded; a session only fits the mesh it was made on. coarse (S.coarse): the face
 // count before long edges were split and each face's parent, so a session saved before that refinement still loads.
@@ -25,7 +23,6 @@ export function decodeSession(txt, nF0, coarse = null) {
     labels = Int32Array.from(coarse.parent, (p) => labels[p]);
     parts = parts.map((p) => ({ ...p, seeds: (p.seeds || []).map((f) => child[f] ?? -1).filter((f) => f >= 0) }));
   }
-  parts = parts.map(gapFromFillAnchorFlags);
   return { labels, parts, mesh, reps, conns: j.conns || [] };
 }
 

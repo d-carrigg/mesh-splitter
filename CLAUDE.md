@@ -16,9 +16,7 @@ When a rule here is broken again, encode it in a check and change its row. Don't
 | The app writes markup only through `setHTML` with an `html` template, which escapes every value | `app/html.js`, `test/html.test.mjs` |
 | The site's CSP allows everything the page loads | `test/csp.browser.mjs`: Chromium reports no CSP violation (release PR only) |
 | The plugin wheel has no encoded blobs and no huge `.py` (OrcaCloud rates those Medium) | `review_risks` in `plugin/build.py` |
-| The OrcaCloud publish request carries the version, changelog and wheel exactly | `plugin/publish.sh`, `PublishTests` |
-| Send to Orca works after any order of sends, Open as project and deletes | `SendSequenceModel`, see `.claude/skills/verify-send-to-orca` |
-| A part's gap is Open (unset), `"fill"` or `"anchor"`, never both | `part.gap`, `setGap` |
+| Send to Orca works after any order of sends, Open as project and deletes | `SendSequenceModel` in `plugin/test_plugin.py` |
 | Moving a part shows the gap by default and Fill/Anchor stay closed | `plugin/e2e.mjs` (release PR only) |
 | Forks build as "Mesh Splitter (unofficial copy)"; the license ships in the wheel | `BuildTests` |
 

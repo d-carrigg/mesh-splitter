@@ -24,7 +24,7 @@
   },
   {
    "do": "eval",
-   "js": "app.setGap([5, 10, 2], 'fill'); app.setGap([3, 7], 'fill'); app.fillMesh() && (app.fillMesh().visible = false); app.render()"
+   "js": "app.setGap([5, 10, 2], 'fill'); app.setAnchor([3, 7], false); app.fillMesh() && (app.fillMesh().visible = false); app.render()"
   },
   {
    "do": "shot",
@@ -52,7 +52,7 @@
   },
   {
    "do": "eval",
-   "js": "app.setGap([3, 7], 'anchor'); app.S.active = 0; app.refreshUI()"
+   "js": "app.setAnchor([3, 7], true); app.S.active = 0; app.refreshUI()"
   },
   {
    "do": "shot",
@@ -73,7 +73,7 @@
   },
   {
    "do": "eval",
-   "js": "app.setGap([3, 7], 'fill'); app.fillMesh() && (app.fillMesh().visible = false); app.render()"
+   "js": "app.setAnchor([3, 7], false); app.fillMesh() && (app.fillMesh().visible = false); app.render()"
   },
   {
    "do": "shot",
@@ -101,7 +101,7 @@
   },
   {
    "do": "eval",
-   "js": "app.setGap([3, 7], 'anchor'); app.S.active = 0; app.refreshUI()"
+   "js": "app.setAnchor([3, 7], true); app.S.active = 0; app.refreshUI()"
   },
   {
    "do": "shot",

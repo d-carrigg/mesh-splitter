@@ -188,9 +188,9 @@ const fa = await page.evaluate(() => {
   app.setGap([i], "fill");
   const fill = { kinds: kinds(), shown: !!app.fillMesh(), me: solid(app.partSoup(i)), nb: solid(app.partSoup(nb)) };
   app.setGap([i], "anchor");
-  const anchor = { kinds: kinds(), me: solid(app.partSoup(i)), nb: solid(app.partSoup(nb)), saved: S.parts[i].gap === "anchor" };
+  const anchor = { kinds: kinds(), me: solid(app.partSoup(i)), nb: solid(app.partSoup(nb)), saved: S.parts[i].anchor };
   app.undo(); app.undo(); x.t = [x.t[0], x.t[1], x.t[2] - 4]; app.applyXf();
-  return { open, fill, anchor, after: !!S.parts[i].gap };
+  return { open, fill, anchor, after: !!S.parts[i].anchor || !!S.parts[i].fill };
 });
 console.log("fill/anchor:", JSON.stringify(fa));
 if (fa.open.kinds.includes("patch") || fa.open.shown || fa.open.me.open || fa.open.nb.open

@@ -543,8 +543,12 @@ class OpenMeshSplitter(orca.script.ScriptPluginCapabilityBase):
 @orca.plugin
 class MeshSplitterPlugin(orca.base):
     def register_capabilities(self):
-        # OrcaSlicer prompts the user for these at load. No network or threads until AI naming is set up: before
-        # that, the first Connect click asks for the host (ask_network_permission).
+        # Declared at load, so OrcaSlicer asks the user before the plugin uses them:
+        #  - write files in ~/Downloads: Send to Orca saves the split 3MF there
+        #  - Linux only: run dbus-send to hand that 3MF to this OrcaSlicer (handoff.py; Windows needs no program)
+        #  - only once the user has set up AI part naming: connect to that one provider's host, and start
+        #    background threads (the request runs off the UI thread). Nothing is declared or sent before that;
+        #    the first Connect or Name parts click asks OrcaSlicer's permission for the host (ask_network_permission).
         storage_dir()
         ai_host = ai_naming_host()
         orca.request_permissions(

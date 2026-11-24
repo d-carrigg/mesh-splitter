@@ -426,7 +426,7 @@ let xfKey = "";
 function applyXf() {
   if (!mesh) return;
   const Ms = S.parts.map(xfMatrix), any = Ms.some(Boolean);
-  const key = any ? JSON.stringify(S.parts.map((p) => [p.xf || 0, p.heal || 0, p.gap || 0, p.trim || 0, p.visible !== false])) + "|" + fullHash() : "";
+  const key = any ? JSON.stringify(S.parts.map((p) => [p.xf || 0, p.heal || 0, p.anchor || 0, p.fill || 0, p.trim || 0, p.visible !== false])) + "|" + fullHash() : "";
   if (key === xfKey) return;
   xfKey = key;
   const geo = mesh.geometry, P = geo.getAttribute("position").array, N = geo.getAttribute("normal").array, { P0, N0 } = mesh.userData;
@@ -862,11 +862,10 @@ function healSoup(i, orig, out) {
 }
 
 // ---------------------------------------------------------------- fill / anchor
-// When a part moves away from a neighbor, the cut between them opens and each side shows a hole. part.gap says what
-// happens there: unset (Open, the default) shows the gap. "fill" closes each side with a patch that follows the
-// surrounding surface, so the body stays smooth where a hand used to rest. "anchor" keeps the part joined instead:
-// new material sweeps from the neighbor's rim to the part's moved cut, along the same turn, so an arm turned at the
-// shoulder stays attached to the body.
+// When a part moves away from a neighbor, the cut between them opens and each side shows a hole. Open (the default)
+// shows the gap. Fill (part.fill) closes each side with a patch that follows the surrounding surface, so the body stays
+// smooth where a hand used to rest. Anchor (part.anchor) keeps the part joined instead: new material sweeps from the
+// neighbor's rim to the part's moved cut, along the same turn, so an arm turned at the shoulder stays attached to the body.
 let twinCache = { key: null, map: null }, loopCache = new Map();
 function twinLabels(hash) { // directed edge a->b (key a*nV+b) -> label of the face that has it
   const key = `${S.nF}|${hash}`;
@@ -889,12 +888,12 @@ function fillCtx() {
   };
   return Object.assign(ctx, { mat, heal, wpos, hash, tol: 1e-4 * (S.G?.diag || 100) });
 }
-const anchored = (l) => l > 0 && S.parts[l]?.gap === "anchor" && !hasRep(S.parts[l]);
+const anchored = (l) => l > 0 && !!S.parts[l]?.anchor && !hasRep(S.parts[l]);
 // Fill and Anchor act only at a part's joint (the cut it turns about, toward the body). Its other cuts (e.g. a hand's
 // grip around a broom) stay Open.
 const atJoint = (l, lp) => bodyJoint(l)?.loopKey === core.loopKey(lp);
 const anchoredAt = (l, lp) => anchored(l) && atJoint(l, lp), filledAt = (l, lp) => filled(l) && atJoint(l, lp);
-const filled = (l) => l > 0 && S.parts[l]?.gap === "fill" && !hasRep(S.parts[l]);
+const filled = (l) => l > 0 && !!S.parts[l]?.fill && !hasRep(S.parts[l]);
 function partLoops(l, ctx) { // boundary loops of part l (geometry only, cached)
   const key = `${l}|${S.nF}|${ctx.hash}`;
   if (!loopCache.has(key)) { if (loopCache.size > 40) loopCache.clear(); loopCache.set(key, partMesh(l)?.loopList || []); }
@@ -1206,17 +1205,17 @@ function smoothNormals(P) { // vertex normals averaged over triangles that share
   for (let o = 0; o < P.length; o += 3) { const v = acc.get(key(o)).clone().normalize(); N[o] = v.x; N[o+1] = v.y; N[o+2] = v.z; }
   return N;
 }
-const GAPS = ["open", "fill", "anchor"];
+// What happens at the cut of parts js when they move: "open" (the default: the gap shows), "fill" or "anchor".
 function setGap(js, mode) {
-  if (!GAPS.includes(mode)) throw new TypeError(`setGap: mode is one of ${GAPS.join(", ")}`);
   js = js.filter((j) => j > 0 && S.parts[j] && !hasRep(S.parts[j]));
   if (!js.length) return;
   pushUndo();
-  for (const j of js) { if (mode === "open") delete S.parts[j].gap; else S.parts[j].gap = mode; }
+  for (const j of js) { delete S.parts[j].anchor; delete S.parts[j].fill; if (mode === "anchor") S.parts[j].anchor = true; else if (mode === "fill") S.parts[j].fill = true; }
   const names = js.map((j) => S.parts[j].name).join(", "), s = js.length > 1 ? "" : "s";
   afterEdit(mode === "anchor" ? `Anchor: ${names} stay${s} joined to the body; the gap fills with new material`
     : mode === "fill" ? `Fill: the holes ${names} leave${s} are patched` : `Open: the gaps ${names} leave${s} show as cut`);
 }
+const setAnchor = (js, on) => setGap(js, on ? "anchor" : "fill"); // Anchor, or Fill
 
 // ---------------------------------------------------------------- trim
 // part.trim: a moved part loses whatever ends up inside other parts, e.g. a foot slid in under the body is cut off
@@ -1689,7 +1688,7 @@ function connGate(s) {
 // state: "ok" (it's built), "bad" (it doesn't fit: left out of files, red), "lost" (no seam between its parts).
 let connStateCache = { key: null, v: null };
 function connState() {
-  const ss = seams(), key = `${seamCache.key}|${S.parts.length}|${xfKey}|${JSON.stringify(S.conns || [])}|${S.parts.map((p) => `${p.uid || ""}:${p.rep?.id || ""}${p.trim ? "t" : ""}${p.gap || ""}`).join(",")}`;
+  const ss = seams(), key = `${seamCache.key}|${S.parts.length}|${xfKey}|${JSON.stringify(S.conns || [])}|${S.parts.map((p) => `${p.uid || ""}:${p.rep?.id || ""}${p.trim ? "t" : ""}${p.fill ? "f" : ""}${p.anchor ? "a" : ""}`).join(",")}`;
   if (connStateCache.key === key) return connStateCache.v;
   const at = new Map(); S.parts.forEach((p, i) => { if (i > 0 && p.uid) at.set(p.uid, i); });
   const list = [], bySeam = new Map(), placed = [];
@@ -2763,8 +2762,8 @@ function refreshXfPanel() {
   $("gzCenter").classList.toggle("on", !gzJointOn);
   $("healRow").classList.toggle("hide", !ok || !!p?.rep);
   $("anchorRow").classList.toggle("hide", !ok || !!p?.rep);
-  $("gapAnchor").classList.toggle("on", ok && p?.gap === "anchor"); $("gapFill").classList.toggle("on", ok && p?.gap === "fill");
-  $("gapOpen").classList.toggle("on", ok && !p?.gap);
+  $("gapAnchor").classList.toggle("on", ok && !!p?.anchor); $("gapFill").classList.toggle("on", ok && !!p?.fill && !p?.anchor);
+  $("gapOpen").classList.toggle("on", ok && !p?.fill && !p?.anchor);
   $("stretchRow").classList.toggle("hide", !ok || !!p?.rep);
   $("trimRow").classList.toggle("hide", !ok || !!p?.rep); $("trimOn").checked = ok && !!p?.trim;
   for (const [id, m] of [["mvFree", "free"], ["mvPlate", "plate"], ["mvJoint", "joint"]]) $(id).classList.toggle("on", gzSlide === m);
@@ -3983,4 +3982,4 @@ if (ORCA.on) {
   window.addEventListener("focus", () => orcaSend({ cmd: "objects" }));
   orcaSend({ cmd: "objects", auto: true });
 }
-window.app = { S, seams, connState, addConns, editConns, buildOne3MF, buildPainted3MF, setPrintAs, deleteGeometry, closeHoles, meshHoles, setGap, setTrim, trimResult, trimMeshes, setSlide, updateTrim, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };
+window.app = { S, seams, connState, addConns, editConns, buildOne3MF, buildPainted3MF, setPrintAs, deleteGeometry, closeHoles, meshHoles, setAnchor, setGap, setTrim, trimResult, trimMeshes, setSlide, updateTrim, loopPlans, partLoops, fillCtx, fillMesh: () => fillMesh, setAutoStretch, solveAutoStretch, setStretch, stretchFrame, findHits, hits: () => hits, carryMat, ORCA, gizmo, gzProxy, setHold, holdersOf, setXfMatrix, xfEdited, reachPoints, setReach, reachOf, setFollow, leaderOf, followersOf, partMat, healField, healBase, partSoup, setGizmo, setGizmoJoint, jointFrame, xfMatrix, snapshot, buildParts3MF, exportParts3MF, loadRaw, scene, REPS, repMatrix, mergedSoup, partStats, localChecks, captureForNaming, runNaming, applyXf, ensureXf, undo, redo, deletePart, smoothBoundaries, smoothCut, snapCreases, encodeSession, segmentFromSeeds, autoSplit, splitShells, fillFrom, exportPainted3MF, exportSTLs, partMesh, paintCode, loadArrayBuffer, setTool, refreshUI, afterEdit, newPart, render, camera, controls, frame };

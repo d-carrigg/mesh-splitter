@@ -39,7 +39,7 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: plugin/package-lock.json
-      - uses: astral-sh/setup-uv@v10.4.0
+      - uses: astral-sh/setup-uv@v10.4.0   # setup-uv has no floating major tag, so pin the exact version
       - name: Python deps (numpy, trimesh)
         run: uv sync
       - run: npm ci
