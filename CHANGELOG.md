@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.21](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.20...v0.3.21) (2026-11-24)
+
+
+### Features
+
+* add llms.txt to the web app ([#109](https://github.com/d-carrigg/mesh-splitter/issues/109)) ([8750566](https://github.com/d-carrigg/mesh-splitter/commit/8750566cae5f28164dad25c705a5ec4ed3f2d72a))
+* connectors (plug and dowel) between parts ([#107](https://github.com/d-carrigg/mesh-splitter/issues/107)) ([b017cd0](https://github.com/d-carrigg/mesh-splitter/commit/b017cd088dbd4f9a46f9ffddf81dd68942cf82e6))
+
+
+### Bug Fixes
+
+* allow Cloudflare Web Analytics beacon in site CSP ([#105](https://github.com/d-carrigg/mesh-splitter/issues/105)) ([95dcae3](https://github.com/d-carrigg/mesh-splitter/commit/95dcae39ede26fb62c589d31b7f1612d01b8c240))
+* make the mistakes that keep coming back fail a check instead ([#110](https://github.com/d-carrigg/mesh-splitter/issues/110)) ([7165c40](https://github.com/d-carrigg/mesh-splitter/commit/7165c40ee207e52b6e10751b2529eee9ff449729))
+* the release PR's CSP check no longer fails on its own wait ([#112](https://github.com/d-carrigg/mesh-splitter/issues/112)) ([be4f77c](https://github.com/d-carrigg/mesh-splitter/commit/be4f77c71cd9e5759c56dfc587d0fcf29bf1a321))
+
 ## [0.3.20](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.19...v0.3.20) (2026-11-22)
 
 
