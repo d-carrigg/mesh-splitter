@@ -71,6 +71,11 @@ jobs:
             -H "Authorization: Bearer $oidc_token" \
             --form-string "metadata=$metadata" -F "files=@$WHL" \
             https://api.orcaslicer.com/api/v1/plugin-publish/releases)"
-          cat response.json
-          echo
-          [ "$status" = "201" ]
+          # The response holds OrcaCloud's review results, meant only for the plugin owner. This repo's Actions
+          # logs are public, so print only the outcome (per cloud.orcaslicer.com/wiki/#publish-from-github).
+          if [ "$status" != "201" ]; then
+            echo "Publish failed with HTTP $status" >&2
+            jq -c '.error // .' response.json >&2 || true
+            exit 1
+          fi
+          jq -c --arg status "$status" '{status: $status, version, level: .security.level}' response.json
