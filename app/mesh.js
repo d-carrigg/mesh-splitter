@@ -1,7 +1,7 @@
 // Reading meshes (STL, 3MF), welding, long-edge refinement, inside-out repair, and a new split of a loaded mesh.
 import { unzipSync, strFromU8 } from "fflate";
 import { buildGraph, components } from "./graph.js";
-import { UNASSIGNED_COLOR } from "./parts.js";
+import { UNASSIGNED_COLOR, newPart } from "./parts.js";
 
 // ---------------------------------------------------------------- reading files
 // Binary or ASCII STL -> triangle soup (9 floats per triangle). Binary unless the size doesn't fit the face count
@@ -72,7 +72,7 @@ export function parse3MF(buf, parseXml) {
         tri.push(v0 + +t.getAttribute("v1"), v0 + +t.getAttribute("v2"), v0 + +t.getAttribute("v3"));
         if (!painted && t.getAttribute("paint_color")) painted = true;
       }
-      meshes.push({ file: norm(file), objectId: String(id), triStart: t0, triCount: tri.length / 3 - t0 });
+      meshes.push({ file: norm(file), objectId: String(id), name: obj.getAttribute("name") || "", triStart: t0, triCount: tri.length / 3 - t0 });
     }
     const compsEl = kids(obj).find((c) => c.localName === "components");
     if (compsEl) for (const c of kids(compsEl)) {
@@ -86,7 +86,20 @@ export function parse3MF(buf, parseXml) {
   if (items.length) for (const it of Array.from(items)) addObject(root, it.getAttribute("objectid"), parseT(it.getAttribute("transform")), 0);
   else for (const o of Array.from(rootDoc.getElementsByTagName("object"))) addObject(root, o.getAttribute("id"), I12, 0);
   if (!tri.length) throw new Error("No triangles found in 3MF");
-  return { pos: new Float32Array(pos), tri: new Uint32Array(tri), source: { type: "3mf", files, meshes, painted } };
+  // Several meshes (a multi-part object, or several objects): each loads as a part, with OrcaSlicer's / Bambu
+  // Studio's part name and filament (Metadata/model_settings.config) when the file has them. A painted file loads as
+  // one model, so its paint can go back into it.
+  let groups;
+  if (meshes.length > 1 && !painted) {
+    const cfg = {};
+    const cf = files["Metadata/model_settings.config"];
+    if (cf) for (const part of Array.from(parseXml(strFromU8(cf)).getElementsByTagName("part"))) {
+      const md = {}; for (const m of Array.from(part.getElementsByTagName("metadata"))) md[m.getAttribute("key")] = m.getAttribute("value");
+      cfg[part.getAttribute("id")] = { name: md.name, filament: +md.extruder || 0 };
+    }
+    groups = meshes.map((m) => ({ name: cfg[m.objectId]?.name || m.name, filament: cfg[m.objectId]?.filament || 0, count: m.triCount }));
+  }
+  return { pos: new Float32Array(pos), tri: new Uint32Array(tri), groups, source: { type: "3mf", files, meshes, painted } };
 }
 
 // Merge coincident vertices so faces share edges. Face order is preserved (needed to write paint back).
@@ -108,21 +121,94 @@ export function weld(pos, tri) {
 export const soupIndex = (v) => Uint32Array.from({ length: v.length / 3 }, (_, i) => i);
 
 // A new split of a loaded mesh (raw = { pos, tri, source }), welded, with its face graph, all faces Unassigned.
+// raw.groups (optional): [{ name, filament, count }], the faces of raw.tri in order, one entry per part of a model
+// that is already split (an OrcaSlicer object with several parts, a multi-part 3MF). Two or more groups load as
+// those parts, and the cut caps that two touching parts share (each part closed over the same seam) are removed,
+// so the parts join along their seams as one surface again. Nothing is moved or reshaped.
 export function newSplit(name, raw) {
   let w = weld(raw.pos, raw.tri);
   const S = { name: name.replace(/\.[^.]+$/, ""), source: raw.source, active: 0, flipped: 0, refined: 0, coarse: null };
+  const groups = (raw.groups || []).filter((g) => g.count > 0);
+  let group = null; // part (1-based) of each face of w
+  if (groups.length > 1 && groups.reduce((n, g) => n + g.count, 0) === w.tri.length / 3) {
+    group = new Int32Array(w.tri.length / 3);
+    let f = 0; groups.forEach((g, k) => group.fill(k + 1, f, (f += g.count)));
+    const keep = sharedCaps(w.tri, group);
+    if (keep) {
+      const t = [], gr = [];
+      for (let i = 0; i < keep.length; i++) if (keep[i]) { t.push(w.tri[3*i], w.tri[3*i+1], w.tri[3*i+2]); gr.push(group[i]); }
+      const vmap = new Int32Array(w.pos.length / 3).fill(-1), P = [];
+      for (let i = 0; i < t.length; i++) { const v = t[i]; if (vmap[v] < 0) { vmap[v] = P.length / 3; P.push(w.pos[3*v], w.pos[3*v+1], w.pos[3*v+2]); } t[i] = vmap[v]; }
+      w = { pos: Float32Array.from(P), tri: Uint32Array.from(t) }; group = Int32Array.from(gr);
+      S.capsRemoved = keep.length - gr.length;
+      if (S.source?.type === "3mf") S.source = { ...S.source, type: "refined" }; // faces no longer match the file
+    }
+  }
   // Long, thin triangles (CAD exports: a box face is two triangles) hide creases from the splitter; split long
   // edges first. The surface is unchanged. The faces no longer match a source 3MF, so paint can't go back into it.
   const r = refineLong(w.pos, w.tri);
-  if (r) { S.coarse = { faces: w.tri.length / 3, parent: r.parent }; w = r; S.refined = r.added; if (S.source?.type === "3mf") S.source = { type: "refined" }; }
+  if (r) {
+    S.coarse = { faces: w.tri.length / 3, parent: r.parent }; S.refined = r.added;
+    if (group) group = Int32Array.from(r.parent, (p) => group[p]);
+    w = r; if (S.source?.type === "3mf") S.source = { type: "refined" };
+  }
   setMesh(S, w.pos, w.tri);
   // Inside-out shells (normals pointing in) swap concave and convex: turn them right side out.
   const fl = flipInsideOut(S.pos, S.tri, S.G);
   if (fl) { S.flipped = fl; setMesh(S, S.pos, S.tri); }
   S.mesh0 = [S.pos, S.tri, S.G];
-  S.labels = new Int32Array(S.nF);
+  S.labels = group || new Int32Array(S.nF);
   S.parts = [{ name: "Unassigned", color: UNASSIGNED_COLOR, filament: 1, seeds: [], visible: true }];
+  if (group) {
+    const first = new Int32Array(groups.length + 1).fill(-1); // a seed face in each part
+    for (let f = 0; f < S.nF; f++) if (first[group[f]] < 0) first[group[f]] = f;
+    groups.forEach((g, k) => S.parts.push(newPart(S, { ...(g.name ? { name: String(g.name) } : {}), ...(g.filament > 0 ? { filament: g.filament | 0 } : {}), seeds: first[k + 1] >= 0 ? [first[k + 1]] : [] })));
+  }
   return S;
+}
+
+// Faces to keep (Uint8Array) once the caps over the cuts between touching parts are removed (each part was closed
+// over its cut so it prints on its own). null when there are none. Two kinds:
+// - a pair of faces from different parts on the same three vertices with opposite winding (both parts capped the
+//   seam the same way);
+// - a fan: every face around one vertex is in one part, the edges out of that vertex are each used twice, and the
+//   edge across from it on each face is also used by another face (the cut's rim: the part's own surface and the
+//   other part there). Mesh Splitter caps a cut with a fan around the cut's center, and two parts' fans differ where a cut
+//   meets a third part.
+// A cut whose parts were moved apart touches nothing, so its cap stays: that part's end, as it prints.
+function sharedCaps(tri, group) {
+  const n = tri.length / 3, byKey = new Map(), keep = new Uint8Array(n).fill(1);
+  const key = (f) => [tri[3*f], tri[3*f+1], tri[3*f+2]].sort((a, b) => a - b).join(",");
+  // the same corners in reverse cyclic order
+  const opposite = (f, g) => { for (let r = 0; r < 3; r++) if (tri[3*f] === tri[3*g+r] && tri[3*f+1] === tri[3*g+(r+2)%3] && tri[3*f+2] === tri[3*g+(r+1)%3]) return true; return false; };
+  let cut = 0;
+  for (let f = 0; f < n; f++) {
+    const a = tri[3*f], b = tri[3*f+1], c = tri[3*f+2];
+    if (a === b || b === c || a === c) continue;
+    const k = key(f), list = byKey.get(k);
+    const j = list ? list.findIndex((g) => keep[g] && group[g] !== group[f] && opposite(f, g)) : -1;
+    if (j >= 0) { keep[list[j]] = 0; keep[f] = 0; list.splice(j, 1); cut += 2; continue; }
+    if (list) list.push(f); else byKey.set(k, [f]);
+  }
+  // fans
+  const ek = (a, b) => (a < b ? a * 4294967296 + b : b * 4294967296 + a), use = new Map(), ring = new Map();
+  for (let f = 0; f < n; f++) if (keep[f]) for (let e = 0; e < 3; e++) {
+    const a = tri[3*f+e], b = tri[3*f+(e+1)%3], k = ek(a, b);
+    use.set(k, (use.get(k) || 0) + 1);
+    let r = ring.get(a); if (!r) ring.set(a, (r = [])); r.push(f);
+  }
+  const fans = [];
+  for (const [v, fs] of ring) {
+    if (fs.length < 3 || fs.some((f) => group[f] !== group[fs[0]])) continue;
+    let ok = true;
+    for (const f of fs) {
+      const e = [0, 1, 2].find((e) => tri[3*f+e] === v), a = tri[3*f+(e+1)%3], b = tri[3*f+(e+2)%3];
+      if (use.get(ek(a, b)) < 3 || use.get(ek(v, a)) !== 2 || use.get(ek(v, b)) !== 2) { ok = false; break; }
+    }
+    if (ok) fans.push(fs);
+  }
+  for (const fs of fans) for (const f of fs) if (keep[f]) { keep[f] = 0; cut++; }
+  return cut ? keep : null;
 }
 // Signed volume of each shell (divergence theorem); shells whose volume is negative and that don't sit inside
 // another shell's box (an inner void is meant to face in) get their triangles' winding reversed, in place.

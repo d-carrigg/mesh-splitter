@@ -11,7 +11,8 @@ real_orca_probe.py. OrcaSlicer opens MESH.stl and SPLIT.3mf from its command lin
 plugin's Bridge with the real `orca` bindings and reports back.
 
 Fails unless OrcaSlicer logs a successful load of the plugin, the probe gets the right mesh back from
-the plugin, OrcaSlicer imported SPLIT.3mf as one object with one part per split part, and AI part naming
+the plugin, OrcaSlicer imported SPLIT.3mf as one object with one part per split part, the plugin reads that
+object with its parts (names and face counts, so the page keeps them), and AI part naming
 reached a local mock OpenAI-compatible server and got names back.
 Logs, the probe's report and a screenshot go to --out.
 """
@@ -174,6 +175,10 @@ def main():
             got = [v["name"] for v in split[0]["volumes"] if v["part"]] if len(split) == 1 else None
             if got != want:
                 problems.append(f"{a.split_3mf.name} imported as {got}, expected one object with parts {want}")
+            mm = r.get("multi_mesh") or {}
+            groups = mm.get("groups") or []
+            if [g.get("name") for g in groups] != want or sum(g.get("count", 0) for g in groups) != mm.get("nF"):
+                problems.append(f"the plugin read {a.split_3mf.name} without its parts: {mm}")
 
     shutil.rmtree(data, ignore_errors=True)
     llm_ctx.__exit__(None, None, None)

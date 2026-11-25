@@ -53,8 +53,10 @@ class MeshTests(unittest.TestCase):
             fake_orca.FakeVolume(TET_V, TET_F, name="mod", kind="modifier"),
         ], fake_orca.FakeInstance(inst))
         p = load_plugin([obj])
-        P, T = p.object_mesh(obj)
+        groups = []
+        P, T = p.object_mesh(obj, groups)
         self.assertEqual((len(P), len(T)), (8, 8))  # modifier skipped
+        self.assertEqual([(g["name"], g["count"]) for g in groups], [("a", 4), ("b", 4)])  # the page keeps the parts
         np.testing.assert_allclose(P[1], [100, 60, 0])    # (10,0,0) rotated 90 deg about Z, offset
         np.testing.assert_allclose(P[5], [100, 65, 0])    # part b: (15,0,0) after its own offset
         self.assertEqual(int(T.min()), 0); self.assertEqual(int(T[4:].min()), 4)

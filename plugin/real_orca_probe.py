@@ -80,6 +80,15 @@ def probe():
         r["mesh"] = {"nV": nV, "nF": nF, "bytes": len(data), "max_index": int(tri.max()),
                      "size": [round(float(x), 2) for x in (pos.max(0) - pos.min(0))]}
 
+        # The split 3MF's object (several parts): the page gets each part's name and face count, so it keeps them
+        multi = next((i for i, o in enumerate(objs) if sum(1 for v in o.volumes() if v.is_model_part()) > 1), None)
+        if multi is not None:
+            sent.clear()
+            bridge.handle({"cmd": "mesh", "index": multi, "req": 2})
+            if sent and sent[0].get("cmd") == "error":
+                raise RuntimeError(sent[0]["message"])
+            r["multi_mesh"] = {"nF": sent[0]["nF"], "groups": sent[0].get("groups")}
+
         llm = os.environ.get("MESH_SPLITTER_MOCK_LLM")
         if llm:
             mod._storage[:] = [tempfile.mkdtemp(prefix="ms-ai-")]
