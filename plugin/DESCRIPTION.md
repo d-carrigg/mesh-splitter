@@ -15,6 +15,8 @@ For the example photo, I made the eyes 1 part, then replaced them with a flipped
 - **Connectors:** the Connectors tool puts a peg and matching hole (or a separate dowel) where parts touch, on every part or the ones you select, like the connectors in OrcaSlicer's Cut tool. Click a part to change its connectors.
 - **Send to Orca:** the edited model goes back on the plate: next to the original, in its place, or filling the plate. **Print as** picks one part on the original's filament, one painted part, or separate parts on their own filaments. Painted 3MF, merged STL and per-part STLs are also available.
 
+![Mesh Splitter features on the curling figure: seeds, auto split, posing an arm, turning the handle, heal joint, trim overlap, filaments, connectors, Send to Orca and exports](https://raw.githubusercontent.com/d-carrigg/mesh-splitter/main/docs/supercut.gif)
+
 ## How to use
 
 1. Subscribe, then tick **Activate** and allow writing to Downloads. A **Mesh Splitter** tab appears next to Prepare / Preview.
