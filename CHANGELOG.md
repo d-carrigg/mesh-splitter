@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.22](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.21...v0.3.22) (2026-11-25)
+
+
+### Bug Fixes
+
+* keep an object's parts when loading a multi-part model ([#113](https://github.com/d-carrigg/mesh-splitter/issues/113)) ([9372ebc](https://github.com/d-carrigg/mesh-splitter/commit/9372ebc4a70ccd2b1352bed253fb6ef515f45d44))
+* keep OrcaCloud review results out of public publish logs ([#114](https://github.com/d-carrigg/mesh-splitter/issues/114)) ([25ae3bc](https://github.com/d-carrigg/mesh-splitter/commit/25ae3bcb468e199a3c5aed60b297100e55b1e138))
+
 ## [0.3.21](https://github.com/d-carrigg/mesh-splitter/compare/v0.3.20...v0.3.21) (2026-11-24)
 
 
