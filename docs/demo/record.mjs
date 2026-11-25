@@ -118,7 +118,9 @@ if (cfg.orca) await page.addInitScript((name) => {
     onMessage: (f) => (rx = f),
     postMessage(m) {
       if (m.cmd === "objects") reply({ cmd: "objects", objects: [{ id: "1", index: 0, name, faces: +(document.getElementById("fileInfo")?.textContent.match(/[\d,]+(?= faces)/)?.[0] || "0").replace(/,/g, ""), parts: 1 }] });
-      else if (m.cmd === "save" && m.part === m.of - 1) reply({ cmd: "saved", id: m.id, path: `C:\\Users\\you\\Downloads\\${m.name}` });
+      else if (m.cmd === "save" && m.part === m.of - 1) reply({ cmd: "saved", id: m.id, path: `C:\\Users\\you\\Downloads\\${m.name}`,
+        // Send to Orca (a save with a mode): the plugin's note when OrcaSlicer took the project (plugin/plugin.py)
+        ...(m.mode ? { note: "Sent to OrcaSlicer. When it asks, pick Open as project." } : {}) });
     },
   };
 }, path.parse(cfg.model).name);
@@ -246,6 +248,12 @@ const steps = {
   },
   async unsplit() { // back to one unassigned part
     await page.evaluate(() => { app.S.labels.fill(0); app.S.parts.splice(1); app.S.active = 0; app.S.hist = { past: [], future: [] }; app.afterEdit(""); document.getElementById("status").textContent = ""; });
+  },
+  async reload() { // a fresh page (localStorage cleared, so nothing is restored), e.g. to start over after a seeds demo
+    await page.reload();
+    await page.waitForFunction(() => window.app && window.__cur, null, { timeout: 60000 });
+    if (cfg.css) await page.addStyleTag({ content: cfg.css });
+    await page.evaluate(([x, y]) => window.__cur.at(x, y), [cur.x, cur.y]);
   },
   hold: (s) => hold(s.s ?? 1),
   async camera(s) { // animate to new camera values over s.s seconds (az can wrap past 360 for a spin)

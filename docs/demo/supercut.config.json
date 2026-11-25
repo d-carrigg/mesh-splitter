@@ -1,0 +1,410 @@
+{
+  "assets": "/mnt/project-files/mesh-splitter/demo-assets",
+  "model": "curler.stl",
+  "orca": true,
+  "out": "docs/supercut.gif",
+  "viewport": {
+    "width": 1440,
+    "height": 810
+  },
+  "fps": 10,
+  "gif": {
+    "width": 960,
+    "colors": 256,
+    "dither": "sierra2_4a",
+    "loop": 0
+  },
+  "camera": {
+    "az": 20,
+    "el": 15,
+    "dist": 0.85,
+    "lift": -0.02
+  },
+  "steps": [
+    {
+      "do": "load",
+      "split": false
+    },
+    {
+      "do": "caption",
+      "text": "Seeds: one click per part",
+      "style": {
+        "left": "840px",
+        "bottom": "auto",
+        "top": "64px"
+      }
+    },
+    {
+      "do": "key",
+      "key": "s",
+      "after": 0.1
+    },
+    {
+      "do": "click",
+      "target": {
+        "at": [
+          5.6,
+          -3.8,
+          78.5
+        ]
+      },
+      "s": 0.45,
+      "after": 0.1
+    },
+    {
+      "do": "key",
+      "key": "Escape",
+      "after": 0
+    },
+    {
+      "do": "click",
+      "target": {
+        "at": [
+          18.9,
+          55.8,
+          119.9
+        ]
+      },
+      "s": 0.45,
+      "after": 0.1
+    },
+    {
+      "do": "key",
+      "key": "Escape",
+      "after": 0
+    },
+    {
+      "do": "click",
+      "target": {
+        "at": [
+          45,
+          -100,
+          24
+        ]
+      },
+      "s": 0.45,
+      "after": 0.1
+    },
+    {
+      "do": "key",
+      "key": "Escape",
+      "after": 0
+    },
+    {
+      "do": "set",
+      "target": "#lambda",
+      "value": "8",
+      "after": 0
+    },
+    {
+      "do": "click",
+      "target": "#segBtn",
+      "s": 0.5,
+      "after": 0.9
+    },
+    {
+      "do": "reload"
+    },
+    {
+      "do": "load"
+    },
+    {
+      "do": "eval",
+      "js": "window.__camFrom = () => ({ p: app.camera.position.toArray(), t: app.controls.target.toArray() });window.__orbit = (c) => { const b = app.S.G.bbox, d = app.S.G.diag * 1.45 * c.dist, T = [(b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2 + c.lift * app.S.G.diag], az = c.az * Math.PI / 180, el = c.el * Math.PI / 180; return { P: [T[0] + d * Math.cos(el) * Math.sin(az), T[1] - d * Math.cos(el) * Math.cos(az), T[2] + d * Math.sin(el)], T }; };window.__camLerp = (t) => { const c = window.__cam, L = (a, b) => a.map((v, i) => v + (b[i] - v) * t), T = L(c.t, c.T); app.camera.position.set(...L(c.p, c.P)); app.controls.target.set(...T); app.camera.up.set(0, 0, 1); app.camera.lookAt(...T); app.controls.update(); };"
+    },
+    {
+      "do": "caption",
+      "text": "Opening a model auto splits it along the creases",
+      "style": {
+        "left": "840px",
+        "bottom": "auto",
+        "top": "64px"
+      }
+    },
+    {
+      "do": "eval",
+      "js": "window.__cam = { ...window.__camFrom(), ...window.__orbit({\"az\": -20, \"el\": 18, \"dist\": 0.85, \"lift\": 0.05}) }"
+    },
+    {
+      "do": "tween",
+      "s": 1.4,
+      "js": "(t) => window.__camLerp(t)"
+    },
+    {
+      "do": "hold",
+      "s": 0.3
+    },
+    {
+      "do": "eval",
+      "js": "app.setFollow([5, 10, 2, 7], 3); app.S.active = 0; app.afterEdit('')"
+    },
+    {
+      "do": "caption",
+      "text": "Pose an arm on its joint; the hand and broom move with it",
+      "style": {
+        "left": "840px",
+        "bottom": "auto",
+        "top": "64px"
+      }
+    },
+    {
+      "do": "click",
+      "target": {
+        "part": 3
+      },
+      "s": 0.5,
+      "after": 0.1
+    },
+    {
+      "do": "eval",
+      "js": "app.setGizmo('rotate'); app.setGizmoJoint(true); const x = app.ensureXf(3); x.c = app.jointFrame(3).J.toArray(); app.xfEdited(3)"
+    },
+    {
+      "do": "hold",
+      "s": 0.3
+    },
+    {
+      "do": "tween",
+      "s": 1.5,
+      "js": "(t) => { const i = 3, x = app.ensureXf(i); x.r = [-40 * t, 0, 40 * t]; app.xfEdited(i); app.applyXf(); }"
+    },
+    {
+      "do": "hold",
+      "s": 0.6
+    },
+    {
+      "do": "caption",
+      "text": "Fill and Anchor close the holes it leaves",
+      "style": {
+        "left": "840px",
+        "bottom": "auto",
+        "top": "64px"
+      }
+    },
+    {
+      "do": "click",
+      "target": "#gapFill",
+      "s": 0.4,
+      "after": 0.1
+    },
+    {
+      "do": "eval",
+      "js": "app.setGap([5, 10, 2], 'fill'); app.setAnchor([3, 7], true); app.S.active = 3; app.refreshUI()"
+    },
+    {
+      "do": "hold",
+      "s": 1.0
+    },
+    {
+      "do": "caption",
+      "text": "Turn the handle on its joint",
+      "style": {
+        "left": "840px",
+        "bottom": "auto",
+        "top": "64px"
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape",
+      "after": 0
+    },
+    {
+      "do": "eval",
+      "js": "window.__cam = { ...window.__camFrom(), ...window.__orbit({\"az\": 20, \"el\": 24, \"dist\": 0.6, \"lift\": 0.2}) }"
+    },
+    {
+      "do": "tween",
+      "s": 0.8,
+      "js": "(t) => window.__camLerp(t)"
+    },
+    {
+      "do": "click",
+      "target": {
+        "at": [
+          18.9,
+          55.8,
+          119.9
+        ]
+      },
+      "s": 0.5,
+      "after": 0.1
+    },
+    {
+      "do": "eval",
+      "js": "app.setGizmo('rotate'); app.setGizmoJoint(true); const x = app.ensureXf(4); x.c = app.jointFrame(4).J.toArray(); app.xfEdited(4)"
+    },
+    {
+      "do": "tween",
+      "s": 1.4,
+      "js": "(t) => { const i = 4, x = app.ensureXf(i); x.r = [0, 0, 90 * t]; app.xfEdited(i); app.applyXf(); }"
+    },
+    {
+      "do": "hold",
+      "s": 0.8
+    },
+    {
+      "do": "caption",
+      "text": "Heal joint blends its cut back onto the stone",
+      "style": {
+        "left": "840px",
+        "bottom": "auto",
+        "top": "64px"
+      }
+    },
+    {
+      "do": "click",
+      "target": "#healOn",
+      "s": 0.5,
+      "after": 1.0
+    },
+    {
+      "do": "caption",
+      "text": "Slide a foot along the plate; Trim overlap cuts it to fit",
+      "style": {
+        "left": "840px",
+        "bottom": "auto",
+        "top": "64px"
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape",
+      "after": 0
+    },
+    {
+      "do": "eval",
+      "js": "window.__cam = { ...window.__camFrom(), ...window.__orbit({\"az\": -100, \"el\": 10, \"dist\": 0.72, \"lift\": -0.1}) }"
+    },
+    {
+      "do": "tween",
+      "s": 1.0,
+      "js": "(t) => window.__camLerp(t)"
+    },
+    {
+      "do": "click",
+      "target": {
+        "part": 8
+      },
+      "s": 0.5,
+      "after": 0.1
+    },
+    {
+      "do": "eval",
+      "js": "app.setGizmo('translate'); app.setSlide('plate')"
+    },
+    {
+      "do": "tween",
+      "s": 1.0,
+      "js": "(t) => { const i = 8, x = app.ensureXf(i); x.t = [18 * t, -6 * t, 0]; app.xfEdited(i); app.applyXf(); }"
+    },
+    {
+      "do": "hold",
+      "s": 0.3
+    },
+    {
+      "do": "click",
+      "target": "#gapFill",
+      "s": 0.4,
+      "after": 0.2
+    },
+    {
+      "do": "click",
+      "target": "#trimOn",
+      "s": 0.4,
+      "after": 1.0
+    },
+    {
+      "do": "click",
+      "target": "#xfDone",
+      "s": 0.4,
+      "after": 0
+    },
+    {
+      "do": "key",
+      "key": "Escape",
+      "after": 0
+    },
+    {
+      "do": "caption",
+      "text": "Print as Parts: each part on its own filament",
+      "style": {
+        "left": "840px",
+        "bottom": "auto",
+        "top": "64px"
+      }
+    },
+    {
+      "do": "eval",
+      "js": "window.__cam = { ...window.__camFrom(), ...window.__orbit({\"az\": 20, \"el\": 15, \"dist\": 0.85, \"lift\": 0.0}) }"
+    },
+    {
+      "do": "tween",
+      "s": 1.0,
+      "js": "(t) => window.__camLerp(t)"
+    },
+    {
+      "do": "click",
+      "target": "#printAs [data-mode=parts]",
+      "s": 0.6,
+      "after": 1.0
+    },
+    {
+      "do": "caption",
+      "text": "Connectors: a peg and hole where parts meet",
+      "style": {
+        "left": "840px",
+        "bottom": "auto",
+        "top": "64px"
+      }
+    },
+    {
+      "do": "click",
+      "target": "[data-gz=conn]",
+      "s": 0.5,
+      "after": 0.1
+    },
+    {
+      "do": "click",
+      "target": "#connAll",
+      "s": 0.5,
+      "after": 1.4
+    },
+    {
+      "do": "click",
+      "target": "#connDone",
+      "s": 0.4,
+      "after": 0.1
+    },
+    {
+      "do": "caption",
+      "text": "Send to Orca puts it back on the plate",
+      "style": {
+        "left": "840px",
+        "bottom": "auto",
+        "top": "64px"
+      }
+    },
+    {
+      "do": "click",
+      "target": "#expMain",
+      "s": 0.6,
+      "after": 1.6
+    },
+    {
+      "do": "caption",
+      "text": "Or export a painted 3MF, part STLs or a merged STL",
+      "style": {
+        "left": "840px",
+        "bottom": "auto",
+        "top": "64px"
+      }
+    },
+    {
+      "do": "click",
+      "target": "#expBtn",
+      "s": 0.5,
+      "after": 2.0
+    }
+  ]
+}
